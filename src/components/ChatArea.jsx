@@ -1,6 +1,7 @@
 import React from "react";
 import { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   Send,
   Mic,
@@ -9,7 +10,8 @@ import {
   CircleUserRound,
   Paperclip,
   X,
-  Speech,
+  CheckCircle,
+  CirclePause,
   AudioLines,
   ArrowDown,
   CircleArrowDown,
@@ -33,6 +35,7 @@ import {
   uploadFiles,
   fetchConversations,
   uploadFinalAudio,
+  sendGuestMessage,
 } from "../api_Routes/api";
 import {
   setMessages,
@@ -50,16 +53,17 @@ import { v4 as uuidv4 } from "uuid";
 // import AudioVisualizer from 'react-audio-visualize';
 import RadialVisualizer from "./RadialVisualizer";
 import { FaMicrophone, FaStop, FaPause, FaPlay } from "react-icons/fa";
-const ChatArea = () => {
+const ChatArea = ({ isGuest }) => {
   const [loading, setLoading] = useState(false);
   const [botTyping, setBotTyping] = useState("");
   const [greeting, setGreeting] = useState("");
   const chatEndRef = useRef(null);
-
+  const [copied, setCopied] = useState(false);
   // greeting text
   const [showGreeting, setShowGreeting] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
-
+  const navigate = useNavigate();
+  const [lastBotMessage, setLastBotMessage] = useState(null);
   const [showUploadTooltip, setShowUploadTooltip] = useState(false);
   const [showMicTooltip, setShowMicTooltip] = useState(false);
   const [scrollTooltip, setscrollTooltip] = useState(false);
@@ -76,8 +80,14 @@ const ChatArea = () => {
   const { user, token } = useSelector((state) => state.auth);
   const [inputMessage, setInputMessage] = useState("");
   const [voiceMode, setVoiceMode] = useState(false);
-
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const conversations = useSelector((state) => state.chat.conversations);
+
+  // guest mode
+
+  const guestConversationId = useSelector(
+    (state) => state.chat.guestConversationId
+  );
 
   const socketRef = useRef(null);
   const recorderRef = useRef(null);
@@ -91,11 +101,19 @@ const ChatArea = () => {
   // scroll button prop
   const chatContainerRef = useRef(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  
 
   // const API_BASE_URL = "https://quantumhash-backend-1.onrender.com/api"; // Replace with your backend URL
 
   const WSS_BASE_URL = import.meta.env.VITE_WSS_API_BASE_URL;
+
+  // copy button
+  const handleCopyCode = (code) => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1000);
+  };
+
+  const handleLoginPrompt = () => setShowLoginPrompt(true);
 
   // 1st useeffect
   useEffect(() => {
@@ -112,7 +130,7 @@ const ChatArea = () => {
 
     fetchConversationHistory(activeConversation, token)
       .then((data) => {
-        console.log("Fetched history:", data.history);
+        // console.log("Fetched history:", data.history);
         const history = Array.isArray(data.history)
           ? data.history
           : [data.history];
@@ -140,7 +158,10 @@ const ChatArea = () => {
     }
   }, [activeConversation]);
 
-  const conversationMessages = messages[activeConversation] || [];
+  // const conversationMessages = messages[activeConversation] || [];
+  const conversationMessages = isGuest
+    ? messages["guest"] || []
+    : messages[activeConversation] || [];
 
   // greeting text function starts
 
@@ -214,11 +235,22 @@ const ChatArea = () => {
     }, 60);
   };
 
+  // const getTimeBasedGreeting = () => {
+  //   const hour = new Date().getHours();
+  //   if (hour < 12) return "Good morning";
+  //   if (hour < 18) return "Good afternoon";
+  //   return "Night owl";
+  // };
+
   const getTimeBasedGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
+
+    if (hour >= 5 && hour < 12) return "Good morning";
+    if (hour >= 12 && hour < 17) return "Good afternoon";
+    if (hour >= 17 && hour < 21) return "Good evening";
+    if (hour >= 21 && hour < 24) return "Night owl";
+    if (hour >= 0 && hour < 3) return "Midnight coder";
+    return "Early bird"; // 3-5 AM
   };
 
   // greeting text function ends
@@ -253,24 +285,43 @@ const ChatArea = () => {
   // }, [messages, botTyping]);
 
   // 5th useEffect - Scroll to bottom when messages update or bot is typing
-  useEffect(() => {
-    const messagesForConversation = messages[activeConversation];
+  // useEffect(() => {
+  //   const messagesForConversation = messages[activeConversation];
 
-    if (!messagesForConversation || messagesForConversation.length === 0)
-      return;
+  //   if (!messagesForConversation || messagesForConversation.length === 0)
+  //     return;
+
+  //   const scrollToBottom = () => {
+  //     // Wait for DOM to update first
+  //     setTimeout(() => {
+  //       if (chatEndRef.current) {
+  //         chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+  //         console.log("Scrolled to bottom after switching conversation.");
+  //       }
+  //     }, 100); // 100ms gives React time to render
+  //   };
+
+  //   scrollToBottom();
+  // }, [activeConversation, messages[activeConversation]?.length]);
+
+  useEffect(() => {
+    // Get current conversation messages based on mode
+    const currentMessages = conversationMessages; // This already handles guest vs user mode
+
+    if (!currentMessages || currentMessages.length === 0) return;
 
     const scrollToBottom = () => {
       // Wait for DOM to update first
       setTimeout(() => {
         if (chatEndRef.current) {
           chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-          console.log("Scrolled to bottom after switching conversation.");
+          // console.log("Scrolled to bottom after message update.");
         }
-      }, 100); // 100ms gives React time to render
+      }, 100);
     };
 
     scrollToBottom();
-  }, [activeConversation, messages[activeConversation]?.length]);
+  }, [conversationMessages.length, botTyping]);
 
   // 6th useEffect
   useEffect(() => {
@@ -296,181 +347,112 @@ const ChatArea = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  useEffect(() => {
+    const stored = localStorage.getItem("last_ai_message");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.suggestions?.length > 0) {
+          setLastBotMessage(parsed);
+        }
+      } catch (err) {
+        console.error("Failed to parse stored AI message:", err);
+      }
+    }
+  }, []);
+
   // working handlesend message function starts
 
-  // const handleSendMessage = async () => {
-  //   if (!inputMessage.trim() && files.length === 0) return;
+  const handleSendMessage = async (customText) => {
+    //  console.log("💥 handleSendMessage fired", { customText });
+    const messageText =
+      typeof customText === "string"
+        ? customText.trim()
+        : inputMessage.trim?.() || "";
 
-  //   const token = localStorage.getItem("token");
-  //   const user_id = user?.user_id || localStorage.getItem("user_id");
-  //   const conv_id =
-  //     activeConversation || localStorage.getItem("conversation_id");
+    if (!messageText && files.length === 0) return;
 
-  //   textareaRef.current.style.height = "44px";
+    textareaRef.current.style.height = "44px";
 
-  //   if (!token) {
-  //     console.error("🚨 Missing token.");
-  //     return;
-  //   }
+    // const plainText = messageText.trim();
+    const plainText =
+      typeof customText === "string" && customText.trim()
+        ? customText.trim()
+        : inputMessage.trim();
 
-  //   if (!user_id) {
-  //     console.error("🚨 Missing user_id.");
-  //     return;
-  //   }
+    if (!plainText && files.length === 0) return;
 
-  //   // ✅ 1. Prepare user message text (without appending file names - we'll show them separately)
-  //   const plainText = inputMessage.trim();
+    // ✅ Guest Mode
+    if (isGuest) {
+      const userMessage = {
+        id: Date.now(),
+        conversationId: guestConversationId || "guest",
+        message: plainText,
+        sender: "user",
+        files: [],
+      };
 
-  //   // Create user message without embedding file names in the text
-  //   const userMessage = {
-  //     id: Date.now(),
-  //     message: plainText,
-  //     sender: "user",
-  //     files: files.map((f) => ({ name: f.name, type: f.type })),
-  //   };
+      setInputMessage("");
+      setFiles([]);
+      setBotTyping(true);
+      setLoading(true); // 🔐 Disable send button here
+      dispatch(
+        addMessage({
+          conversationId: guestConversationId || "guest",
+          message: userMessage,
+        })
+      );
+      console.log("📤 Sending guest message:", plainText);
+      try {
+        const res = await sendGuestMessage(plainText);
 
-  //   const initialConvId = conv_id || "temp";
-  //   dispatch(
-  //     addMessage({ conversationId: initialConvId, message: userMessage })
-  //   );
+        const aiResponse = res.response || "🧠 No AI response received.";
+        const suggestions = res.suggestions || [];
 
-  //   setInputMessage("");
-  //   setBotTyping(true);
-  //   setFiles([]);
-  //   try {
-  //     // ✅ 2. Prepare FormData for upload
-  //     const formData = new FormData();
-  //     if (plainText) formData.append("message", plainText);
-  //     formData.append("user_id", user_id);
-  //     if (conv_id) formData.append("conversation_id", conv_id);
-  //     files.forEach((file) => {
-  //       formData.append("files", file);
-  //     });
+        const botMessage = {
+          id: Date.now() + 1,
+          conversationId: guestConversationId || "guest",
+          message: aiResponse,
+          sender: "bot",
+          response: aiResponse,
+          isNewMessage: true,
+          suggestions, // ✅ Include suggestions if needed
+        };
 
-  //     // ✅ 3. Upload files
-  //     const uploadResponse = await uploadFiles(formData, token, (event) => {
-  //       const percent = Math.round((event.loaded * 100) / event.total);
-  //       const progressMap = {};
-  //       files.forEach((file) => {
-  //         progressMap[file.name] = percent;
-  //       });
-  //       setUploadProgress(progressMap);
-  //     });
+        dispatch(
+          addMessage({
+            conversationId: guestConversationId || "guest",
+            message: botMessage,
+          })
+        );
 
-  //     const finalConversationId =
-  //       uploadResponse?.data?.conversation_id ||
-  //       uploadResponse?.conversation_id;
+        setBotTyping(false);
 
-  //     if (!activeConversation && finalConversationId) {
-  //       dispatch(setActiveConversation(finalConversationId));
-  //     }
+        const prevGuestChat = JSON.parse(
+          localStorage.getItem("guest_chat") || "[]"
+        );
+        localStorage.setItem(
+          "guest_chat",
+          JSON.stringify([...prevGuestChat, userMessage, botMessage])
+        );
 
-  //     // ✅ 4. Extract metadata to send to chatbot
-  //     const uploaded_file_metadata = uploadResponse?.data?.files || [];
+        return;
+      } catch (error) {
+        console.error("❌ Guest mode error:", error);
+        setBotTyping(false);
+        toast.error("❌ Failed to get guest response.");
+      } finally {
+        setLoading(false); // 🔓 Re-enable send button here
+      }
+      return;
+    }
 
-  //     // Update the user message in redux with the proper file metadata
-  //     if (uploaded_file_metadata.length > 0) {
-  //       // Update the message with file names from the backend
-  //       dispatch(
-  //         updateMessage({
-  //           conversationId: finalConversationId || initialConvId,
-  //           id: userMessage.id,
-  //           files: uploaded_file_metadata,
-  //         })
-  //       );
-  //     }
-
-  //     // ✅ 5. Send message to chatbot if there's a user message
-  //     if (plainText || files.length > 0) {
-  //       const chatRes = await sendMessage(
-  //         finalConversationId,
-  //         plainText,
-  //         user_id,
-  //         token,
-  //         uploadResponse?.data?.extracted_summary_raw,
-  //         uploaded_file_metadata
-  //       );
-
-  //       const aiResponse = chatRes?.response || "🧠 No AI response received.";
-  //       const responseFiles = chatRes?.files || [];
-
-  //       const botMessage = {
-  //         id: Date.now() + 1,
-  //         message: aiResponse,
-  //         sender: "bot",
-  //         response: aiResponse,
-  //         files: responseFiles,
-  //       };
-
-  //       dispatch(
-  //         addMessage({
-  //           conversationId: finalConversationId,
-  //           message: botMessage,
-  //         })
-  //       );
-
-  //       // ✅ stop typing immediately after bot response is added
-  //       setBotTyping(false);
-
-  //       // ✅ 6. Rename is handled by the backend — now refresh conversations list in Sidebar
-  //       const updatedConversations = await fetchConversations(token);
-  //       dispatch(setConversations(updatedConversations?.conversations || []));
-
-  //       // ✅ 7. Fetch updated conversation list after rename
-  //       const currentConv = conversations.find(
-  //         (c) => c.id === finalConversationId
-  //       );
-  //       if (currentConv?.name === "New Conversation") {
-  //         const updatedData = await fetchConversations(token);
-  //         if (updatedData?.conversations) {
-  //           dispatch(setConversations(updatedData.conversations));
-  //           const currentId = localStorage.getItem("conversation_id");
-  //           if (currentId) {
-  //             dispatch(setActiveConversation(Number(currentId)));
-  //           }
-  //         }
-  //       }
-  //     } else if (files.length > 0) {
-  //       // ✅ 8. No user message, only files
-  //       toast.info(
-  //         uploadResponse?.data?.extracted_summary ||
-  //           "🧠 Files received, but no text was extractable.",
-  //         { position: "bottom-right" }
-  //       );
-  //       setBotTyping(false); // ✅ stop here too
-  //     }
-  //   } catch (error) {
-  //     console.error("❌ Error sending message:", error);
-  //     dispatch(
-  //       addMessage({
-  //         conversationId: conv_id,
-  //         message: {
-  //           id: Date.now() + 1,
-  //           message: "❌ Failed to get a response.",
-  //           sender: "bot",
-  //           response: "❌ Failed to get a response.",
-  //         },
-  //       })
-  //     );
-  //     toast.error("❌ Message or file upload failed.");
-  //     setBotTyping(false); // ✅ also stop here in error
-  //   } finally {
-  //     // ✅ 9. Cleanup
-
-  //     setUploadProgress({});
-  //   }
-  // };
-
-  // test
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() && files.length === 0) return;
+    // ✅ Logged-in user flow
 
     const token = localStorage.getItem("token");
     const user_id = user?.user_id || localStorage.getItem("user_id");
     const conv_id =
       activeConversation || localStorage.getItem("conversation_id");
-
-    textareaRef.current.style.height = "44px";
 
     if (!token) {
       console.error("🚨 Missing token.");
@@ -483,7 +465,7 @@ const ChatArea = () => {
     }
 
     // ✅ 1. Prepare user message text (without appending file names - we'll show them separately)
-    const plainText = inputMessage.trim();
+    // const plainText = inputMessage.trim();
 
     // Create user message without embedding file names in the text
     const userMessage = {
@@ -494,7 +476,7 @@ const ChatArea = () => {
     };
 
     dispatch(addMessage({ conversationId: conv_id, message: userMessage }));
-
+    setLoading(true); // 🔐 Disable send button here
     setInputMessage("");
     setBotTyping(true);
     setFiles([]);
@@ -555,6 +537,7 @@ const ChatArea = () => {
 
         const aiResponse = chatRes?.response || "🧠 No AI response received.";
         const responseFiles = chatRes?.files || [];
+        const suggestions = chatRes?.suggestions || []; // 👈 new
 
         const botMessage = {
           id: Date.now() + 1,
@@ -562,6 +545,8 @@ const ChatArea = () => {
           sender: "bot",
           response: aiResponse,
           files: responseFiles,
+          suggestions: suggestions, // 👈 attach suggestions
+          isNewMessage: true,
         };
 
         dispatch(
@@ -616,12 +601,30 @@ const ChatArea = () => {
       );
       toast.error("❌ Message or file upload failed.");
       setBotTyping(false); // ✅ also stop here in error
+      setLoading(false); // 🔓 Re-enable send button here
     } finally {
       // ✅ 9. Cleanup
       setUploadProgress({});
+      setLoading(false); // 🔓 Re-enable send button here
     }
   };
 
+  // handle suggestion click
+  // const handleSuggestionClick = (text) => {
+  //   setInputMessage(text);
+  //   setTimeout(() => {
+  //     handleSendMessage();
+  //   }, 50);
+  // };
+  const handleSuggestionClick = (text) => {
+    // Remove leading dot if present
+    const cleanText = text.replace(/^\.+\s*/, "");
+
+    setInputMessage(cleanText);
+    setTimeout(() => {
+      handleSendMessage(cleanText); // Pass the clean text directly
+    }, 50);
+  };
   // working handlesend message ends
 
   // ✅ Remove selected file
@@ -684,7 +687,7 @@ const ChatArea = () => {
 
     const token = localStorage.getItem("token");
     console.log("🎙️ Token:", token);
-    socketRef.current = new WebSocket(`${WSS_BASE_URL}`);
+    socketRef.current = new WebSocket(`${WSS_BASE_URL}?token=${token}`);
 
     socketRef.current.onopen = () => {
       console.log("🎙️ Voice WebSocket connected");
@@ -762,545 +765,8 @@ const ChatArea = () => {
   };
   // voice functions dictation part ends
 
-  // voice mode realtime AI
-  //   const SILENCE_TIMEOUT_MS = 3000; // shorter silence timeout for quicker interaction
-  //   const STOP_DELAY_MS = 200;
-  //   const AUDIO_CHUNK_MS = 500;
-
-  //   const [isProcessing, setIsProcessing] = useState(false);
-  //   const [isResponding, setIsResponding] = useState(false);
-
-  //   const mediaRecorderRef = useRef(null);
-  //   const audioStreamRef = useRef(null);
-  //   const voiceWsRef = useRef(null);
-  //   const silenceTimerRef = useRef(null);
-  //   const isSilenceDetectedRef = useRef(false);
-
-  //   const blobToBase64 = (blob) => {
-  //     return new Promise((resolve, reject) => {
-  //       const reader = new FileReader();
-  //       reader.onloadend = () => {
-  //         const base64data = reader.result.split(",")[1];
-  //         resolve(base64data);
-  //       };
-  //       reader.onerror = reject;
-  //       reader.readAsDataURL(blob);
-  //     });
-  //   };
-
-  //   useEffect(() => {
-  //     return () => {
-  //       stopAivoice();
-  //     };
-  //   }, []);
-
-  //   const startAivoice = async () => {
-  //     try {
-  //       const token = localStorage.getItem("token");
-  //       if (!token) {
-  //         console.error("No token found");
-  //         return;
-  //       }
-
-  //       if (voiceWsRef.current) {
-  //         stopMicrophoneStream();
-  //         voiceWsRef.current.close();
-  //       }
-
-  //       voiceWsRef.current = new WebSocket(
-  //         `ws://localhost:5001/api/voice/ws?token=${token}`
-  //       );
-  //       voiceWsRef.current.binaryType = "arraybuffer";
-
-  //       voiceWsRef.current.onopen = () => {
-  //         console.log("✅ Voice WebSocket connected");
-  //         startMicrophoneStream();
-  //       };
-
-  //       voiceWsRef.current.onmessage = (event) => {
-  //         const data = JSON.parse(event.data);
-
-  //         if (data.type === "interim") {
-  //           console.log("📝 Interim:", data.transcript);
-  //         } else if (data.type === "processing") {
-  //           console.log("⚙️ Processing AI response...");
-  //           setIsProcessing(true);
-  //         } else if (data.type === "userMessage") {
-  //           dispatch(
-  //             addMessage({
-  //               conversation_id: data.conversation_id,
-  //               sender: "user",
-  //               text: data.message,
-  //               audioUrl: data.audioUrl,
-  //             })
-  //           );
-  //           console.log("📤 User message:", data.message);
-  //         } else if (data.type === "aiMessage") {
-  //           console.log("🤖 AI response:", data.message);
-  //           dispatch(
-  //             addMessage({
-  //               conversation_id: data.conversation_id,
-  //               sender: "ai",
-  //               text: data.message,
-  //             })
-  //           );
-  //           playTTS(data.message);
-  //           setIsResponding(false);
-  //           setIsProcessing(false);
-
-  //           console.log("🔄 Restarting microphone...");
-  //           startMicrophoneStream();
-  //         } else if (data.type === "conversation_created") {
-  //           console.log("🆕 New conversation:", data.conversation_id);
-  //         } else if (data.type === "error") {
-  //           console.error("🚨 Server error:", data.error);
-  //           stopAivoice();
-  //         }
-  //       };
-
-  //       voiceWsRef.current.onclose = () => {
-  //         console.log("❌ Voice WebSocket closed");
-  //         stopMicrophoneStream();
-  //       };
-
-  //       voiceWsRef.current.onerror = (err) => {
-  //         console.error("🚨 Voice WebSocket error:", err);
-  //         stopAivoice();
-  //       };
-  //     } catch (error) {
-  //       console.error("Failed to start AI voice mode:", error);
-  //     }
-  //   };
-
-  //   const stopAivoice = () => {
-  //     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-  //     stopMicrophoneStream();
-
-  //     if (voiceWsRef.current) {
-  //       try {
-  //         if (voiceWsRef.current.readyState === WebSocket.OPEN) {
-  //           voiceWsRef.current.send(
-  //             JSON.stringify({ type: "control", action: "stop" })
-  //           );
-  //         }
-  //         voiceWsRef.current.close();
-  //       } catch (err) {
-  //         console.error("Error closing WebSocket:", err);
-  //       }
-  //       voiceWsRef.current = null;
-  //     }
-
-  //     setAiRecording(false);
-  //     setIsProcessing(false);
-  //     setIsResponding(false);
-  //     isSilenceDetectedRef.current = false;
-
-  //     console.log("🛑 Stopped AI voice mode");
-  //   };
-
-  //   const startMicrophoneStream = async () => {
-  //     try {
-  //       if (isResponding || isSilenceDetectedRef.current) return;
-
-  //       if (audioStreamRef.current || mediaRecorderRef.current) {
-  //         stopMicrophoneStream();
-  //       }
-
-  //       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  //       audioStreamRef.current = stream;
-
-  //       const mediaRecorder = new MediaRecorder(stream, {
-  //         mimeType: "audio/webm;codecs=opus",
-  //       });
-  //       mediaRecorderRef.current = mediaRecorder;
-
-  //       mediaRecorder.ondataavailable = async (event) => {
-  //         if (
-  //           voiceWsRef.current &&
-  //           voiceWsRef.current.readyState === WebSocket.OPEN &&
-  //           !isSilenceDetectedRef.current
-  //         ) {
-  //           const base64Audio = await blobToBase64(event.data);
-
-  // voiceWsRef.current.send(
-  //   JSON.stringify({
-  //     type: "transcribe",
-  //     audio_data: base64Audio,
-  //   })
-  // );
-
-  // console.log("📤 Sent base64 audio chunk");
-  // resetSilenceTimer();
-
-  //         }
-  //       };
-
-  //       mediaRecorder.start(AUDIO_CHUNK_MS);
-
-  //       setAiRecording(true);
-  //       isSilenceDetectedRef.current = false;
-  //       console.log("🎙️ Microphone recording started");
-  //     } catch (err) {
-  //       console.error("Could not start microphone:", err);
-  //     }
-  //   };
-
-  //   const stopMicrophoneStream = () => {
-  //     if (mediaRecorderRef.current) {
-  //       try {
-  //         if (mediaRecorderRef.current.state !== "inactive") {
-  //           mediaRecorderRef.current.stop();
-  //           console.log("🎤 Microphone stopped");
-  //         }
-  //       } catch (err) {
-  //         console.error("Error stopping media recorder:", err);
-  //       }
-  //       mediaRecorderRef.current = null;
-  //     }
-
-  //     if (audioStreamRef.current) {
-  //       audioStreamRef.current.getTracks().forEach((track) => track.stop());
-  //       audioStreamRef.current = null;
-  //     }
-  //   };
-
-  //   const resetSilenceTimer = () => {
-  //     if (isResponding) return;
-
-  //     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-
-  //     silenceTimerRef.current = setTimeout(() => {
-  //       if (
-  //         voiceWsRef.current &&
-  //         voiceWsRef.current.readyState === WebSocket.OPEN
-  //       ) {
-  //         console.log("🤫 Silence detected, sending stop signal...");
-  //         isSilenceDetectedRef.current = true;
-  //         voiceWsRef.current.send(
-  //           JSON.stringify({ type: "control", action: "stop" })
-  //         );
-
-  //         setTimeout(() => {
-  //           stopMicrophoneStream();
-  //           setIsResponding(true);
-  //         }, STOP_DELAY_MS);
-  //       }
-  //     }, SILENCE_TIMEOUT_MS);
-  //   };
-
-  //   const playTTS = (text) => {
-  //     const utterance = new SpeechSynthesisUtterance(text);
-  //     utterance.lang = "en-US";
-  //     speechSynthesis.speak(utterance);
-  //     console.log("🔊 Speaking AI response...");
-  //   };
-
-  // working part 08/05/2025
-
-  // const [isliveRecording, setIsliveRecording] = useState(false);
-  //   const [isProcessing, setIsProcessing] = useState(false);
-  //   const [isResponding, setIsResponding] = useState(false);
-
-  //   const mediaRecorderRef = useRef(null);
-  //   const audioStreamRef = useRef(null);
-  //   const voiceWsRef = useRef(null);
-  //   const silenceTimerRef = useRef(null);
-  //   const isSilenceDetectedRef = useRef(false);
-
-  //   const startAivoice = async () => {
-  //     try {
-  //       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  //       audioStreamRef.current = stream;
-
-  //       const mediaRecorder = new MediaRecorder(stream, {
-  //         mimeType: "audio/webm",
-  //         audioBitsPerSecond: 64000,
-  //       });
-
-  //               const token = localStorage.getItem("token");
-  //               console.log(token);
-  //       const ws = new WebSocket(`ws://localhost:5001/api/voice/ws?token=${token}`); // Adjust to your backend address
-  //       voiceWsRef.current = ws;
-
-  //       ws.onopen = () => {
-  //         console.log("✅ WebSocket connected");
-
-  //         // Send conversation ID if stored
-  //         const storedConversationId = localStorage.getItem("conversation_id");
-  //         if (storedConversationId) {
-  //           ws.send(
-  //             JSON.stringify({
-  //               type: "control",
-  //               conversation_id: storedConversationId,
-  //             })
-  //           );
-  //         }
-  //       };
-
-  //       ws.onmessage = (event) => {
-  //         const data = JSON.parse(event.data);
-
-  //         if (data.type === "aiMessage") {
-  //           console.log("🤖 AI:", data.message);
-  //           setIsResponding(false);
-  //         } else if (data.type === "userMessage") {
-  //           console.log("🧑 You:", data.message);
-  //           if (data.conversation_id) {
-  //             localStorage.setItem("conversation_id", data.conversation_id);
-  //           }
-  //         } else if (data.type === "processing") {
-  //           setIsResponding(true);
-  //         } else if (data.type === "error") {
-  //           console.error("❌ Error:", data.error);
-  //         }
-  //       };
-
-  //       mediaRecorder.ondataavailable = (event) => {
-  //         if (event.data.size > 0 && !isSilenceDetectedRef.current && voiceWsRef.current?.readyState === 1) {
-  //           const reader = new FileReader();
-  //           reader.onloadend = () => {
-  //             const base64Audio = reader.result.split(",")[1];
-  //             voiceWsRef.current.send(
-  //               JSON.stringify({
-  //                 type: "transcribe",
-  //                 audio_data: base64Audio,
-  //               })
-  //             );
-  //             setIsProcessing(true);
-  //           };
-  //           reader.readAsDataURL(event.data);
-  //         }
-  //       };
-
-  //       mediaRecorder.onstart = () => {
-  //         console.log("🎙️ Recording started");
-  //         setIsliveRecording(true);
-  //       };
-
-  //       mediaRecorder.onstop = () => {
-  //         console.log("⏹️ Recording stopped");
-  //         setIsliveRecording(false);
-  //         clearTimeout(silenceTimerRef.current);
-  //       };
-
-  //       mediaRecorderRef.current = mediaRecorder;
-  //       mediaRecorder.start(3000); // Record chunks every 3 seconds
-
-  //       detectSilence(stream);
-
-  //     } catch (err) {
-  //       console.error("🎤 Voice error:", err);
-  //     }
-  //   };
-
-  //   const detectSilence = (stream) => {
-  //     const audioContext = new AudioContext();
-  //     const analyser = audioContext.createAnalyser();
-  //     const microphone = audioContext.createMediaStreamSource(stream);
-  //     const data = new Uint8Array(analyser.frequencyBinCount);
-
-  //     analyser.fftSize = 2048;
-  //     microphone.connect(analyser);
-
-  //     const checkSilence = () => {
-  //       analyser.getByteFrequencyData(data);
-  //       const volume = data.reduce((a, b) => a + b, 0) / data.length;
-
-  //       if (volume < 10) {
-  //         if (!isSilenceDetectedRef.current) {
-  //           silenceTimerRef.current = setTimeout(() => {
-  //             isSilenceDetectedRef.current = true;
-  //             console.log("🔇 Silence detected, pausing audio sending");
-  //           }, 4000); // 4s silence triggers pause
-  //         }
-  //       } else {
-  //         if (isSilenceDetectedRef.current) {
-  //           console.log("🎤 Resumed speaking");
-  //         }
-  //         isSilenceDetectedRef.current = false;
-  //         clearTimeout(silenceTimerRef.current);
-  //       }
-
-  //       requestAnimationFrame(checkSilence);
-  //     };
-
-  //     checkSilence();
-  //   };
-
-  //   const stopAiVoice = () => {
-  //     mediaRecorderRef.current?.stop();
-  //     audioStreamRef.current?.getTracks().forEach((track) => track.stop());
-
-  //     if (voiceWsRef.current?.readyState === 1) {
-  //       voiceWsRef.current.send(JSON.stringify({ type: "control", action: "stop" }));
-  //       voiceWsRef.current.close();
-  //     }
-
-  //     setIsliveRecording(false);
-  //     setIsProcessing(false);
-  //     setIsResponding(false);
-  //   };
-
-  //   const startNewConversation = () => {
-  //     localStorage.removeItem("conversation_id");
-  //     console.log("🆕 New conversation started");
-  //   };
-
-  // test
-
-  // const [isliveRecording, setIsliveRecording] = useState(false);
-  //   const [isProcessing, setIsProcessing] = useState(false);
-  //   const [isResponding, setIsResponding] = useState(false);
-
-  //   const mediaRecorderRef = useRef(null);
-  //   const audioStreamRef = useRef(null);
-  //   const voiceWsRef = useRef(null);
-  //   const silenceTimerRef = useRef(null);
-  //   const isSilenceDetectedRef = useRef(false);
-
-  //   const startAivoice = async () => {
-  //     try {
-  //       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  //       audioStreamRef.current = stream;
-
-  //       const token = localStorage.getItem("token");
-  //       const ws = new WebSocket(`ws://localhost:5001/api/voice/ws?token=${token}`);
-  //       voiceWsRef.current = ws;
-
-  //       ws.onopen = () => {
-  //         console.log("✅ WebSocket connected");
-  //         const storedConversationId = localStorage.getItem("conversation_id");
-  //         if (storedConversationId) {
-  //           ws.send(JSON.stringify({ type: "control", conversation_id: storedConversationId }));
-  //         }
-  //       };
-
-  //       ws.onmessage = (event) => {
-  //         const data = JSON.parse(event.data);
-
-  //         if (data.type === "aiMessage") {
-  //           console.log("🤖 AI:", data.message);
-  //           setIsResponding(false);
-  //           setIsProcessing(false);
-
-  //           // Restart voice input after AI response
-  //           continueVoiceLoop();
-  //         } else if (data.type === "userMessage") {
-  //           console.log("🧑 You:", data.message);
-  //           if (data.conversation_id) {
-  //             localStorage.setItem("conversation_id", data.conversation_id);
-  //           }
-  //         } else if (data.type === "processing") {
-  //           setIsResponding(true);
-  //         } else if (data.type === "error") {
-  //           console.error("❌ Error:", data.error);
-  //         }
-  //       };
-
-  //       // Start recording first time
-  //       startRecorder(stream);
-
-  //       detectSilence(stream);
-  //     } catch (err) {
-  //       console.error("🎤 Voice error:", err);
-  //     }
-  //   };
-
-  //   const startRecorder = (stream) => {
-  //     const mediaRecorder = new MediaRecorder(stream, {
-  //       mimeType: "audio/webm",
-  //       audioBitsPerSecond: 64000,
-  //     });
-
-  //     mediaRecorder.ondataavailable = (event) => {
-  //       if (event.data.size > 0 && !isSilenceDetectedRef.current && voiceWsRef.current?.readyState === 1) {
-  //         const reader = new FileReader();
-  //         reader.onloadend = () => {
-  //           const base64Audio = reader.result.split(",")[1];
-  //           voiceWsRef.current.send(
-  //             JSON.stringify({
-  //               type: "transcribe",
-  //               audio_data: base64Audio,
-  //             })
-  //           );
-  //           setIsProcessing(true);
-  //         };
-  //         reader.readAsDataURL(event.data);
-  //       }
-  //     };
-
-  //     mediaRecorder.onstart = () => {
-  //       console.log("🎙️ Recording started");
-  //       setIsliveRecording(true);
-  //     };
-
-  //     mediaRecorder.onstop = () => {
-  //       console.log("⏹️ Recording stopped");
-  //       setIsliveRecording(false);
-  //     };
-
-  //     mediaRecorderRef.current = mediaRecorder;
-  //     mediaRecorder.start(3000); // Send audio chunks every 3 seconds
-  //   };
-
-  //   const continueVoiceLoop = () => {
-  //     if (!audioStreamRef.current) return;
-  //     startRecorder(audioStreamRef.current);
-  //   };
-
-  //   const detectSilence = (stream) => {
-  //     const audioContext = new AudioContext();
-  //     const analyser = audioContext.createAnalyser();
-  //     const microphone = audioContext.createMediaStreamSource(stream);
-  //     const data = new Uint8Array(analyser.frequencyBinCount);
-
-  //     analyser.fftSize = 2048;
-  //     microphone.connect(analyser);
-
-  //     const checkSilence = () => {
-  //       analyser.getByteFrequencyData(data);
-  //       const volume = data.reduce((a, b) => a + b, 0) / data.length;
-
-  //       if (volume < 10) {
-  //         if (!isSilenceDetectedRef.current) {
-  //           silenceTimerRef.current = setTimeout(() => {
-  //             isSilenceDetectedRef.current = true;
-  //             console.log("🔇 Silence detected, pausing audio sending");
-
-  //             // Pause recording temporarily
-  //             mediaRecorderRef.current?.stop();
-  //           }, 3000); // 3s silence triggers pause
-  //         }
-  //       } else {
-  //         if (isSilenceDetectedRef.current) {
-  //           console.log("🎤 Resumed speaking");
-  //         }
-  //         isSilenceDetectedRef.current = false;
-  //         clearTimeout(silenceTimerRef.current);
-  //       }
-
-  //       requestAnimationFrame(checkSilence);
-  //     };
-
-  //     checkSilence();
-  //   };
-
-  //   const stopAiVoice = () => {
-  //     mediaRecorderRef.current?.stop();
-  //     audioStreamRef.current?.getTracks().forEach((track) => track.stop());
-
-  //     if (voiceWsRef.current?.readyState === 1) {
-  //       voiceWsRef.current.send(JSON.stringify({ type: "control", action: "stop" }));
-  //       voiceWsRef.current.close();
-  //     }
-
-  //     setIsliveRecording(false);
-  //     setIsProcessing(false);
-  //     setIsResponding(false);
-  //   };
-
-  // test2
-  const [isliveRecording, setIsliveRecording] = useState(false);
+  // test2 working 14-05-25
+  const [isLiveRecording, setIsliveRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isResponding, setIsResponding] = useState(false);
   const [isTTSPlaying, setIsTTSPlaying] = useState(false);
@@ -1313,7 +779,7 @@ const ChatArea = () => {
   const silenceEndConfirmTimerRef = useRef(null);
   const hasAudioBeenSentRef = useRef(false);
 
-  const startAivoice = async () => {
+  const startAiVoice = async () => {
     try {
       // 🧠 Noise suppression enabled
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -1328,9 +794,9 @@ const ChatArea = () => {
 
       const token = localStorage.getItem("token");
       const ws = new WebSocket(
-        `ws://localhost:5001/api/voice/ws?token=${token}`
+        // `ws://localhost:5001/api/voice/ws?token=${token}`
         // `wss://quantumhash-backend-1.onrender.com/api/voice/ws?token=${token}`
-        // `${WSS_BASE_URL}`
+        `${WSS_BASE_URL}?token=${token}`
       );
       voiceWsRef.current = ws;
 
@@ -1347,340 +813,6 @@ const ChatArea = () => {
           );
         }
       };
-
-      //  working
-      // ws.onmessage = (event) => {
-      //   const data = JSON.parse(event.data);
-      //   const conversationId =
-      //     data.conversation_id || localStorage.getItem("conversation_id");
-
-      //   if (!conversationId) {
-      //     console.error("❌ Missing conversation_id in WebSocket data.");
-      //     return;
-      //   }
-
-      //   // Ensure it's active in Redux
-      //   if (!activeConversation) {
-      //     localStorage.setItem("conversation_id", conversationId);
-      //     dispatch(setActiveConversation(Number(conversationId)));
-      //   }
-
-      //   // 🎤 User voice message
-      //   if (data.type === "userMessage") {
-      //     console.log("🧑 You:", data.message);
-
-      //     dispatch(
-      //       addMessage({
-      //         conversationId,
-      //         message: {
-      //           id: Date.now(),
-      //           message: data.message,
-      //           sender: "user",
-      //           timestamp: new Date().toISOString(),
-      //           files: [], // Optional: add if you're sending voice files
-      //         },
-      //       })
-      //     );
-      //   }
-
-      //   // 🤖 AI Response
-      //   else if (data.type === "aiMessage") {
-      //     console.log("🤖 AI:", data.message);
-
-      //     dispatch(
-      //       addMessage({
-      //         conversationId,
-      //         message: {
-      //           id: Date.now() + 1,
-      //           message: data.message,
-      //           sender: "bot",
-      //           response: data.message,
-      //           timestamp: new Date().toISOString(),
-      //           files: data.files || [], // In case AI response includes files
-      //         },
-      //       })
-      //     );
-
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-
-      //     // Optional: refresh conversations if new one created
-      //     if (data.refreshSidebar) {
-      //       fetchConversations(token).then((updated) =>
-      //         dispatch(setConversations(updated.conversations))
-      //       );
-      //     }
-      //   } else if (data.type === "transcriptionTooShort") {
-      //     console.warn("⚠️ Transcription too short");
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-      //   } else if (data.type === "processing") {
-      //     setIsResponding(true);
-      //   } else if (data.type === "error") {
-      //     console.error("❌ Error:", data.error);
-      //     alert(data.error);
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-      //   }
-      // };
-      // ws.onmessage = async (event) => {
-      //   // 🧠 TTS Binary Audio Stream
-      //   // if (event.data instanceof Blob) {
-      //   //   const audioUrl = URL.createObjectURL(event.data);
-      //   //   const audio = new Audio(audioUrl);
-      //   //   await audio.play();
-      //   //   return;
-      //   // }
-
-      //   // 🧠 Normal JSON Messages (aiMessage, userMessage, etc.)
-      //     const data = JSON.parse(event.data);
-      //   const conversationId =
-      //     data.conversation_id || localStorage.getItem("conversation_id");
-
-      //   if (!conversationId) {
-      //     console.error("❌ Missing conversation_id in WebSocket data.");
-      //     return;
-      //   }
-
-      //   // Ensure active conversation is set
-      //   if (!activeConversation) {
-      //     localStorage.setItem("conversation_id", conversationId);
-      //     dispatch(setActiveConversation(Number(conversationId)));
-      //   }
-
-      //   if (data.type === "userMessage") {
-      //     console.log("🧑 You:", data.message);
-      //     dispatch(
-      //       addMessage({
-      //         conversationId,
-      //         message: {
-      //           id: Date.now(),
-      //           message: data.message,
-      //           sender: "user",
-      //           timestamp: new Date().toISOString(),
-      //           files: [],
-      //         },
-      //       })
-      //     );
-      //   } else if (data.type === "aiMessage") {
-      //     console.log("🤖 AI:", data.message);
-      //     dispatch(
-      //       addMessage({
-      //         conversationId,
-      //         message: {
-      //           id: Date.now() + 1,
-      //           message: data.message,
-      //           sender: "bot",
-      //           response: data.message,
-      //           timestamp: new Date().toISOString(),
-      //           files: data.files || [],
-      //         },
-      //       })
-      //     );
-
-      //     // Stream the AI response as audio
-      //         await streamAudio(data.message); // Pass the AI response text to streamAudio
-
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-
-      //     if (data.refreshSidebar) {
-      //       fetchConversations(token).then((updated) =>
-      //         dispatch(setConversations(updated.conversations))
-      //       );
-      //     }
-      //   } else if (data.type === "transcriptionTooShort") {
-      //     console.warn("⚠️ Transcription too short");
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-      //   } else if (data.type === "processing") {
-      //     setIsResponding(true);
-      //   } else if (data.type === "error") {
-      //     console.error("❌ Error:", data.error);
-      //     alert(data.error);
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-      //   }
-      // };
-      // test working
-      // ws.onmessage = async (event) => {
-      //   const data = JSON.parse(event.data);
-      //   const conversationId = data.conversation_id || localStorage.getItem("conversation_id");
-
-      //   if (!conversationId) {
-      //     console.error("❌ Missing conversation_id in WebSocket data.");
-      //     return;
-      //   }
-
-      //   // Ensure active conversation is set
-      //   if (!activeConversation) {
-      //     localStorage.setItem("conversation_id", conversationId);
-      //     dispatch(setActiveConversation(Number(conversationId)));
-      //   }
-
-      //   if (data.type === "userMessage") {
-      //     console.log("🧑 You:", data.message);
-      //     dispatch(
-      //       addMessage({
-      //         conversationId,
-      //         message: {
-      //           id: Date.now(),
-      //           message: data.message,
-      //           sender: "user",
-      //           timestamp: new Date().toISOString(),
-      //           files: [],
-      //         },
-      //       })
-      //     );
-      //   } else if (data.type === "aiMessage") {
-      //     console.log("🤖 AI:", data.message);
-
-      //     // Play the TTS audio first
-      //     try {
-      //       await streamAudio(data.message); // Stream the AI response audio
-      //     } catch (error) {
-      //       console.error("❌ Error playing audio:", error);
-      //     }
-
-      //     // After the audio finishes, show the AI response text
-      //     dispatch(
-      //       addMessage({
-      //         conversationId,
-      //         message: {
-      //           id: Date.now() + 1,
-      //           message: data.message,
-      //           sender: "bot",
-      //           response: data.message,
-      //           timestamp: new Date().toISOString(),
-      //           files: data.files || [],
-      //         },
-      //       })
-      //     );
-
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-
-      //     if (data.refreshSidebar) {
-      //       fetchConversations(token).then((updated) =>
-      //         dispatch(setConversations(updated.conversations))
-      //       );
-      //     }
-      //   } else if (data.type === "transcriptionTooShort") {
-      //     console.warn("⚠️ Transcription too short");
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-      //   } else if (data.type === "processing") {
-      //     setIsResponding(true);
-      //   } else if (data.type === "error") {
-      //     console.error("❌ Error:", data.error);
-      //     alert(data.error);
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-      //   }
-      // };
-
-      // ws.onmessage = async (event) => {
-      //   const data = JSON.parse(event.data);
-      //   const conversationId = data.conversation_id || localStorage.getItem("conversation_id");
-
-      //   if (!conversationId) {
-      //     console.error("❌ Missing conversation_id in WebSocket data.");
-      //     return;
-      //   }
-
-      //   // Ensure active conversation is set
-      //   if (!activeConversation) {
-      //     localStorage.setItem("conversation_id", conversationId);
-      //     dispatch(setActiveConversation(Number(conversationId)));
-      //   }
-      // if (data.type === "userMessage") {
-      //     console.log("🧑 You:", data.message);
-      //     dispatch(
-      //       addMessage({
-      //         conversationId,
-      //         message: {
-      //           id: Date.now(),
-      //           message: data.message,
-      //           sender: "user",
-      //           timestamp: new Date().toISOString(),
-      //           files: [],
-      //         },
-      //       })
-      //     )}
-      //  else if (data.type === "aiMessage") {
-      //     console.log("🤖 AI:", data.message);
-
-      //     // Pause recording while TTS is playing
-      //     setIsTTSPlaying(true);
-      //     // mediaRecorderRef.current?.stop();
-      // // Stop media recording with event listener
-      //     if (mediaRecorderRef.current) {
-      //         mediaRecorderRef.current.onstop = () => {
-      //             console.log("Media recorder stopped successfully");
-      //         };
-      //         mediaRecorderRef.current?.stop();
-      //     }
-
-      //     // Play the TTS audio first
-      //     try {
-      //       await streamAudio(data.message); // Stream the AI response audio
-      //     } catch (error) {
-      //       console.error("❌ Error playing audio:", error);
-      //     }
-
-      //     // After the audio finishes, resume recording and show the AI response text
-      //     setIsTTSPlaying(false); // TTS has finished
-      //   mediaRecorderRef.current?.start(); // Resume recording
-
-      //     dispatch(
-      //       addMessage({
-      //         conversationId,
-      //         message: {
-      //           id: Date.now() + 1,
-      //           message: data.message,
-      //           sender: "bot",
-      //           response: data.message,
-      //           timestamp: new Date().toISOString(),
-      //           files: data.files || [],
-      //         },
-      //       })
-      //     );
-
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-
-      //     if (data.refreshSidebar) {
-      //       fetchConversations(token).then((updated) =>
-      //         dispatch(setConversations(updated.conversations))
-      //       );
-      //     }
-      //   } else if (data.type === "transcriptionTooShort") {
-      //     console.warn("⚠️ Transcription too short");
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-      //   } else if (data.type === "processing") {
-      //     setIsResponding(true);
-      //   } else if (data.type === "error") {
-      //     console.error("❌ Error:", data.error);
-      //     alert(data.error);
-      //     setIsResponding(false);
-      //     setIsProcessing(false);
-      //     continueVoiceLoop();
-      //   }
-      // };
-
-      // 🟢 Start first recording cycle
 
       ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
@@ -1904,17 +1036,262 @@ const ChatArea = () => {
     setIsResponding(false);
   };
 
+  // try
+  // State and Refs
+  // const [isLiveRecording, setIsliveRecording] = useState(false);
+  // const [isProcessing, setIsProcessing] = useState(false);
+  // const [isResponding, setIsResponding] = useState(false);
+  // const [isTTSPlaying, setIsTTSPlaying] = useState(false);
+
+  // const audioContextRef = useRef(null);
+  // const audioStreamRef = useRef(null);
+  // const processorRef = useRef(null);
+  // const sourceRef = useRef(null);
+  // const wsRef = useRef(null);
+  // const silenceTimeoutRef = useRef(null);
+  // const speakingTimeoutRef = useRef(null);
+
+  // const VOLUME_THRESHOLD = 0.01;
+  // const SILENCE_DELAY = 2000;
+  // const CHUNK_DURATION_MS = 3000;
+
+  // // Start AI Voice
+  // const startAiVoice = async () => {
+  //   try {
+  //     const stream = await navigator.mediaDevices.getUserMedia({
+  //       audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
+  //     });
+
+  //     const audioContext = new AudioContext();
+  //     const source = audioContext.createMediaStreamSource(stream);
+  //     const processor = audioContext.createScriptProcessor(2048, 1, 1);
+
+  //     audioContextRef.current = audioContext;
+  //     sourceRef.current = source;
+  //     processorRef.current = processor;
+  //     audioStreamRef.current = stream; // ✅ Fixed
+
+  //     const token = localStorage.getItem("token");
+  //     const ws = new WebSocket(`
+  //      ws://localhost:5001/api/voice/ws?token=${token}`
+  //         // `wss://quantumhash-backend-1.onrender.com/api/voice/ws?token=${token}`
+  //         // `${WSS_BASE_URL}?token=${token}`
+  //       );
+  //     wsRef.current = ws;
+
+  //     ws.onopen = () => {
+  //       console.log("✅ WebSocket connected");
+  //       const conversationId = localStorage.getItem("conversation_id");
+  //       if (conversationId) {
+  //         ws.send(JSON.stringify({ type: "control", conversation_id: conversationId }));
+  //       }
+  //     };
+
+  //     ws.onclose = () => {
+  //       console.log("🔌 WebSocket disconnected");
+  //       wsRef.current = null;
+  //     };
+
+  //     ws.onerror = (err) => {
+  //       console.error("❌ WebSocket error:", err);
+  //     };
+
+  //     ws.onmessage = async (event) => {
+  //       const data = JSON.parse(event.data);
+  //       const conversationId = data.conversation_id || localStorage.getItem("conversation_id");
+  //       if (!conversationId) return;
+
+  //       if (!activeConversation) {
+  //         localStorage.setItem("conversation_id", conversationId);
+  //         dispatch(setActiveConversation(Number(conversationId)));
+  //       }
+
+  //       if (data.type === "userMessage") {
+  //         dispatch(addMessage({
+  //           conversationId,
+  //           message: {
+  //             id: Date.now(),
+  //             message: data.message,
+  //             sender: "user",
+  //             timestamp: new Date().toISOString(),
+  //             files: [],
+  //           },
+  //         }));
+  //       }
+
+  //       else if (data.type === "aiMessage") {
+  //         console.log("🤖 AI:", data.message);
+  //         await stopStream(); // Stop mic for TTS playback
+  //         setIsTTSPlaying(true);
+
+  //         try {
+  //           await streamAudio(data.message);
+  //         } catch (err) {
+  //           console.error("❌ TTS playback failed", err);
+  //         }
+
+  //         dispatch(addMessage({
+  //           conversationId,
+  //           message: {
+  //             id: Date.now() + 1,
+  //             message: data.message,
+  //             sender: "bot",
+  //             response: data.message,
+  //             timestamp: new Date().toISOString(),
+  //             files: data.files || [],
+  //           },
+  //         }));
+
+  //         setIsTTSPlaying(false);
+  //         setIsProcessing(false);
+  //         setIsResponding(false);
+  //         restartVoiceStream(); // Resume mic
+  //       }
+
+  //       else if (data.type === "processing") {
+  //         setIsProcessing(true);
+  //         setIsResponding(true);
+  //       }
+
+  //       else if (data.type === "transcriptionTooShort") {
+  //         setIsProcessing(false);
+  //         setIsResponding(false);
+  //         restartVoiceStream();
+  //       }
+
+  //       else if (data.type === "error") {
+  //         console.error("❌ WebSocket error:", data.error);
+  //         alert(data.error);
+  //         setIsProcessing(false);
+  //         setIsResponding(false);
+  //         restartVoiceStream();
+  //       }
+  //     };
+
+  //     // Audio processor setup
+  //     let audioBuffer = [];
+  //     processor.onaudioprocess = (event) => {
+  //       if (isTTSPlaying || isProcessing || isResponding) return;
+
+  //       const input = event.inputBuffer.getChannelData(0);
+  //       const volume = input.reduce((sum, val) => sum + val ** 2, 0) / input.length;
+
+  //       if (volume > VOLUME_THRESHOLD) {
+  //         clearTimeout(silenceTimeoutRef.current);
+  //         clearTimeout(speakingTimeoutRef.current);
+
+  //         speakingTimeoutRef.current = setTimeout(() => {
+  //           console.log("📤 Sending speech chunk");
+  //           sendAudio(audioBuffer);
+  //           audioBuffer = [];
+  //         }, CHUNK_DURATION_MS);
+  //       } else {
+  //         clearTimeout(silenceTimeoutRef.current);
+  //         silenceTimeoutRef.current = setTimeout(() => {
+  //           console.log("🛑 Silence detected, stopping stream...");
+  //           stopStream();
+  //         }, SILENCE_DELAY);
+  //       }
+
+  //       const pcm = new Float32Array(input);
+  //       audioBuffer.push(...pcm);
+  //     };
+
+  //     source.connect(processor);
+  //     processor.connect(audioContext.destination);
+  //     setIsliveRecording(true);
+  //   } catch (err) {
+  //     console.error("🎤 Error starting voice:", err);
+  //   }
+  // };
+
+  // // Convert Float32 PCM to Int16 and send to WebSocket
+  // const sendAudio = (float32Pcm) => {
+  //   if (wsRef.current?.readyState !== 1) return;
+
+  //   const int16Array = floatTo16BitPCM(float32Pcm);
+  //   const blob = new Blob([int16Array], { type: "audio/webm" });
+  //   const reader = new FileReader();
+
+  //   reader.onloadend = () => {
+  //     const base64 = reader.result.split(",")[1];
+  //     if (base64.length > 50) {
+  //       wsRef.current.send(JSON.stringify({
+  //         type: "transcribe",
+  //         audio_data: base64,
+  //       }));
+  //     }
+  //   };
+
+  //   reader.readAsDataURL(blob);
+  // };
+
+  // const floatTo16BitPCM = (float32Array) => {
+  //   const int16Array = new Int16Array(float32Array.length);
+  //   for (let i = 0; i < float32Array.length; i++) {
+  //     int16Array[i] = Math.max(-1, Math.min(1, float32Array[i])) * 0x7fff;
+  //   }
+  //   return int16Array;
+  // };
+
+  // // Stop voice stream safely
+  // const stopStream = async () => {
+  //   try {
+  //     if (processorRef.current) {
+  //       processorRef.current.disconnect();
+  //       processorRef.current = null;
+  //     }
+
+  //     if (sourceRef.current) {
+  //       sourceRef.current.disconnect();
+  //       sourceRef.current = null;
+  //     }
+
+  //     if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+  //       await audioContextRef.current.close();
+  //       audioContextRef.current = null;
+  //     }
+
+  //     if (audioStreamRef.current) {
+  //       audioStreamRef.current.getTracks().forEach(track => track.stop());
+  //       audioStreamRef.current = null;
+  //     }
+
+  //     clearTimeout(silenceTimeoutRef.current);
+  //     clearTimeout(speakingTimeoutRef.current);
+  //     setIsliveRecording(false);
+  //   } catch (err) {
+  //     console.warn("⚠️ Error during stopStream:", err);
+  //   }
+  // };
+
+  // const restartVoiceStream = async () => {
+  //   await stopStream();
+  //   setTimeout(startAiVoice, 300);
+  // };
+
+  // const stopAiVoice = async () => {
+  //   await stopStream();
+  //   if (wsRef.current?.readyState === 1) {
+  //     wsRef.current.send(JSON.stringify({ type: "control", action: "stop" }));
+  //     wsRef.current.close();
+  //   }
+  //   setIsResponding(false);
+  //   setIsProcessing(false);
+  //   setIsTTSPlaying(false);
+  // };
+
   return (
-    <div className="flex flex-col w-full h-screen overflow-y-auto bg-white dark:bg-gradient-to-r dark:from-zinc-700 dark:to-slate-900 transition-colors duration-300">
-      <Navbar />
+    <div className="flex flex-col w-full h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300">
+      <Navbar isGuest={isGuest} />
       {/* Chat Area starts */}
       <div
         ref={chatContainerRef}
-        className=" relative flex-1 h-[calc(100vh-160px)] w-full  md:p-4  mt-20 md:mt-0 space-y-6 overflow-auto mx-auto bg-white dark:bg-gradient-to-r dark:from-zinc-700 dark:to-slate-900 transition-colors duration-300">
+        className=" relative flex-1 h-[calc(100vh-160px)] w-full scrollbar-hover  md:p-4  mt-20 md:mt-0 space-y-6 overflow-auto mx-auto bg-white  dark:bg-[#121212] transition-colors duration-300">
         <div className="  md:w-[70%] w-full  mx-auto">
           {/* chats section starts */}
-
           {/* final  */}
+
           {conversationMessages.length > 0 ? (
             <>
               {conversationMessages
@@ -1930,58 +1307,165 @@ const ChatArea = () => {
                     {/* USER MESSAGE */}
                     {(msg.sender === "user" ||
                       (!msg.sender && msg.message)) && (
+                      // <motion.div
+                      //   initial={{ opacity: 0, y: 10 }}
+                      //   animate={{ opacity: 1, y: 0 }}
+                      //   className="relative p-3 rounded-lg mt-2 break-words text-sm shadow-md bg-[#f4f4f5] dark:bg-indigo-500 text-[#1e293b] dark:text-white max-w-2xl w-fit self-end ml-auto">
+                      //   <div className="flex items-start gap-2">
+                      //     <div className="p-1 rounded-full">
+                      //       {/* <CircleUserRound
+                      //         size={20}
+                      //         color="black"
+                      //         strokeWidth={2.25}
+                      //       /> */}
+                      //       <img src={user?.user_img} className="h-8 w-8 rounded-full object-cover" alt="" />
+                      //     </div>
+                      //     <div className="flex flex-col w-full mr-7 overflow-auto text-justify text-xs md:text-base space-y-2 font-centurygothic">
+                      //       <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                      //         {msg.message}
+                      //       </ReactMarkdown>
+                      //       {/* <ChatbotMarkdown content={msg.message} /> */}
+                      //     </div>
+                      //   </div>
+                      // </motion.div>
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative p-3 rounded-lg mt-2 break-words text-sm shadow-md bg-[#f4f4f5] dark:bg-indigo-500 text-[#1e293b] dark:text-white max-w-2xl w-fit self-end ml-auto">
+                        className="relative p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white max-w-2xl w-fit self-end ml-auto">
                         <div className="flex items-start gap-2">
-                          <div className="rounded-full">
-                            <CircleUserRound
-                              size={20}
-                              color="black"
-                              strokeWidth={2.25}
-                            />
+                          <div className="p-1 rounded-full flex-shrink-0">
+                            {/* Fallback to default circle icon if user_img is not available */}
+                            {user?.user_img ? (
+                              <img
+                                src={user?.user_img}
+                                className="h-5 w-5 md:h-7 md:w-7 rounded-full object-cover border-2 border-gray-300"
+                                alt="User Avatar"
+                                onError={(e) => {
+                                  e.target.onerror = null; // Prevent infinite loop if fallback image also fails
+                                  e.target.src = "./user.png"; // Trigger fallback icon display
+                                }}
+                              />
+                            ) : (
+                              <div className="h-7 w-7 md:h-8 md:w-8 rounded-full flex items-center justify-center bg-gray-200">
+                                {/* Default User Icon */}
+                                <CircleUserRound
+                                  size={20} // Set the icon size to fit inside the circle
+                                  color="black"
+                                  strokeWidth={2.25}
+                                />
+                              </div>
+                            )}
                           </div>
-                          <div className="flex flex-col w-full mr-7 overflow-auto text-justify text-xs md:text-base space-y-2 font-centurygothic">
-                            {/* <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+
+                          <div className="flex flex-col w-full mr-7  mt-1  overflow-auto text-justify text-xs md:text-base space-y-2 font-centurygothic">
+                            <ReactMarkdown rehypePlugins={[rehypeRaw]}>
                               {msg.message}
-                            </ReactMarkdown> */}
-                            <ChatbotMarkdown content={msg.message} />
+                            </ReactMarkdown>
                           </div>
                         </div>
                       </motion.div>
                     )}
 
                     {/* BOT RESPONSE */}
+                    {/* {msg.response && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="relative p-3 rounded-lg break-words text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3">
+                          <div className="flex items-start gap-2">
+                            <div className="p-1 rounded-full">
+                              <img
+                                src="./logo.png"
+                                className="h-5 w-5"
+                                alt="Bot Logo"
+                              />
+                            </div>
+                            <div className="flex flex-col w-full mr-7 overflow-auto text-xs md:text-base select-text text-justify space-y-2 font-centurygothic">
+                              <ChatbotMarkdown content={msg.response} />
+                              <ChatbotMarkdown
+                                content={msg.response}
+                                messageId={msg.id}
+                                isNewMessage={msg.isNewMessage || false}
+                              />
+                            </div>
+                          </div>
+                          copy button 
+                          <button
+                            onClick={() =>
+                              navigator.clipboard.writeText(msg.response)
+                            }
+                            className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition">
+                            <Copy size={14} />
+                          </button>
+                        </motion.div>
+                      )} */}
                     {msg.response && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative p-3 rounded-lg break-words text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3">
+                        className="relative p-3 rounded-lg break-words dark:bg-[#282828]  text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3 select-text">
                         <div className="flex items-start gap-2">
-                          <div className="p-1 rounded-full">
+                          <div className="p-1 rounded-full select-none">
                             <img
                               src="./logo.png"
                               className="h-5 w-5"
                               alt="Bot Logo"
                             />
                           </div>
-                          <div className="flex flex-col w-full mr-7 overflow-auto text-xs md:text-base text-justify space-y-2 font-centurygothic">
-                            {/* <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                          <div className="flex flex-col w-full mr-7 text-xs md:text-lg select-text space-y-2 font-centurygothic">
+                            {/* <ChatbotMarkdown
+                              content={msg.response}
+                              messageId={msg.id}
+                              isNewMessage={msg.isNewMessage || false}
+                            /> */}
+                            <ReactMarkdown rehypePlugins={[rehypeRaw]}>
                               {msg.response}
-                            </ReactMarkdown> */}
-                            <ChatbotMarkdown content={msg.response} />
+                            </ReactMarkdown>
+                            {/* <ChatbotMarkdown content={msg.response}  /> */}
                           </div>
                         </div>
                         {/* copy button  */}
                         <button
-                          onClick={() =>
-                            navigator.clipboard.writeText(msg.response)
-                          }
-                          className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition">
-                          <Copy size={14} />
+                          onClick={() => handleCopyCode(msg.response)}
+                          className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition select-none">
+                          {copied ? (
+                            <span className="flex items-center">
+                              <CheckCircle size={16} color="#4cd327" />
+                              <span className="ml-2">Copied!</span>
+                            </span>
+                          ) : (
+                            <span className="flex items-center">
+                              <Copy size={16} />
+                              {/* <span className="ml-2">Copy</span> */}
+                            </span>
+                          )}
                         </button>
                       </motion.div>
+                    )}
+                    {msg.suggestions && msg.suggestions.length > 0 && (
+                      <div className="mt-2  p-4  font-centurygothic ">
+                        <p className="text-xs md:text-base text-gray-800 text-bold dark:text-gray-300 mb-2 font-medium">
+                          Would you like to know more?
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {msg.suggestions.map((suggestion, index) => (
+                            <button
+                              key={index}
+                              onClick={() => {
+                                const cleanSuggestion = suggestion.replace(
+                                  /^\.+\s*/,
+                                  ""
+                                ); // Remove leading dots
+                                setInputMessage(cleanSuggestion);
+                                handleSendMessage(cleanSuggestion);
+                              }}
+                              className="px-4 py-1.5  flex justify-between text-left w-full font-bold rounded-full bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-700 text-gray-900 dark:text-white text-xs md:text-sm   shadow-sm hover:text-blue-500 transition-all duration-200 ease-in-out">
+                              {suggestion.replace(/^[.]/, "")} <span>+</span>
+                              {/* {suggestion} */}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
 
                     {msg.response && (
@@ -1996,7 +1480,7 @@ const ChatArea = () => {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.5 }}
-                  className="p-3 rounded-lg w-32 md:w-80 bg-gray-500 font-centurygothic text-white self-start ml-2 mb-2  md:ml-0 mr-auto mt-3">
+                  className="p-3 rounded-lg w-44 md:w-80 bg-gray-500 font-centurygothic text-white self-start ml-2 mb-2  md:ml-0 mr-auto mt-3">
                   <div className="flex items-center gap-2">
                     <div className="bg-gray-500 p-1 rounded-full">
                       <img
@@ -2005,8 +1489,9 @@ const ChatArea = () => {
                         alt="Bot Logo"
                       />
                     </div>
-                    <span className="animate-typingDots text-xs md:text-lg font-centurygothic">
-                      Thinking
+                    <span className="text-xs md:text-lg font-mono">Thinking</span>
+                    <span className="animate-typingDots text-xs md:text-lg font-mono">
+                      
                     </span>
                   </div>
                 </motion.div>
@@ -2014,19 +1499,35 @@ const ChatArea = () => {
             </>
           ) : (
             // ✅ Greeting when no messages yet
-            showGreeting && (
+            <>
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className={`absolute bottom-72 w-fit gap-3 md:w-3/5 flex font-centurygothic flex-col items-center justify-center text-center text-gray-800 dark:text-white`}>
-                <img src="./logo.png" className="w-16 h-16  " alt="" />
-                <span className="md:text-3xl text-base font-extrabold mb-2 bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 text-transparent bg-clip-text">
+                className={`absolute md:right-80  bottom-44 md:bottom-24 w-full gap-3 md:w-3/5 flex font-centurygothic flex-col items-center justify-center text-center text-gray-800 dark:text-white`}>
+                <img
+                  src="./logo.png"
+                  className="w-16 h-16 block dark:hidden"
+                  alt="Logo"
+                />
+                <img
+                  src="./q.png"
+                  className="w-16 h-16 hidden dark:block"
+                  alt="Logo"
+                />
+                <span className="md:text-3xl font-centurygothic text-base font-extrabold mb-2 bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 text-transparent bg-clip-text">
                   Quantum<span className="text-base md:text-4xl">Ai</span>
                 </span>
 
                 <h2 className="md:text-3xl text-base font-bold mb-2 bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 text-transparent bg-clip-text">
                   {greeting}
+                  <span>
+                    {isGuest && (
+                      <p className="text-xs md:text-base bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 text-transparent bg-clip-text">
+                        You are in guest mode. Your messages won't be saved.
+                      </p>
+                    )}
+                  </span>
                   {/* <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 text-transparent bg-clip-text">{showCursor ? "|" : ""}</span> */}
                 </h2>
 
@@ -2034,20 +1535,19 @@ const ChatArea = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 1.5 }}
-                  className="text-base md:text-2xl font-bold text-gray-500 dark:text-gray-300">
-                  {getTimeBasedGreeting()}, {user?.username}
+                  className="text-base md:text-2xl font-bold text-gray-500 dark:text-gray-300 font-centurygothic">
+                  {getTimeBasedGreeting()} {user?.username}
                 </motion.p>
                 {/* <motion.p
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 1.5 }}
-                  className="text-base md:text-lg text-gray-500 dark:text-gray-300">
-                  How can i help you today?
-                </motion.p> */}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 1.5 }}
+                    className="text-base md:text-lg text-gray-500 dark:text-gray-300">
+                    How can i help you today?
+                  </motion.p> */}
               </motion.div>
-            )
+            </>
           )}
-
           <div ref={chatEndRef} />
         </div>
       </div>
@@ -2080,56 +1580,53 @@ const ChatArea = () => {
       )}
       {/* chat area ends*/}
       {/* Input Section div starts */}
-      <div className="flex flex-col  mx-auto    mb-3 mt-2 w-[95%] sm:w-[70%] shadow-2xl rounded-3xl bg-white dark:bg-gray-800  p-2 transition-colors duration-300">
+      <div className="flex flex-col  mx-auto    mb-3 mt-2 w-[95%] sm:w-[70%] shadow-2xl rounded-3xl bg-white dark:bg-[#282828]  p-2 transition-colors duration-300">
         {/* File Previews Section — ✅ UPDATED LIKE CHATGPT */}
-        
 
         {/* test  */}
-<div className="w-full flex gap-3 mb-1 md:mb-3 flex-nowrap overflow-x-auto sm:flex-wrap sm:overflow-visible">
-  {files.map((file, index) => (
-    <div
-      key={index}
-      className="relative p-2 border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 rounded-xl shadow-sm w-[150px] flex-shrink-0 flex items-center gap-2"
-    >
-      {/* 📸 Image Preview */}
-      {file?.type?.startsWith("image/") ||
-      /\.(jpg|jpeg|png|gif|webp)$/i.test(file?.name) ? (
-        <img
-          src={URL.createObjectURL(file)}
-          alt={file.name}
-          className="w-14 h-14 object-cover rounded-md hover:scale-105 transition-transform duration-200"
-        />
-      ) : (
-        <div className="flex flex-col items-start text-black dark:text-white text-xs font-medium">
-          <span className="truncate max-w-[120px] flex items-center gap-1">
-            📄 {file.name}
-          </span>
-          <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
-            {file.name.split(".").pop()?.toUpperCase()}
-          </span>
-        </div>
-      )}
+        <div className="w-full flex gap-3 mb-1 md:mb-3 flex-nowrap overflow-x-auto sm:flex-wrap sm:overflow-visible">
+          {files.map((file, index) => (
+            <div
+              key={index}
+              className="relative p-2 border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 rounded-xl shadow-sm w-[150px] flex-shrink-0 flex items-center gap-2">
+              {/* 📸 Image Preview */}
+              {file?.type?.startsWith("image/") ||
+              /\.(jpg|jpeg|png|gif|webp)$/i.test(file?.name) ? (
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt={file.name}
+                  className="w-14 h-14 object-cover rounded-md hover:scale-105 transition-transform duration-200"
+                />
+              ) : (
+                <div className="flex flex-col items-start text-black dark:text-white text-xs font-medium">
+                  <span className="truncate max-w-[120px] flex items-center gap-1">
+                    📄 {file.name}
+                  </span>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                    {file.name.split(".").pop()?.toUpperCase()}
+                  </span>
+                </div>
+              )}
 
-      {/* ❌ Remove Button */}
-      <button
-        className="text-red-600 hover:text-red-400 absolute top-1 right-1"
-        onClick={() => removeFile(index)}
-      >
-        <X size={14} />
-      </button>
+              {/* ❌ Remove Button */}
+              <button
+                className="text-red-600 hover:text-red-400 absolute top-1 right-1"
+                onClick={() => removeFile(index)}>
+                <X size={14} />
+              </button>
 
-      {/* ⏳ Upload Progress */}
-      {uploadProgress[file.name] && (
-        <div className="absolute bottom-0 left-0 w-full h-[4px] bg-gray-300 dark:bg-gray-600 rounded-b-md overflow-hidden">
-          <div
-            className="bg-blue-500 h-full transition-all duration-200"
-            style={{ width: `${uploadProgress[file.name]}%` }}
-          />
+              {/* ⏳ Upload Progress */}
+              {uploadProgress[file.name] && (
+                <div className="absolute bottom-0 left-0 w-full h-[4px] bg-gray-300 dark:bg-gray-600 rounded-b-md overflow-hidden">
+                  <div
+                    className="bg-blue-500 h-full transition-all duration-200"
+                    style={{ width: `${uploadProgress[file.name]}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-      )}
-    </div>
-  ))}
-</div>
 
         {/* Textarea Input */}
 
@@ -2156,13 +1653,15 @@ const ChatArea = () => {
           {/* Textarea Input */}
           <textarea
             ref={textareaRef}
-            className="w-full h-auto text-xs md:text-base max-h-36 min-h-[35px] md:min-h-[44px] p-2 md:p-3  rounded-2xl bg-white dark:bg-gray-700 transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
+            className="w-full h-auto text-xs md:text-base max-h-36 min-h-[35px] md:min-h-[44px] p-2 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
             value={inputMessage + (isRecording ? transcriptBuffer : "")}
             onChange={handleInputChange}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                handleSendMessage();
+                if (!loading) {
+                  handleSendMessage();
+                }
               }
             }}
             rows="1"
@@ -2211,7 +1710,10 @@ const ChatArea = () => {
             <div className="relative">
               <div
                 className="cursor-pointer border-[0.5px] border-gray-800 dark:border-gray-300 rounded-full p-2 text-black dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
-                onClick={() => fileInputRef.current.click()}
+                onClick={() => {
+                  if (isGuest) return handleLoginPrompt();
+                  fileInputRef.current.click();
+                }}
                 onMouseEnter={() => setShowUploadTooltip(true)}
                 onMouseLeave={() => setShowUploadTooltip(false)}>
                 <span className="md:block hidden">
@@ -2221,9 +1723,31 @@ const ChatArea = () => {
                   <Paperclip size={12} />
                 </span>
               </div>
+              {showLoginPrompt && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                  <div className="bg-white dark:bg-gray-800 p-6 rounded-xl text-center shadow-2xl">
+                    <h2 className="text-xl font-semibold mb-4 text-black dark:text-white">
+                      Login Required
+                    </h2>
+                    <p className="mb-6 text-gray-700 dark:text-gray-300">
+                      Please login or sign up to use this feature.
+                    </p>
+                    <button
+                      onClick={() => navigate("/login")}
+                      className="bg-blue-500 text-white px-4 py-2 rounded mr-2">
+                      Login
+                    </button>
+                    <button
+                      onClick={() => setShowLoginPrompt(false)}
+                      className="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {showUploadTooltip && (
-                <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
+                <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-1 md:px-2 py-1 text-[9px] md:text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
                   Upload file
                   <div
                     className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 
@@ -2236,86 +1760,57 @@ const ChatArea = () => {
             </div>
 
             {/* Mic Button */}
-            <div className="relative">
-              <div
-                className={`cursor-pointer border-[0.5px] text-black dark:text-white border-gray-800 dark:border-gray-300 rounded-full p-2 
-      ${
-        isRecording
-          ? "bg-red-500 animate-pulse text-white"
-          : "hover:bg-gray-300 dark:hover:bg-gray-700"
-      } transition-all duration-300`}
-                onClick={isRecording ? stopRecording : startRecording}
-                onMouseEnter={() => setShowMicTooltip(true)}
-                onMouseLeave={() => setShowMicTooltip(false)}>
-                {/* {isRecording ? <MicOff size={16} /> : <Mic size={16} />} */}
-                <span className="md:block hidden">
-                  {isRecording ? <MicOff size={16} /> : <Mic size={16} />}{" "}
-                </span>
+            {/* Mic Button */}
+<div className="relative">
+  <div
+    className={`cursor-pointer border-[0.5px] text-black dark:text-white border-gray-800 dark:border-gray-300 rounded-full p-2 
+${
+  isRecording
+    ? "bg-red-500 animate-pulse text-white"
+    : "hover:bg-gray-300 dark:hover:bg-gray-700"
+} transition-all duration-300 ${!isGuest ? 'opacity-50 cursor-not-allowed' : ''}`}
+    onClick={() => {
+      if (isGuest) {
+        handleLoginPrompt();
+        return;
+      }
+      if (!isGuest) return; // Disable for logged-in users
+      isRecording ? stopRecording() : startRecording();
+    }}
+    onMouseEnter={() => setShowMicTooltip(true)}
+    onMouseLeave={() => setShowMicTooltip(false)}>
+    {/* {isRecording ? <MicOff size={16} /> : <Mic size={16} />} */}
+    <span className="md:block hidden">
+      {isRecording ? <MicOff size={16} /> : <Mic size={16} />}{" "}
+    </span>
 
-                <span className="block md:hidden">
-                  {isRecording ? <MicOff size={12} /> : <Mic size={12} />}{" "}
-                </span>
-              </div>
+    <span className="block md:hidden">
+      {isRecording ? <MicOff size={12} /> : <Mic size={12} />}{" "}
+    </span>
+  </div>
 
-              {showMicTooltip && (
-                <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900  rounded-lg shadow-md">
-                  {isRecording ? "Stop" : "Dictate"}
-                  <div
-                    className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 
-                  border-l-[6px] border-l-transparent 
-                  border-r-[6px] border-r-transparent 
-                  border-t-[6px] border-t-zinc-900"
-                  />
-                </div>
-              )}
-            </div>
+  {showMicTooltip && (
+    <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900  rounded-lg shadow-md">
+      {!isGuest ? "Coming Soon" : (isRecording ? "Stop" : "Dictate")}
+      <div
+        className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 
+      border-l-[6px] border-l-transparent 
+      border-r-[6px] border-r-transparent 
+      border-t-[6px] border-t-zinc-900"
+      />
+    </div>
+  )}
+</div>
 
-            {/* Voice Assistant Button WORKING*/}
-            {/* <div className="voice-controls text-gray-800 dark:text-white">
-              {aiRecording ? (
-                <button onClick={stopAiVoice} className="btn-stop">
-                  🛑 Stop
-                </button>
-              ) : (
-                <button onClick={startAivoice} className="btn-start font-bold">
-                  <span className=" text-xs md:text-base flex">
-                    🎙 Start Voice
-                  </span>
-                </button>
-              )}
-              {isProcessing && <p>⏳ AI thinking...</p>}
-            </div> */}
 
-            {/* test */}
-
-            {/* <div className="voice-controls text-gray-800 dark:text-white">
-      {isliveRecording ? (
-        <button onClick={stopAiVoice} className="btn-stop px-4 py-2 bg-red-600 text-white rounded-xl shadow-md">
-          🛑 Stop
-        </button>
-      ) : (
-        <button onClick={startAivoice} className="btn-start font-bold px-4 py-2 bg-green-600 text-white rounded-xl shadow-md">
-          <span className="text-xs md:text-base flex items-center gap-2">
-            🎙 Start Voice
-          </span>
-        </button>
-      )}
-
-      <div className="mt-2 text-sm">
-        {isProcessing && <p className="text-yellow-500">⏳ AI thinking...</p>}
-        {isResponding && <p className="text-green-500">🤖 Responding...</p>}
-        {!isProcessing && !isResponding && isliveRecording && (
-          <p className="text-blue-500">🎧 Listening...</p>
-        )}
-      </div>
-    </div> */}
-
-            <div className="relative voice-controls text-gray-800 dark:text-white">
+            {/* <div className=" voice mode working commented for live users"> */}
+            {/* <div className="relative voice-controls text-gray-800 dark:text-white">
               <button
                 onMouseEnter={() => setvoiceTooltip(true)}
                 onMouseLeave={() => setvoiceTooltip(false)}
                 onClick={() => {
-                  startAivoice();
+                  if (isGuest) return handleLoginPrompt();
+                  startAiVoice();
                   setShowVoiceOverlay(true);
                 }}
                 className="btn-start font-bold px-4 py-2 bg-green-600  text-white rounded-xl shadow-md">
@@ -2337,9 +1832,9 @@ const ChatArea = () => {
                   </div>
                 )}
               </button>
-            </div>
+            </div> */}
             {/* voice overlay container  */}
-            {showVoiceOverlay && (
+            {/* {showVoiceOverlay && (
               <motion.div
                 initial={{ opacity: 0, y: 100 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -2349,9 +1844,9 @@ const ChatArea = () => {
                   <div className=" w-52 flex items-center justify-center flex-col">
                     <div className=" w-20 h-20  md:w-40 md:h-40  ">
                       <RadialVisualizer audioStream={audioStreamRef.current} />
-                    </div>
-                    {/* Voice status */}
-                    <div className="  text-sm font-semibold text-center h-6 flex items-center">
+                    </div> */}
+            {/* Voice status */}
+            {/* <div className="  text-sm font-semibold text-center h-6 flex items-center">
                       {isProcessing && (
                         <p className="text-yellow-400 animate-pulse">
                           ⏳ AI thinking...
@@ -2362,17 +1857,17 @@ const ChatArea = () => {
                           🤖 Responding...
                         </p>
                       )}
-                      {!isProcessing && !isResponding && isliveRecording && (
+                      {!isProcessing && !isResponding && isLiveRecording && (
                         <div className="text-blue-400 flex items-center gap-1">
                           <span>🎧 Listening</span>
                           <span className="animate-typingDots ml-1"></span>
                         </div>
                       )}
                     </div>
-                  </div>
+                  </div> */}
 
-                  {/* Stop button */}
-                  <button
+            {/* Stop button */}
+            {/* <button
                     onClick={() => {
                       stopAiVoice();
                       setShowVoiceOverlay(false);
@@ -2381,9 +1876,9 @@ const ChatArea = () => {
                     🛑 Stop Voice
                   </button>
                 </div>
-              </motion.div>
-            )}
-
+              </motion.div> */}
+            {/* )} */}
+            {/* </div> */}
             {/* Hidden File Input */}
             <input
               type="file"
@@ -2400,13 +1895,25 @@ const ChatArea = () => {
               onClick={handleSendMessage}
               className="ml-2 p-2 border border-blue-500 bg-blue-500 text-white rounded-lg disabled:opacity-50 hover:bg-blue-600 transition-colors"
               disabled={loading}>
-             <span  className="md:block hidden"> <Send size={16} /></span>
-              <span  className="block md:hidden"> <Send size={12} /></span>
+              {loading ? (
+                // 🌀 Rotating icon while loading (disabled)
+                <CirclePause className="w-5 h-5 animate-spin  text-white" />
+              ) : (
+                <>
+                  {/* Show different size icons for responsive views */}
+                  <span className="md:block hidden">
+                    <Send size={16} />
+                  </span>
+                  <span className="block md:hidden">
+                    <Send size={12} />
+                  </span>
+                </>
+              )}
             </button>
           </div>
         </div>
       </div>
-
+<p className="mx-auto text-gray-400 dark:text-gray-700 text-xs md:text-sm font-mono font-bold">AI generated content for reference only</p>
       {/* Tailwind Typing Animation */}
       <style>
         {`
@@ -2484,6 +1991,13 @@ const ChatArea = () => {
   -ms-overflow-style: none; /* IE/Edge */
   scrollbar-width: none; /* Firefox */
 }
+  /* Expand scrollbar on container hover */
+.scrollbar-hover:hover::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+
 @keyframes wave1 {
   0%, 100% { height: 20%; }
   50% { height: 100%; }
@@ -2617,6 +2131,20 @@ const ChatArea = () => {
   animation: typingDots 1s steps(3, end) infinite;
 }
 
+// response select css 
+.select-text {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
+.select-none {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
 
 
 `}

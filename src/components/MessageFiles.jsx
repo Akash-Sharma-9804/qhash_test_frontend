@@ -48,7 +48,7 @@ export default function MessageFiles({ files }) {
               <div className="flex text-base font-bold gap-2 mt-2 font-centurygothic">
                <span className="text-black ">Reading file</span>   <div className="loader2"></div>
               </div>
-              <div class="loader"></div>
+              <div className="loader"></div>
             </div>
             );
           }

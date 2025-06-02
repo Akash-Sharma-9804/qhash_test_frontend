@@ -8,7 +8,9 @@ import {
   Trash,
   X,
   Pen,
-  Ellipsis,
+  EllipsisVertical,
+  CircleEllipsis ,
+  ChevronDown,
   Save,
   PanelRightOpen,
   BadgeHelp,
@@ -107,7 +109,7 @@ const Sidebar = () => {
     if (token) {
       fetchConversations(token)
         .then((data) => {
-          console.log("Fetched Conversations:", data);
+          // console.log("Fetched Conversations:", data);
           dispatch(setConversations(data.conversations || []));
         })
         .catch((err) => console.error("Error fetching conversations:", err));
@@ -143,50 +145,73 @@ const Sidebar = () => {
     }
   }, [conversations, activeConversation, dispatch]); // Run whenever conversations or activeConversation changes
 
+  
+ 
+ 
   // const handleNewChat = async () => {
   //   try {
-  //     const newChat = await createNewConversation(token);
+  //     const newChat = await createNewConversation(token); // API call to create conversation
 
-  //     if (newChat?.id) {
-  //       // ✅ Make sure created_at is set to now if not present
-  //       if (!newChat.created_at) {
-  //         newChat.created_at = new Date().toISOString();
-  //       }
+  //     if (newChat?.conversation_id) {
+  //       const newConversation = {
+  //         id: newChat.conversation_id,
+  //         name: newChat.name || "New Chat",
+  //         created_at: new Date().toISOString(),
+  //       };
 
-  //       dispatch(addConversation(newChat));
-  //       dispatch(setActiveConversation(newChat.id));
+  //       // ✅ Add to Redux immediately
+  //       dispatch(addConversation(newConversation));
+
+  //       // ✅ Set it as active
+  //       dispatch(setActiveConversation(newConversation.id));
+
+  //       // ✅ Optional: save to localStorage
+  //       localStorage.setItem("conversation_id", newConversation.id);
   //     }
   //   } catch (error) {
   //     console.error("Error creating new chat:", error);
   //   }
   // };
-  const handleNewChat = async () => {
-    try {
-      const newChat = await createNewConversation(token); // API call to create conversation
-
-      if (newChat?.conversation_id) {
-        const newConversation = {
-          id: newChat.conversation_id,
-          name: newChat.name || "New Chat",
-          created_at: new Date().toISOString(),
-        };
-
-        // ✅ Add to Redux immediately
-        dispatch(addConversation(newConversation));
-
-        // ✅ Set it as active
-        dispatch(setActiveConversation(newConversation.id));
-
-        // ✅ Optional: save to localStorage
-        localStorage.setItem("conversation_id", newConversation.id);
-      }
-    } catch (error) {
-      console.error("Error creating new chat:", error);
-    }
-  };
 
   // rename conversations
 
+  const handleNewChat = async () => {
+  try {
+    const newChat = await createNewConversation(token); // API call to create conversation
+    console.log("🔍 API Response:", newChat); // Debug log
+
+    if (newChat?.conversation_id) {
+      const conversationData = {
+        id: newChat.conversation_id,
+        name: newChat.name || "New Chat",
+        created_at: new Date().toISOString(),
+      };
+
+      // Check if conversation already exists in Redux
+      const existsInRedux = conversations.some(conv => conv.id === newChat.conversation_id);
+
+      if (newChat.action === "created") {
+        // Always add new conversations
+        dispatch(addConversation(conversationData));
+        console.log("✅ Added new conversation to Redux:", conversationData);
+      } else if (newChat.action === "reused" && !existsInRedux) {
+        // Add reused conversation only if it's not already in Redux
+        dispatch(addConversation(conversationData));
+        console.log("🔄 Added reused conversation to Redux:", conversationData);
+      } else {
+        console.log("🔄 Reusing existing conversation from Redux:", newChat.conversation_id);
+      }
+
+      // ✅ Always set as active (whether new or reused)
+      dispatch(setActiveConversation(newChat.conversation_id));
+
+      // ✅ Optional: save to localStorage
+      localStorage.setItem("conversation_id", newChat.conversation_id);
+    }
+  } catch (error) {
+    console.error("Error creating new chat:", error);
+  }
+};
   
 
   const handleRename = async (id) => {
@@ -293,125 +318,130 @@ const Sidebar = () => {
     }
   }, [darkMode]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside any dropdown
+      if (dropdownId !== null) {
+        const dropdownElement = document.querySelector(`[data-dropdown-id="${dropdownId}"]`);
+        if (dropdownElement && !dropdownElement.contains(event.target)) {
+          setDropdownId(null);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [dropdownId]);
+
+  const handleDropdownOpen = (convId) => {
+    const wasOpen = dropdownId === convId;
+    setDropdownId(wasOpen ? null : convId);
+    
+    // Scroll to make dropdown visible only when opening
+    if (!wasOpen) {
+      setTimeout(() => {
+        const conversationElement = document.querySelector(`[data-conversation-id="${convId}"]`);
+        const scrollContainer = document.querySelector('.conversation-scroll-container');
+        
+        if (conversationElement && scrollContainer) {
+          const containerRect = scrollContainer.getBoundingClientRect();
+          const elementRect = conversationElement.getBoundingClientRect();
+          
+          // Check if element is not fully visible
+          const isElementVisible = (
+            elementRect.top >= containerRect.top &&
+            elementRect.bottom <= containerRect.bottom
+          );
+          
+          if (!isElementVisible) {
+            conversationElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center',
+              inline: 'nearest'
+            });
+          }
+        }
+      }, 100);
+    }
+  };
+
   return (
     <div className="flex">
-    {/* Sidebar starts */}
-    <div
-      className={`fixed md:relative z-30 h-full  
-        ${
-          isOpen ? "translate-x-0 w-56" : "-translate-x-full"
-        } md:translate-x-0
-        ${isCollapsed ? "md:w-16" : "md:w-56"}
-        bg-slate-100 dark:bg-gradient-to-r dark:from-zinc-700 dark:to-slate-900   p-2 flex flex-col space-y-2 
-        transition-all duration-500 overflow-y-auto`}>
-      {/* logo with Menu Button starts */}
-      <div className="flex gap-2 items-center ">
-        {/* logo with menu button */}
-        <div
-          className={`flex items-center gap-2  justify-center ${
-            isCollapsed ? "mb-10" : ""
-          }`}>
-          <div
-            className={`origin-left ml-14 md:ml-5 mt-4 md:mt-0 transition-all duration-500 ${
-              isCollapsed ? "scale-x-0 opacity-0" : "scale-x-100 opacity-100"
-            } whitespace-nowrap overflow-hidden  `}>
-            <span className="text-2xl  mt-2   items-center cursor-pointer sm:text-center font-bold text-black dark:text-white">
-              <img src="./logoName.png" className="w-32" alt="Logo" />
-            </span>
-          </div>
-          <div className="relative z-30">
-            <button
-              className={`absolute   hidden md:block p-1 ${
-                isCollapsed ? "top-4 right-4 " : ""
-              } z-30 rounded-md  relative   text-black dark:text-white hover:dark:bg-slate-600 hover:bg-slate-400 transition-all duration-300  `}
-              onClick={() => {
-                setIsOpen(!isOpen);
-                setIsCollapsed(!isCollapsed);
-              }}
-              onMouseEnter={() => setShowTooltip(true)}
-              onMouseLeave={() => setShowTooltip(false)}
-              ref={buttonRef}>
-              <PanelRightOpen size={24} />
-
-              {/* Tooltip on hover */}
-            </button>
-            {/* Tooltip outside the button so it doesn't trigger hover */}
-            {showTooltip && (
-              <div
-                className={`absolute ${
-                  isCollapsed
-                    ? "top-12 left-1/2 transform -translate-x-3/4"
-                    : "top-8 left-1/2 transform -translate-x-2/3 "
-                }  mt-1 px-2 py-1 text-xs text-white bg-zinc-900  rounded  `}>
-                 
-                {isCollapsed ? "Open Sidebar" : "Close Sidebar"}
-              </div>
-            )}
+      {/* Sidebar starts */}
+      <div
+        className={`fixed md:relative z-30 h-screen
+          ${isOpen ? "translate-x-0 w-56" : "-translate-x-full"} md:translate-x-0
+          ${isCollapsed ? "md:w-16" : "md:w-56"}
+          bg-slate-200 dark:bg-[#282828] p-2 flex flex-col
+          transition-all duration-500`}>
+        
+        {/* Logo with Menu Button */}
+        <div className="flex gap-2 items-center mb-4 flex-shrink-0">
+          <div className={`flex items-center gap-2 justify-center ${isCollapsed ? "" : ""}`}>
+            <div
+              className={`origin-left ml-14 md:ml-5 mt-4 md:mt-0 transition-all duration-300 ${
+                isCollapsed ? "opacity-0" : "opacity-100"
+              } whitespace-nowrap overflow-hidden`}>
+              <span className="text-2xl mt-2 items-center cursor-pointer sm:text-center font-bold text-black dark:text-white">
+                <img src="./logoName.png" className="w-32 block dark:hidden" alt="Logo" />
+                <img src="./dark_logo.png" className="w-32 hidden dark:block" alt="Logo" />
+              </span>
+            </div>
+            <div className="relative z-30">
+              <button
+                className={`absolute hidden md:block p-1 ${
+                  isCollapsed ? "right-4" : ""
+                } z-30 rounded-md relative text-black dark:text-white hover:dark:bg-slate-600 hover:bg-slate-400 transition-all duration-300`}
+                onClick={() => {
+                  setIsOpen(!isOpen);
+                  setIsCollapsed(!isCollapsed);
+                }}
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+                ref={buttonRef}>
+                <PanelRightOpen size={24} />
+              </button>
+              {showTooltip && (
+                <div
+                  className={`absolute ${
+                    isCollapsed
+                      ? "top-8 left-1/2 transform -translate-x-3/4"
+                      : "top-8 left-1/2 transform -translate-x-2/3"
+                  } mt-1 px-2 py-1 text-xs text-white bg-zinc-900 rounded`}>
+                  {isCollapsed ? "Open Sidebar" : "Close Sidebar"}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* logo with menu button ends */}
-
-      <div className="flex flex-col justify-between  ">
         {/* New Chat Button */}
-        <div className="newchat-history  flex flex-col gap-2  ">
-          <button
-            className={`border border-black  dark:border-white p-2 bg-blue-500 text-white rounded-lg flex items-center justify-center`}
-            onClick={handleNewChat}>
-            <Plus size={18} className="mr-2 text-black dark:text-white" />
+        <div className="mb-4 flex-shrink-0">
+          <button onClick={handleNewChat}
+            className={`border border-black dark:border-white p-2 bg-gradient-to-r from-[#0000B5] to-[#0076FF]
+              hover:from-[#0076FF] hover:to-[#0000B5] text-white rounded-lg flex items-center
+              transition-all duration-300 overflow-hidden ${
+                isCollapsed ? "w-12 h-12 justify-center" : "w-full"
+              }`}>
+            <Plus size={18} className="text-white flex-shrink-0" />
             <span
-              className={`transition-all duration-500 ${
-                isCollapsed
-                  ? "opacity-0 scale-x-0 w-0"
-                  : "opacity-100 scale-x-100 w-auto"
-              } text-sm text-black dark:text-white`}>
+              className={`ml-2 whitespace-nowrap text-sm transition-all duration-300 ease-in-out
+                ${isCollapsed ? "opacity-0 scale-x-0 w-0 ml-0" : "opacity-100 scale-x-100 w-auto ml-2"}`}>
               New Chat
             </span>
           </button>
+        </div>
 
-          {/* Chat History */}
-          <span
-            className={`bg-white border border-black dark:border-white p-2 flex items-center gap-4 dark:bg-gray-600 text-black dark:text-white rounded-lg cursor-pointer`}>
-            <History size={18} />
-            <span
-              className={`transition-all duration-300 ${
-                isCollapsed
-                  ? "opacity-0 scale-x-0 w-0"
-                  : "opacity-100 scale-x-100 w-auto"
-              } text-sm`}>
-              Chat history
-            </span>
-          </span>
-
-          {/* Chat List */}
-          <div className="flex flex-col space-y-2 flex-1 overflow-y-auto max-h-96  ">
-            <h2 className="font-medium text-gray-700 dark:text-gray-300">
-              Recent Chats
-            </h2>
-            {/* Today */}
-
-            {/* {Object.entries(groupedConversations).map(([section, convs]) => (
-        convs.length > 0 && (
-          <div key={section} className="mb-4">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase mb-2">
-              {section === "today" ? "Today" : section === "yesterday" ? "Yesterday" : "Previous"}
-            </h3>
-            {convs.map((conv) => (
-              <div
-                key={conv.id}
-                onClick={() => handleSelectConversation(conv.id)}
-                className={`p-2 rounded cursor-pointer transition ${
-                  activeConversation === conv.id ? "bg-blue-700" : " bg-slate-300 dark:bg-gray-700 hover:bg-gray-500"
-                } my-1`}
-              >
-                {conv.name || "New Chat"}
-              </div>
-            ))}
-          </div>
-        )
-      ))} */}
-
+        {/* Chat History - Scrollable Container with proper bottom spacing */}
+        <div className={`flex-1 flex flex-col min-h-0 ${isCollapsed ? "hidden" : "block"} pb-32`}>
+          <h2 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-2 flex-shrink-0">
+            Chat History
+          </h2>
+          
+          {/* Scrollable conversation list with visible scrollbar */}
+          <div className="conversation-scroll-container flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-200 dark:scrollbar-track-gray-700 hover:scrollbar-thumb-gray-600">
             {Object.entries(groupedConversations).map(
               ([section, convs]) =>
                 convs.length > 0 && (
@@ -426,14 +456,15 @@ const Sidebar = () => {
                     {convs.map((conv) => (
                       <div
                         key={conv.id}
-                        className={`p-2 text-[13px] mr-2 text-black dark:text-white rounded-md cursor-pointer transition flex justify-between items-center relative ${
+                        data-conversation-id={conv.id}
+                        className={`p-2 text-[13px] text-black dark:text-white rounded-md cursor-pointer transition-all duration-300 flex justify-between items-center relative ${
                           activeConversation === conv.id
-                            ? "bg-blue-700 text-white "
-                            : "bg-slate-300 dark:bg-gray-700  hover:bg-gray-500"
-                        } my-1`}>
+                            ? "bg-gradient-to-r from-[#0000B5] to-[#0076FF] hover:bg-gradient-to-r hover:from-[#0076FF] hover:to-[#0000B5] text-white"
+                            : "bg-slate-300 dark:bg-[#3f3f3f] border hover:bg-gray-500"
+                        } my-1 mr-2`}>
                         <div
                           onClick={() => handleSelectConversation(conv.id)}
-                          className="flex-grow">
+                          className="flex-grow min-w-0">
                           {editingId === conv.id ? (
                             <div className="flex items-center gap-2">
                               <input
@@ -442,7 +473,7 @@ const Sidebar = () => {
                                 autoFocus
                                 onChange={(e) => setEditText(e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
-                                onBlur={() => handleRename(conv.id)} // ✅ Save on blur
+                                onBlur={() => handleRename(conv.id)}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter")
                                     handleRename(conv.id);
@@ -453,14 +484,13 @@ const Sidebar = () => {
                                 }}
                                 className="bg-transparent border-b border-gray-400 outline-none w-full"
                               />
-
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleRename(conv.id);
                                 }}
                                 title="Save"
-                                className="text-green-500 hover:text-green-700">
+                                className="text-green-500 hover:text-green-700 flex-shrink-0">
                                 <Save
                                   size={20}
                                   color="#4dff00"
@@ -469,31 +499,28 @@ const Sidebar = () => {
                               </button>
                             </div>
                           ) : (
-                            <span title={conv.name || "New Chat"}>
-                              {(conv.name || "New Chat").length > 20
-                                ? (conv.name || "New Chat").substring(0, 17) +
-                                  "..."
-                                : conv.name || "New Chat"}
+                            <span 
+                              title={conv.name || "New Chat"}
+                              className="block truncate pr-2">
+                              {conv.name || "New Chat"}
                             </span>
                           )}
                         </div>
 
                         {/* Dropdown trigger */}
-                        <div className="relative">
+                        <div className="relative flex-shrink-0" data-dropdown-id={conv.id}>
                           <span
-                            className="ml-2 flex justify-center items-center cursor-pointer"
+                            className="ml-2 flex justify-center items-center cursor-pointer p-1 hover:bg-black/10 rounded"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setDropdownId(
-                                dropdownId === conv.id ? null : conv.id
-                              );
+                              handleDropdownOpen(conv.id);
                             }}>
-                            <Ellipsis />
+                            <ChevronDown size={16} />
                           </span>
 
                           {/* Dropdown menu */}
                           {dropdownId === conv.id && (
-                            <div className="absolute right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-300 rounded shadow-md z-50">
+                            <div className="absolute right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-300 rounded shadow-md z-50 min-w-[120px]">
                               <button
                                 className="block px-4 py-2 font-bold text-sm text-gray-700 hover:bg-gray-100 dark:bg-gray-600 w-full text-left dark:text-white"
                                 onClick={(e) => {
@@ -502,22 +529,22 @@ const Sidebar = () => {
                                   setEditText(conv.name || "New Chat");
                                   setDropdownId(null);
                                 }}>
-                                  <span className="flex gap-1"> Rename <Pen size={16}  /></span>
-                               
+                                <span className="flex gap-2 items-center"> 
+                                  <Pen size={14} />
+                                  Rename 
+                                </span>
                               </button>
                               <button
                                 className="block px-4 py-2 text-sm text-red-600 hover:bg-red-100 hover:dark:bg-red-800 font-bold hover:dark:text-black w-full text-left"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeleteConversation(
-                                    conv.id,
-                                    token,
-                                    dispatch
-                                  ); // pass token & dispatch
+                                  handleDeleteConversation(conv.id, token, dispatch);
                                   setDropdownId(null);
                                 }}>
-                                  <span className="flex gap-1"> Delete<Trash size={16}   /></span>
-                               
+                                <span className="flex gap-2 items-center"> 
+                                  <Trash size={14} />
+                                  Delete
+                                </span>
                               </button>
                             </div>
                           )}
@@ -529,54 +556,80 @@ const Sidebar = () => {
             )}
 
             {conversations.length === 0 && (
-              <p className="text-gray-400">No conversations found</p>
+              <div className="space-y-4 animate-pulse">
+                {[...Array(6)].map((_, idx) => (
+                  <div key={idx} className="flex items-center space-x-4">
+                    <div className="w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600"></div>
+                    <div className="flex-1 h-4 bg-gray-400 dark:bg-gray-600 rounded"></div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
 
-        {/* Footer Buttons */}
-        <div
-          className={` ${
-            isCollapsed ? "md:w-12" : "md:w-52"
-          }  buttons  absolute bottom-1 mb-3 flex flex-col gap-4`}>
+        {/* Footer Buttons - Always at bottom with absolute positioning */}
+        <div className={`absolute bottom-2 left-2 right-2 flex flex-col gap-3 ${
+          isCollapsed ? " " : ""
+        }`}>
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className={`bg-white p-2 flex items-center gap-4 dark:bg-gray-600 text-black dark:text-white border border-black dark:border-white rounded-lg cursor-pointer`}>
-            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            className={`relative overflow-hidden p-2 flex items-center gap-3 
+                      bg-[#282828] dark:bg-slate-200 text-white dark:text-black 
+                      hover:bg-slate-200 hover:text-black border border-black dark:border-white 
+                      rounded-lg cursor-pointer transition-all duration-300 ${
+                        isCollapsed ? "w-12 h-12 " : "w-full"
+                      }`}>
+            
+            {/* Animated Icon Swap */}
+            <div className="relative w-5 h-5 flex-shrink-0">
+              <div
+                className={`absolute inset-0 transition-transform duration-500 ${
+                  darkMode ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0"
+                }`}>
+                <Sun size={18} />
+              </div>
+              <div
+                className={`absolute inset-0 transition-transform duration-500 ${
+                  darkMode ? "translate-x-full opacity-0" : "translate-x-0 opacity-100"
+                }`}>
+                <Moon size={18} />
+              </div>
+            </div>
+
+            {/* Animated Text Label */}
             <span
-              className={`transition-all duration-300 ${
-                isCollapsed
-                  ? "opacity-0 scale-x-0 w-0"
-                  : "opacity-100 scale-x-100 w-auto"
-              }`}>
+              className={`transition-all duration-500 ease-in-out
+              ${isCollapsed ? "opacity-0 scale-x-0 w-0" : "opacity-100 scale-x-100 w-auto"}
+              whitespace-nowrap`}>
               {darkMode ? "Light Mode" : "Dark Mode"}
             </span>
           </button>
+
           {/* Help */}
-          <span
-            className={`bg-white p-2 flex items-center gap-4 dark:bg-gray-600 text-black dark:text-white border border-black dark:border-white rounded-lg cursor-pointer`}>
-            <BadgeHelp size={18} />
+          <Link to="/about"
+            className={`bg-gradient-to-r from-[#0000B5] to-[#0076FF] hover:bg-gradient-to-r hover:from-[#0076FF] hover:to-[#0000B5] p-2 flex items-center gap-3 text-white border border-black dark:border-white rounded-lg cursor-pointer transition-all duration-300 ${
+              isCollapsed ? "w-12 h-12 justify-center" : "w-full"
+            }`}>
+            <BadgeHelp size={18} className="flex-shrink-0" />
             <span
-              className={`transition-all duration-300 ${
-                isCollapsed
-                  ? "opacity-0 scale-x-0 w-0"
-                  : "opacity-100 scale-x-100 w-auto"
-              }`}>
-              <Link to="/about">About Us</Link>
+              className={`transition-all duration-500 ease-in-out
+              ${isCollapsed ? "opacity-0 scale-x-0 w-0" : "opacity-100 scale-x-100 w-auto"}
+              whitespace-nowrap`}>
+              About us
             </span>
-          </span>
+          </Link>
         </div>
       </div>
-    </div>
 
-    {/* Mobile Menu Button */}
-    <button
-      className="md:hidden fixed top-4 left-4 z-30 p-1 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-all duration-300"
-      onClick={() => setIsOpen(!isOpen)}>
-      {isOpen ? <X size={24} /> : <Menu size={24} />}
-    </button>
-  </div>
+      {/* Mobile Menu Button */}
+      <button
+        className="md:hidden fixed top-4 left-4 z-30 p-1 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-all duration-300"
+        onClick={() => setIsOpen(!isOpen)}>
+        {isOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
+    </div>
   );
 };
 

@@ -72,7 +72,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: "/ai/", // make sure this matches your actual deployment path
+  base: "/", // make sure this matches your actual deployment path
   build: {
     outDir: "dist",
     assetsDir: "assets",
@@ -93,7 +93,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
-      "pdfjs-dist/legacy/build/pdf.worker.min.js",
+      // "pdfjs-dist/legacy/build/pdf.worker.min.js",
        
       "remark-gfm",
       "rehype-raw"

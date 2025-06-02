@@ -5,6 +5,26 @@ import axios from "axios";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Login API
+// export const login = async (credentials) => {
+//   try {
+//     const response = await axios.post(`${API_BASE_URL}/auth/login`, credentials);
+    
+//     console.log("🔍 Raw Axios Response:", response); // Check raw response
+//     console.log("🔍 Response Data:", response.data); // Ensure .data exists
+
+//     return response.data; // ✅ Return actual data
+//   } catch (error) {
+//     if (error.response) {
+//       console.error("❌ Login API Error (Response):", error.response.data);
+//     } else if (error.request) {
+//       console.error("❌ Login API Error (No Response):", error.request);
+//     } else {
+//       console.error("❌ Login API Error (Other):", error.message);
+//     }
+//     return null; // Prevents breaking the app
+//   }
+// };
+
 export const login = async (credentials) => {
   try {
     const response = await axios.post(`${API_BASE_URL}/auth/login`, credentials);
@@ -14,24 +34,99 @@ export const login = async (credentials) => {
 
     return response.data; // ✅ Return actual data
   } catch (error) {
+    let errorMsg = "Login failed!";
     if (error.response) {
       console.error("❌ Login API Error (Response):", error.response.data);
+      errorMsg = error.response.data?.error || errorMsg;
     } else if (error.request) {
       console.error("❌ Login API Error (No Response):", error.request);
+      errorMsg = "No response from server.";
     } else {
       console.error("❌ Login API Error (Other):", error.message);
+      errorMsg = error.message;
     }
-    return null; // Prevents breaking the app
+
+    // ❌ Throw the error to be caught by the thunk
+    throw new Error(errorMsg);
+  }
+};
+
+ 
+ 
+
+// Fetch user, token, and conversation ID from Google callback route
+export const fetchGoogleCallbackData = async (credentials) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/google/callback`,credentials );
+console.log("🔍 Google Callback Response:", response);
+console.log("🔍 Response Data:", response.data); // Ensure .data exists
+
+    if (!response.ok) {
+      throw new Error("❌ Google login failed");
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.error || "Google login failed");
+    }
+
+    return data; // Return the data containing token, user, and conversation_id
+  } catch (error) {
+    console.error("❌ Error in API call:", error.message);
+    throw error; // Rethrow the error to be caught in the Redux action
   }
 };
 
 
+export const initiateGoogleLogin = () => {
+  window.location.href = `${API_BASE_URL}/auth/google`;
+};
+
+ 
 
 // Signup API
+
+
 export const signup = async (credentials) => {
   const response = await axios.post(`${API_BASE_URL}/auth/signup`, credentials);
   return response.data;
 };
+
+
+// New: Verify OTP API
+export const verifyOtp = async (data) => {
+  const response = await axios.post(`${API_BASE_URL}/auth/verify-otp`, data);
+  return response.data;
+};
+
+// New: Resend OTP API
+export const resendOtp = async (data) => {
+  const response = await axios.post(`${API_BASE_URL}/auth/signup`, data); 
+  // Assuming resend is the same endpoint as signup sending OTP again
+  return response.data;
+};
+
+export const sendForgotPasswordOtp = async (email) => {
+  const response = await axios.post(`${API_BASE_URL}/auth/forgot-password`, { email });
+  return response.data;
+};
+
+export const verifyResetOtp = async ({ email, otp }) => {
+  const response = await axios.post(`${API_BASE_URL}/auth/verify-reset-otp`, { email, otp });
+  return response.data;
+};
+
+export const resetPassword = async ({ email, otp, newPassword, confirmPassword }) => {
+  const response = await axios.post(`${API_BASE_URL}/auth/reset-password`, {
+    email,
+    otp,
+    newPassword,
+    confirmPassword,
+  });
+  return response.data;
+};
+
 
 // Fetch user's conversations
 export const fetchConversations = async (token) => {
@@ -183,6 +278,27 @@ export const uploadFinalAudio = async (blob, token) => {
 
 // Send a message from voice (used by startRealtimeAI)
  
+export const fetchUserDetails = async (token) => {
+  const response = await fetch(`${API_BASE_URL}/auth/userDetails`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response;
+};
 
+// guest mode 
+export const sendGuestMessage = async (plainText) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/chat/guest-chat`, {
+      userMessage: plainText, // ✅ Correct key
+    });
+    return response.data;
+  } catch (error) {
+    console.error("❌ Error sending guest message:", error);
+    throw error;
+  }
+};
 
   

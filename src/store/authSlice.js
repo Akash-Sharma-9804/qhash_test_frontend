@@ -42,10 +42,10 @@
 
 // //     const newConversation = await createNewConversation(data.token);
 
-// //     dispatch(setUser({ 
-// //       user: data.user, 
-// //       token: data.token, 
-// //       conversationId: newConversation.id 
+// //     dispatch(setUser({
+// //       user: data.user,
+// //       token: data.token,
+// //       conversationId: newConversation.id
 // //     }));
 
 // //   } catch (error) {
@@ -83,14 +83,6 @@
 //   }
 // };
 
-
-
-
-
-
-
-
-
 // // Async Thunk to handle Signup + Auto-create Conversation
 // export const signupUser = (credentials) => async (dispatch) => {
 //   try {
@@ -105,13 +97,41 @@
 
 // export default authSlice.reducer;
 import { createSlice } from "@reduxjs/toolkit";
-import { createNewConversation, login, signup } from "../api_Routes/api";
+import {
+  createNewConversation,
+  login,
+  signup,
+   fetchUserDetails,
+   fetchGoogleCallbackData,
+} from "../api_Routes/api";
 
-// Hydrate state from localStorage
+// ✅ Safe JSON parse with auto-clean on error
+const safeParseJSON = (key) => {
+  try {
+    const value = localStorage.getItem(key);
+    if (!value || value === "undefined" || value === "null") return null;
+    return JSON.parse(value);
+  } catch (err) {
+    console.error(`❌ Failed to parse localStorage key "${key}". Removing corrupted value.`, err);
+    localStorage.removeItem(key);
+    return null;
+  }
+};
+
+// ✅ Safe fallback for conversationId
+const getSafeConversationId = () => {
+  const value = localStorage.getItem("conversation_id");
+  return value && value !== "undefined" ? value : null;
+};
+ 
 const initialState = {
-  user: JSON.parse(localStorage.getItem("user")) || null,
+  // user: localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : null,
+    user: safeParseJSON("user"),
+
   token: localStorage.getItem("token") || null,
-  conversationId: localStorage.getItem("conversation_id") || null,
+  conversationId: getSafeConversationId(),
+   guest: localStorage.getItem("guest") === "true" || false,
+     showGreeting: true,
 };
 
 const authSlice = createSlice({
@@ -119,29 +139,44 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     setUser: (state, action) => {
+      //  console.log("User payload:", action.payload.user); // Debugging line
       state.user = action.payload.user;
       state.token = action.payload.token;
       state.conversationId = action.payload.conversationId;
-
+       state.guest = false;
+//  console.log("User saved in Redux state:", state.user);
       // ✅ Save to localStorage
       localStorage.setItem("user", JSON.stringify(action.payload.user));
       localStorage.setItem("token", action.payload.token);
       localStorage.setItem("conversation_id", action.payload.conversationId);
+      localStorage.setItem("guest", "false");
     },
     logout: (state) => {
       state.user = null;
       state.token = null;
       state.conversationId = null;
-
+ state.guest = false;
       // ✅ Clear localStorage
       localStorage.removeItem("user");
       localStorage.removeItem("token");
       localStorage.removeItem("conversation_id");
+       localStorage.removeItem("guest");
+    },
+      setGuestMode: (state) => {
+      state.user = null;
+      state.token = null;
+      state.conversationId = "guest";
+      state.guest = true;
+
+      localStorage.setItem("guest", "true");
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      localStorage.setItem("conversation_id", "guest");
     },
   },
 });
 
-export const { setUser, logout } = authSlice.actions;
+export const { setUser, logout,setGuestMode } = authSlice.actions;
 
 // ✅ Login Thunk
 export const loginUser = (credentials) => async (dispatch) => {
@@ -156,12 +191,14 @@ export const loginUser = (credentials) => async (dispatch) => {
 
     console.log("✅ Received Token:", data.token);
     console.log("✅ Conversation ID from Login:", data.conversation_id);
-
-    dispatch(setUser({
-      user: data.user,
-      token: data.token,
-      conversationId: data.conversation_id,
-    }));
+    console.log("✅ User ID from Login:", data.user);
+    dispatch(
+      setUser({
+        user: data.user,
+        token: data.token,
+        conversationId: data.conversation_id,
+      })
+    );
 
     return { payload: data }; // ✅ Return the full data
   } catch (error) {
@@ -174,17 +211,72 @@ export const loginUser = (credentials) => async (dispatch) => {
 export const signupUser = (credentials) => async (dispatch) => {
   try {
     const data = await signup(credentials);
-    
 
-    dispatch(setUser({
-      user: data.user,
-      token: data.token,
-      conversationId: data.conversation_id,
-    }));
+    dispatch(
+      setUser({
+        user: data.user,
+        token: data.token,
+        conversationId: data.conversation_id,
+      })
+    );
     return { payload: data };
   } catch (error) {
     console.error("❌ Signup failed:", error);
-    return { error: error.message };  
+     // Extract the actual error message from backend
+    const errorMessage =
+      error.response?.data?.error || "Signup failed. Please try again.";
+    return { error: errorMessage };
+  }
+};
+
+// export const getUser = () => async (dispatch) => {
+//   try {
+//     const data = await fetchUserDetails(); // fetches from /auth/me
+
+//     console.log("🔍 Raw API Response:", data);
+
+//     if (!data?.success || !data?.user?.user_id) {
+//       throw new Error("❌ Missing user data or success flag");
+//     }
+
+//     console.log("✅ User fetched:", data.user);
+//     console.log("✅ Conversation ID:", data.conversation_id);
+
+//     dispatch(
+//       setUser({
+//         user: data.user,
+//         token: null,               // token is in cookie, so no need here
+//         conversationId: data.conversation_id,
+//       })
+//     );
+
+//     return { payload: data }; // optional if you want to use .unwrap()
+//   } catch (error) {
+//     console.error("❌ Get user failed:", error);
+//     return { error: error.message };
+//   }
+// };
+// ✅ Google Sign-In Thunk
+export const googleSignIn = (token, user, conversationId) => async (dispatch) => {
+// console.log("✅ user.",user);
+  try {
+    // Assuming you are receiving the full user data from Google
+    dispatch(
+      setUser({
+        user: user, // Full user details from Google
+        token: token, // JWT token
+        conversationId: conversationId, // Conversation ID from Google login
+      })
+    );
+
+    // Store the token in localStorage for persistence
+    // localStorage.setItem("token", token);
+    // localStorage.setItem("user", JSON.stringify(user));
+    // localStorage.setItem("conversation_id", conversationId);
+
+    // console.log("✅ Google Sign-In successful, user details stored in Redux and localStorage.");
+  } catch (error) {
+    console.error("❌ Google Sign-In failed:", error);
   }
 };
 

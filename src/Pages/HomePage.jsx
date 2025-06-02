@@ -1,26 +1,39 @@
-import React from 'react'
+import React from "react";
 import { useState, useEffect, useRef } from "react";
+import { useSelector, useDispatch } from "react-redux";
 
-import ChatArea from '../components/ChatArea';
+import ChatArea from "../components/ChatArea";
 
-import Sidebar from '../components/Sidebar';
+import Sidebar from "../components/Sidebar";
 
 const HomePage = () => {
-   
-    const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  // ✅ Check if user is authenticated
+  const user = useSelector((state) => state.auth.user);
+
+  // ✅ Determine guest mode
+  const isGuest = !user;
+
   return (
-    <div className=' font-mono  h-screen overflow-hidden   text-white   '>
+    <div className=" font-mono  h-screen overflow-hidden   text-white   ">
       <div className="flex h-screen overflow-auto">
-      
-      <Sidebar isCollapsed={!isSidebarOpen} setSidebarOpen={setSidebarOpen} />
-      
-    <ChatArea isCollapsed={!isSidebarOpen } setSidebarOpen={setSidebarOpen} />
-     
- </div>
+       {!isGuest && (
+  <Sidebar
+    isGuest={isGuest}
+    isCollapsed={!isSidebarOpen}
+    setSidebarOpen={setSidebarOpen}
+  />
+)}
+
+
+        <ChatArea
+          isGuest={isGuest}
+          isCollapsed={!isSidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+        />
+      </div>
     </div>
- 
+  );
+};
 
-  )
-}
-
-export default HomePage
+export default HomePage;

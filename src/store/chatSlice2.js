@@ -95,6 +95,8 @@ const initialState = {
   conversations: [],
   activeConversation: null,
   messages: {}, // ✅ Per-conversation messages
+   isGuest: false,              // <-- track if guest mode is active
+  guestConversationId: null,   // <-- store guest conversation ID
 };
 
 const chatSlice2 = createSlice({
@@ -110,12 +112,23 @@ const chatSlice2 = createSlice({
         state.messages[action.payload] = [];
       }
     },
-    addConversation: (state, action) => {
-      state.conversations.unshift(action.payload);
-    },
+   addConversation: (state, action) => {
+  // Check if conversation already exists
+  const existingConversation = state.conversations.find(
+    conv => conv.id === action.payload.id
+  );
+  
+  if (!existingConversation) {
+    // Only add if it doesn't exist
+    state.conversations.unshift(action.payload);
+    console.log("✅ Added conversation to Redux:", action.payload.id);
+  } else {
+    console.log("⚠️ Conversation already exists in Redux:", action.payload.id);
+  }
+},
     setMessages: (state, action) => {
       const { conversationId, messages } = action.payload;
-      console.log("📦 Setting messages in Redux for:", conversationId, messages); // <-- Add this
+      // console.log("📦 Setting messages in Redux for:", conversationId, messages); // <-- Add this
       state.messages[conversationId] = messages;
     },
     removeConversationFromRedux: (state, action) => {
@@ -141,6 +154,7 @@ const chatSlice2 = createSlice({
       const newMessage = {
         ...message,
         files: message.files || [], // Ensure files array is present
+         suggestions: message.suggestions || [], // ✅ add this
       };
 
       state.messages[conversationId].push(newMessage);
@@ -168,6 +182,7 @@ const chatSlice2 = createSlice({
       state.activeConversation = null;
       state.messages = {};
       localStorage.removeItem("conversation_id"); // fix key name
+      localStorage.removeItem("guest_conversation_id"); // clear guest ID
     },
 
     resetChat: (state) => {
@@ -181,6 +196,17 @@ const chatSlice2 = createSlice({
           (msg) => msg.id !== id
         );
       }
+    },
+      setGuestMode: (state, action) => {
+      state.isGuest = action.payload;
+      if (!action.payload) {
+        state.guestConversationId = null;
+        localStorage.removeItem("guest_conversation_id");
+      }
+    },
+    setGuestConversationId: (state, action) => {
+      state.guestConversationId = action.payload;
+      localStorage.setItem("guest_conversation_id", action.payload);
     },
     
   },
@@ -198,6 +224,8 @@ export const {
   renameConversationRedux,
   removeConversationFromRedux,
   resetChat,
+  setGuestMode,           // Export guest mode toggle
+  setGuestConversationId, // Export guest conv id setter
 } = chatSlice2.actions;
 
 export default chatSlice2.reducer;
