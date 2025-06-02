@@ -1,15 +1,15 @@
 {
   "name": "chat",
-  "homepage": "https://qhashai.com/",
+  "homepage": " ",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --force",
-    "build": "vite build && cp .htaccess dist/.htaccess",
+    "build": "vite build ",
     "lint": "eslint .",
     "preview": "vite preview",
-    "proxy": "https://quantumhash-backend.onrender.com"
+    "proxy": "https://qhash-test.onrender.com"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.3.0",
