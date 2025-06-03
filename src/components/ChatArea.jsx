@@ -557,77 +557,163 @@ const handleCopyCode = (content, messageId) => {
   const handleSendMessage = async (customText) => {
     //  console.log("💥 handleSendMessage fired", { customText });
     const messageText =
-      typeof customText === "string"
-        ? customText.trim()
-        : inputMessage.trim?.() || "";
-    if (!messageText && files.length === 0) return;
+    typeof customText === "string"
+      ? customText.trim()
+      : inputMessage.trim?.() || "";
+  if (!messageText && files.length === 0) return;
 
-    textareaRef.current.style.height = "44px";
+  textareaRef.current.style.height = "44px";
+  const plainText =
+    typeof customText === "string" && customText.trim()
+      ? customText.trim()
+      : inputMessage.trim();
+  if (!plainText && files.length === 0) return;
 
-    const plainText =
-      typeof customText === "string" && customText.trim()
-        ? customText.trim()
-        : inputMessage.trim();
-    if (!plainText && files.length === 0) return;
+  // ✅ Guest Mode with Streaming
+  if (isGuest) {
+    const userMessage = {
+      id: Date.now(),
+      conversationId: guestConversationId || "guest",
+      message: plainText,
+      sender: "user",
+      files: [],
+    };
 
-    // ✅ Guest Mode
-    if (isGuest) {
-      const userMessage = {
-        id: Date.now(),
+    setInputMessage("");
+    setFiles([]);
+    setBotTyping(true);
+    setLoading(true);
+
+    dispatch(
+      addMessage({
         conversationId: guestConversationId || "guest",
-        message: plainText,
-        sender: "user",
-        files: [],
-      };
-      setInputMessage("");
-      setFiles([]);
-      setBotTyping(true);
-      setLoading(true); // 🔐 Disable send button here
+        message: userMessage,
+      })
+    );
+
+    // Create initial bot message for streaming
+    let currentBotMessageId = Date.now() + 1;
+    let streamingResponse = "";
+
+    const initialBotMessage = {
+      id: currentBotMessageId,
+      conversationId: guestConversationId || "guest",
+      message: "",
+      sender: "bot",
+      response: "",
+      isNewMessage: true,
+      suggestions: [],
+      isStreaming: true, // Flag to show it's streaming
+    };
+
+    dispatch(
+      addMessage({
+        conversationId: guestConversationId || "guest",
+        message: initialBotMessage,
+      })
+    );
+
+    console.log("📤 Sending guest message with streaming:", plainText);
+
+    try {
+      await sendGuestMessage(plainText, (streamData) => {
+        switch (streamData.type) {
+          case "start":
+            console.log("🚀 Guest stream started:", streamData.data);
+            break;
+          
+          case "content":
+            streamingResponse = streamData.fullResponse;
+            
+            // Hide typing indicator when first content arrives
+            if (streamingResponse.trim().length > 0) {
+              setBotTyping(false);
+            }
+
+            // Update the message in real-time as content streams
+            dispatch(
+              updateMessage({
+                conversationId: guestConversationId || "guest",
+                id: currentBotMessageId,
+                message: streamingResponse,
+                response: streamingResponse,
+              })
+            );
+            break;
+          
+          case "end":
+            // Final update with suggestions and complete response
+            dispatch(
+              updateMessage({
+                conversationId: guestConversationId || "guest",
+                id: currentBotMessageId,
+                message: streamData.fullResponse,
+                response: streamData.fullResponse,
+                suggestions: streamData.suggestions || [],
+                isStreaming: false,
+              })
+            );
+            setBotTyping(false);
+            
+            // Update localStorage with final messages
+            const finalUserMessage = userMessage;
+            const finalBotMessage = {
+              id: currentBotMessageId,
+              conversationId: guestConversationId || "guest",
+              message: streamData.fullResponse,
+              sender: "bot",
+              response: streamData.fullResponse,
+              suggestions: streamData.suggestions || [],
+            };
+
+            const prevGuestChat = JSON.parse(
+              localStorage.getItem("guest_chat") || "[]"
+            );
+            localStorage.setItem(
+              "guest_chat",
+              JSON.stringify([...prevGuestChat, finalUserMessage, finalBotMessage])
+            );
+            
+            console.log("✅ Guest stream completed");
+            break;
+          
+          case "error":
+            dispatch(
+              updateMessage({
+                conversationId: guestConversationId || "guest",
+                id: currentBotMessageId,
+                message: streamData.error || "❌ Failed to get a response.",
+                response: streamData.error || "❌ Failed to get a response.",
+                isStreaming: false,
+              })
+            );
+            setBotTyping(false);
+            toast.error("❌ Guest response failed.");
+            break;
+        }
+      });
+
+    } catch (error) {
+      console.error("❌ Guest mode streaming error:", error);
+      
+      // Update the bot message with error
       dispatch(
-        addMessage({
+        updateMessage({
           conversationId: guestConversationId || "guest",
-          message: userMessage,
+          id: currentBotMessageId,
+          message: "❌ Failed to get a response.",
+          response: "❌ Failed to get a response.",
+          isStreaming: false,
         })
       );
-      console.log("📤 Sending guest message:", plainText);
-      try {
-        const res = await sendGuestMessage(plainText);
-        const aiResponse = res.response || "🧠 No AI response received.";
-        const suggestions = res.suggestions || [];
-        const botMessage = {
-          id: Date.now() + 1,
-          conversationId: guestConversationId || "guest",
-          message: aiResponse,
-          sender: "bot",
-          response: aiResponse,
-          isNewMessage: true,
-          suggestions, // ✅ Include suggestions if needed
-        };
-        dispatch(
-          addMessage({
-            conversationId: guestConversationId || "guest",
-            message: botMessage,
-          })
-        );
-        setBotTyping(false);
-        const prevGuestChat = JSON.parse(
-          localStorage.getItem("guest_chat") || "[]"
-        );
-        localStorage.setItem(
-          "guest_chat",
-          JSON.stringify([...prevGuestChat, userMessage, botMessage])
-        );
-        return;
-      } catch (error) {
-        console.error("❌ Guest mode error:", error);
-        setBotTyping(false);
-        toast.error("❌ Failed to get guest response.");
-      } finally {
-        setLoading(false); // 🔓 Re-enable send button here
-      }
-      return;
+      
+      setBotTyping(false);
+      toast.error("❌ Failed to get guest response.");
+    } finally {
+      setLoading(false);
     }
-
+    return;
+  }
     // ✅ Logged-in user flow
     const token = localStorage.getItem("token");
     const user_id = user?.user_id || localStorage.getItem("user_id");

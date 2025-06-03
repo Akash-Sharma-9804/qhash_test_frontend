@@ -391,12 +391,79 @@ export const fetchUserDetails = async (token) => {
 };
 
 // guest mode 
-export const sendGuestMessage = async (plainText) => {
+export const sendGuestMessage = async (plainText, onStream) => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/chat/guest-chat`, {
-      userMessage: plainText, // ✅ Correct key
+    const response = await fetch(`${API_BASE_URL}/chat/guest-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userMessage: plainText,
+      }),
     });
-    return response.data;
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // Handle streaming response
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullResponse = '';
+    let suggestions = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n').filter(Boolean);
+
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line);
+          
+          switch (data.type) {
+            case 'start':
+              onStream?.({
+                type: 'start',
+                data: data
+              });
+              break;
+            case 'content':
+              fullResponse += data.content;
+              onStream?.({
+                type: 'content',
+                content: data.content,
+                fullResponse: fullResponse
+              });
+              break;
+            case 'end':
+              suggestions = data.suggestions || [];
+              onStream?.({
+                type: 'end',
+                fullResponse: data.full_response || fullResponse,
+                suggestions: suggestions
+              });
+              break;
+            case 'error':
+              onStream?.({
+                type: 'error',
+                error: data.error
+              });
+              throw new Error(data.error);
+          }
+        } catch (parseError) {
+          console.error('Parse error:', parseError);
+        }
+      }
+    }
+
+    return {
+      response: fullResponse,
+      suggestions: suggestions
+    };
   } catch (error) {
     console.error("❌ Error sending guest message:", error);
     throw error;
