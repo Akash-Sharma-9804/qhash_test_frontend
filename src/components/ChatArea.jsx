@@ -53,6 +53,8 @@ import { v4 as uuidv4 } from "uuid";
 // import AudioVisualizer from 'react-audio-visualize';
 import RadialVisualizer from "./RadialVisualizer";
 import { FaMicrophone, FaStop, FaPause, FaPlay } from "react-icons/fa";
+ 
+
 const ChatArea = ({ isGuest }) => {
   const [loading, setLoading] = useState(false);
   const [botTyping, setBotTyping] = useState("");
@@ -101,17 +103,32 @@ const ChatArea = ({ isGuest }) => {
   // scroll button prop
   const chatContainerRef = useRef(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
-
+const markdownRefs = useRef({});
   // const API_BASE_URL = "https://quantumhash-backend-1.onrender.com/api"; // Replace with your backend URL
 
   const WSS_BASE_URL = import.meta.env.VITE_WSS_API_BASE_URL;
 
   // copy button
-  const handleCopyCode = (code) => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1000);
-  };
+
+const handleCopyCode = (content, messageId) => {
+  const markdownRef = markdownRefs.current[messageId];
+  
+  if (markdownRef && markdownRef.getFormattedText) {
+    // Get the formatted text from the rendered component
+    const formattedText = markdownRef.getFormattedText();
+    console.log("Formatted text to copy:", formattedText.substring(0, 200));
+    navigator.clipboard.writeText(formattedText);
+  } else {
+    // Fallback to original content
+    console.log("Fallback to raw content");
+    navigator.clipboard.writeText(content);
+  }
+  
+  setCopied(true);
+  setTimeout(() => setCopied(false), 1000);
+};
+
+
 
   const handleLoginPrompt = () => setShowLoginPrompt(true);
 
@@ -165,47 +182,7 @@ const ChatArea = ({ isGuest }) => {
 
   // greeting text function starts
 
-  // const generateGreeting = () => {
-  //   const greetingText = " Hacking the Quantum, no limits!....";
-  //   let index = 0;
-  //   let typedText = "";
-
-  //   const interval = setInterval(() => {
-  //     if (index < greetingText.length) {
-  //       typedText += greetingText[index];
-  //       setGreeting(typedText);
-  //       index++;
-  //     } else {
-  //       clearInterval(interval);
-  //       setGreeting(greetingText); // Keep the full greeting
-  //     }
-  //   }, 60);
-  // };
-  // test
-  // const generateGreeting = () => {
-  //   const greetingOptions = [
-  //     "Explore Like Never Before. The Quantum Way!!!",
-  //     "Say Hello to the Quantum Future",
-  //     "I'm QuantumAI, bringing intelligence to the conversation.",
-  //   ];
-
-  //   const selectedGreeting =
-  //     greetingOptions[Math.floor(Math.random() * greetingOptions.length)];
-
-  //   let index = 0;
-  //   let typedText = "";
-
-  //   const interval = setInterval(() => {
-  //     if (index < selectedGreeting.length) {
-  //       typedText += selectedGreeting[index];
-  //       setGreeting(typedText + '<span class="blinker">|</span>');
-  //       index++;
-  //     } else {
-  //       clearInterval(interval);
-  //       setGreeting(selectedGreeting + '<span class="blinker">|</span>');
-  //     }
-  //   }, 60);
-  // };
+   
   const generateGreeting = () => {
     const greetingOptions = [
       "Explore Like Never Before. The Quantum Way!!!",
@@ -235,12 +212,7 @@ const ChatArea = ({ isGuest }) => {
     }, 60);
   };
 
-  // const getTimeBasedGreeting = () => {
-  //   const hour = new Date().getHours();
-  //   if (hour < 12) return "Good morning";
-  //   if (hour < 18) return "Good afternoon";
-  //   return "Night owl";
-  // };
+ 
 
   const getTimeBasedGreeting = () => {
     const hour = new Date().getHours();
@@ -277,33 +249,7 @@ const ChatArea = ({ isGuest }) => {
     }
   }, [activeConversation, messages]);
 
-  // greeting text function ends
-
-  // 5th useeffect
-  // useEffect(() => {
-  //   chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  // }, [messages, botTyping]);
-
-  // 5th useEffect - Scroll to bottom when messages update or bot is typing
-  // useEffect(() => {
-  //   const messagesForConversation = messages[activeConversation];
-
-  //   if (!messagesForConversation || messagesForConversation.length === 0)
-  //     return;
-
-  //   const scrollToBottom = () => {
-  //     // Wait for DOM to update first
-  //     setTimeout(() => {
-  //       if (chatEndRef.current) {
-  //         chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-  //         console.log("Scrolled to bottom after switching conversation.");
-  //       }
-  //     }, 100); // 100ms gives React time to render
-  //   };
-
-  //   scrollToBottom();
-  // }, [activeConversation, messages[activeConversation]?.length]);
-
+   
   useEffect(() => {
     // Get current conversation messages based on mode
     const currentMessages = conversationMessages; // This already handles guest vs user mode
@@ -363,23 +309,265 @@ const ChatArea = ({ isGuest }) => {
 
   // working handlesend message function starts
 
+  // const handleSendMessage = async (customText) => {
+  //   //  console.log("💥 handleSendMessage fired", { customText });
+  //   const messageText =
+  //     typeof customText === "string"
+  //       ? customText.trim()
+  //       : inputMessage.trim?.() || "";
+
+  //   if (!messageText && files.length === 0) return;
+
+  //   textareaRef.current.style.height = "44px";
+
+  //   // const plainText = messageText.trim();
+  //   const plainText =
+  //     typeof customText === "string" && customText.trim()
+  //       ? customText.trim()
+  //       : inputMessage.trim();
+
+  //   if (!plainText && files.length === 0) return;
+
+  //   // ✅ Guest Mode
+  //   if (isGuest) {
+  //     const userMessage = {
+  //       id: Date.now(),
+  //       conversationId: guestConversationId || "guest",
+  //       message: plainText,
+  //       sender: "user",
+  //       files: [],
+  //     };
+
+  //     setInputMessage("");
+  //     setFiles([]);
+  //     setBotTyping(true);
+  //     setLoading(true); // 🔐 Disable send button here
+  //     dispatch(
+  //       addMessage({
+  //         conversationId: guestConversationId || "guest",
+  //         message: userMessage,
+  //       })
+  //     );
+  //     console.log("📤 Sending guest message:", plainText);
+  //     try {
+  //       const res = await sendGuestMessage(plainText);
+
+  //       const aiResponse = res.response || "🧠 No AI response received.";
+  //       const suggestions = res.suggestions || [];
+
+  //       const botMessage = {
+  //         id: Date.now() + 1,
+  //         conversationId: guestConversationId || "guest",
+  //         message: aiResponse,
+  //         sender: "bot",
+  //         response: aiResponse,
+  //         isNewMessage: true,
+  //         suggestions, // ✅ Include suggestions if needed
+  //       };
+
+  //       dispatch(
+  //         addMessage({
+  //           conversationId: guestConversationId || "guest",
+  //           message: botMessage,
+  //         })
+  //       );
+
+  //       setBotTyping(false);
+
+  //       const prevGuestChat = JSON.parse(
+  //         localStorage.getItem("guest_chat") || "[]"
+  //       );
+  //       localStorage.setItem(
+  //         "guest_chat",
+  //         JSON.stringify([...prevGuestChat, userMessage, botMessage])
+  //       );
+
+  //       return;
+  //     } catch (error) {
+  //       console.error("❌ Guest mode error:", error);
+  //       setBotTyping(false);
+  //       toast.error("❌ Failed to get guest response.");
+  //     } finally {
+  //       setLoading(false); // 🔓 Re-enable send button here
+  //     }
+  //     return;
+  //   }
+
+  //   // ✅ Logged-in user flow
+
+  //   const token = localStorage.getItem("token");
+  //   const user_id = user?.user_id || localStorage.getItem("user_id");
+  //   const conv_id =
+  //     activeConversation || localStorage.getItem("conversation_id");
+
+  //   if (!token) {
+  //     console.error("🚨 Missing token.");
+  //     return;
+  //   }
+
+  //   if (!user_id) {
+  //     console.error("🚨 Missing user_id.");
+  //     return;
+  //   }
+
+  //   // ✅ 1. Prepare user message text (without appending file names - we'll show them separately)
+  //   // const plainText = inputMessage.trim();
+
+  //   // Create user message without embedding file names in the text
+  //   const userMessage = {
+  //     id: Date.now(),
+  //     message: plainText,
+  //     sender: "user",
+  //     files: files.map((f) => ({ name: f.name, type: f.type })),
+  //   };
+
+  //   dispatch(addMessage({ conversationId: conv_id, message: userMessage }));
+  //   setLoading(true); // 🔐 Disable send button here
+  //   setInputMessage("");
+  //   setBotTyping(true);
+  //   setFiles([]);
+  //   try {
+  //     // ✅ 2. Prepare FormData for upload
+  //     const formData = new FormData();
+  //     if (plainText) formData.append("message", plainText);
+  //     formData.append("user_id", user_id);
+  //     if (conv_id) formData.append("conversation_id", conv_id);
+  //     files.forEach((file) => {
+  //       formData.append("files", file);
+  //     });
+
+  //     // ✅ 3. Upload files
+  //     const uploadResponse = await uploadFiles(formData, token, (event) => {
+  //       const percent = Math.round((event.loaded * 100) / event.total);
+  //       const progressMap = {};
+  //       files.forEach((file) => {
+  //         progressMap[file.name] = percent;
+  //       });
+  //       setUploadProgress(progressMap);
+  //     });
+
+  //     const finalConversationId =
+  //       uploadResponse?.data?.conversation_id ||
+  //       uploadResponse?.conversation_id ||
+  //       conv_id;
+
+  //     if (!activeConversation && finalConversationId) {
+  //       dispatch(setActiveConversation(finalConversationId));
+  //     }
+
+  //     // ✅ 4. Extract metadata to send to chatbot
+  //     const uploaded_file_metadata = uploadResponse?.data?.files || [];
+
+  //     // Update the user message in redux with the proper file metadata
+  //     if (uploaded_file_metadata.length > 0) {
+  //       // Update the message with file names from the backend
+  //       dispatch(
+  //         updateMessage({
+  //           conversationId: finalConversationId,
+  //           id: userMessage.id,
+  //           files: uploaded_file_metadata,
+  //         })
+  //       );
+  //     }
+
+  //     // ✅ 5. Send message to chatbot if there's a user message
+  //     if (plainText || files.length > 0) {
+  //       const chatRes = await sendMessage(
+  //         finalConversationId,
+  //         plainText,
+  //         user_id,
+  //         token,
+  //         uploadResponse?.data?.extracted_summary_raw,
+  //         uploaded_file_metadata
+  //       );
+
+  //       const aiResponse = chatRes?.response || "🧠 No AI response received.";
+  //       const responseFiles = chatRes?.files || [];
+  //       const suggestions = chatRes?.suggestions || []; // 👈 new
+
+  //       const botMessage = {
+  //         id: Date.now() + 1,
+  //         message: aiResponse,
+  //         sender: "bot",
+  //         response: aiResponse,
+  //         files: responseFiles,
+  //         suggestions: suggestions, // 👈 attach suggestions
+  //         isNewMessage: true,
+  //       };
+
+  //       dispatch(
+  //         addMessage({
+  //           conversationId: finalConversationId,
+  //           message: botMessage,
+  //         })
+  //       );
+
+  //       // ✅ stop typing immediately after bot response is added
+  //       setBotTyping(false);
+
+  //       // ✅ 6. Rename is handled by the backend — now refresh conversations list in Sidebar
+  //       const updatedConversations = await fetchConversations(token);
+  //       dispatch(setConversations(updatedConversations?.conversations || []));
+
+  //       // ✅ 7. Fetch updated conversation list after rename
+  //       const currentConv = conversations.find(
+  //         (c) => c.id === finalConversationId
+  //       );
+  //       if (currentConv?.name === "New Conversation") {
+  //         const updatedData = await fetchConversations(token);
+  //         if (updatedData?.conversations) {
+  //           dispatch(setConversations(updatedData.conversations));
+  //           const currentId = localStorage.getItem("conversation_id");
+  //           if (currentId) {
+  //             dispatch(setActiveConversation(Number(currentId)));
+  //           }
+  //         }
+  //       }
+  //     } else if (files.length > 0) {
+  //       // ✅ 8. No user message, only files
+  //       toast.info(
+  //         uploadResponse?.data?.extracted_summary ||
+  //           "🧠 Files received, but no text was extractable.",
+  //         { position: "bottom-right" }
+  //       );
+  //       setBotTyping(false); // ✅ stop here too
+  //     }
+  //   } catch (error) {
+  //     console.error("❌ Error sending message:", error);
+  //     dispatch(
+  //       addMessage({
+  //         conversationId: conv_id,
+  //         message: {
+  //           id: Date.now() + 1,
+  //           message: "❌ Failed to get a response.",
+  //           sender: "bot",
+  //           response: "❌ Failed to get a response.",
+  //         },
+  //       })
+  //     );
+  //     toast.error("❌ Message or file upload failed.");
+  //     setBotTyping(false); // ✅ also stop here in error
+  //     setLoading(false); // 🔓 Re-enable send button here
+  //   } finally {
+  //     // ✅ 9. Cleanup
+  //     setUploadProgress({});
+  //     setLoading(false); // 🔓 Re-enable send button here
+  //   }
+  // };
   const handleSendMessage = async (customText) => {
     //  console.log("💥 handleSendMessage fired", { customText });
     const messageText =
       typeof customText === "string"
         ? customText.trim()
         : inputMessage.trim?.() || "";
-
     if (!messageText && files.length === 0) return;
 
     textareaRef.current.style.height = "44px";
 
-    // const plainText = messageText.trim();
     const plainText =
       typeof customText === "string" && customText.trim()
         ? customText.trim()
         : inputMessage.trim();
-
     if (!plainText && files.length === 0) return;
 
     // ✅ Guest Mode
@@ -391,7 +579,6 @@ const ChatArea = ({ isGuest }) => {
         sender: "user",
         files: [],
       };
-
       setInputMessage("");
       setFiles([]);
       setBotTyping(true);
@@ -405,10 +592,8 @@ const ChatArea = ({ isGuest }) => {
       console.log("📤 Sending guest message:", plainText);
       try {
         const res = await sendGuestMessage(plainText);
-
         const aiResponse = res.response || "🧠 No AI response received.";
         const suggestions = res.suggestions || [];
-
         const botMessage = {
           id: Date.now() + 1,
           conversationId: guestConversationId || "guest",
@@ -418,16 +603,13 @@ const ChatArea = ({ isGuest }) => {
           isNewMessage: true,
           suggestions, // ✅ Include suggestions if needed
         };
-
         dispatch(
           addMessage({
             conversationId: guestConversationId || "guest",
             message: botMessage,
           })
         );
-
         setBotTyping(false);
-
         const prevGuestChat = JSON.parse(
           localStorage.getItem("guest_chat") || "[]"
         );
@@ -435,7 +617,6 @@ const ChatArea = ({ isGuest }) => {
           "guest_chat",
           JSON.stringify([...prevGuestChat, userMessage, botMessage])
         );
-
         return;
       } catch (error) {
         console.error("❌ Guest mode error:", error);
@@ -448,38 +629,32 @@ const ChatArea = ({ isGuest }) => {
     }
 
     // ✅ Logged-in user flow
-
     const token = localStorage.getItem("token");
     const user_id = user?.user_id || localStorage.getItem("user_id");
     const conv_id =
       activeConversation || localStorage.getItem("conversation_id");
-
     if (!token) {
       console.error("🚨 Missing token.");
       return;
     }
-
     if (!user_id) {
       console.error("🚨 Missing user_id.");
       return;
     }
 
     // ✅ 1. Prepare user message text (without appending file names - we'll show them separately)
-    // const plainText = inputMessage.trim();
-
-    // Create user message without embedding file names in the text
     const userMessage = {
       id: Date.now(),
       message: plainText,
       sender: "user",
       files: files.map((f) => ({ name: f.name, type: f.type })),
     };
-
     dispatch(addMessage({ conversationId: conv_id, message: userMessage }));
     setLoading(true); // 🔐 Disable send button here
     setInputMessage("");
     setBotTyping(true);
     setFiles([]);
+
     try {
       // ✅ 2. Prepare FormData for upload
       const formData = new FormData();
@@ -504,14 +679,12 @@ const ChatArea = ({ isGuest }) => {
         uploadResponse?.data?.conversation_id ||
         uploadResponse?.conversation_id ||
         conv_id;
-
       if (!activeConversation && finalConversationId) {
         dispatch(setActiveConversation(finalConversationId));
       }
 
       // ✅ 4. Extract metadata to send to chatbot
       const uploaded_file_metadata = uploadResponse?.data?.files || [];
-
       // Update the user message in redux with the proper file metadata
       if (uploaded_file_metadata.length > 0) {
         // Update the message with file names from the backend
@@ -524,58 +697,137 @@ const ChatArea = ({ isGuest }) => {
         );
       }
 
-      // ✅ 5. Send message to chatbot if there's a user message
+      // ✅ 5. Send message to chatbot with streaming if there's a user message
       if (plainText || files.length > 0) {
-        const chatRes = await sendMessage(
-          finalConversationId,
-          plainText,
-          user_id,
-          token,
-          uploadResponse?.data?.extracted_summary_raw,
-          uploaded_file_metadata
-        );
+        let streamingResponse = "";
+        let currentBotMessageId = Date.now() + 1;
 
-        const aiResponse = chatRes?.response || "🧠 No AI response received.";
-        const responseFiles = chatRes?.files || [];
-        const suggestions = chatRes?.suggestions || []; // 👈 new
-
-        const botMessage = {
-          id: Date.now() + 1,
-          message: aiResponse,
+        // Create initial bot message for streaming
+        const initialBotMessage = {
+          id: currentBotMessageId,
+          message: "",
           sender: "bot",
-          response: aiResponse,
-          files: responseFiles,
-          suggestions: suggestions, // 👈 attach suggestions
+          response: "",
+          files: [],
+          suggestions: [],
           isNewMessage: true,
+          isStreaming: true, // Flag to show it's streaming
         };
 
         dispatch(
           addMessage({
             conversationId: finalConversationId,
-            message: botMessage,
+            message: initialBotMessage,
           })
         );
 
-        // ✅ stop typing immediately after bot response is added
-        setBotTyping(false);
+        try {
+          const chatRes = await sendMessage(
+            finalConversationId,
+            plainText,
+            user_id,
+            token,
+            uploadResponse?.data?.extracted_summary_raw,
+            uploaded_file_metadata,
+            // 🚀 Streaming callback
+            (streamData) => {
+              switch (streamData.type) {
+                case "start":
+                  console.log("🚀 Stream started:", streamData.data);
 
-        // ✅ 6. Rename is handled by the backend — now refresh conversations list in Sidebar
-        const updatedConversations = await fetchConversations(token);
-        dispatch(setConversations(updatedConversations?.conversations || []));
+                  // Update with initial metadata
+                  dispatch(
+                    updateMessage({
+                      conversationId: finalConversationId,
+                      id: currentBotMessageId,
+                      files: streamData.data?.uploaded_files || [],
+                    })
+                  );
+                  break;
 
-        // ✅ 7. Fetch updated conversation list after rename
-        const currentConv = conversations.find(
-          (c) => c.id === finalConversationId
-        );
-        if (currentConv?.name === "New Conversation") {
-          const updatedData = await fetchConversations(token);
-          if (updatedData?.conversations) {
-            dispatch(setConversations(updatedData.conversations));
-            const currentId = localStorage.getItem("conversation_id");
-            if (currentId) {
-              dispatch(setActiveConversation(Number(currentId)));
+                case "content":
+                  streamingResponse = streamData.fullResponse;
+                  // ✅ ADD THIS - Hide thinking when first content arrives
+                  if (streamingResponse.trim().length > 0) {
+                    setBotTyping(false);
+                  }
+                  // Update the message in real-time as content streams
+                  dispatch(
+                    updateMessage({
+                      conversationId: finalConversationId,
+                      id: currentBotMessageId,
+                      message: streamingResponse,
+                      response: streamingResponse,
+                    })
+                  );
+                  break;
+
+                case "end":
+                  // Final update with suggestions and complete response
+                  dispatch(
+                    updateMessage({
+                      conversationId: finalConversationId,
+                      id: currentBotMessageId,
+                      message: streamData.fullResponse,
+                      response: streamData.fullResponse,
+                      suggestions: streamData.suggestions || [],
+                      isStreaming: false,
+                    })
+                  );
+                  setBotTyping(false);
+                  console.log("✅ Stream completed");
+                  break;
+
+                case "error":
+                  dispatch(
+                    updateMessage({
+                      conversationId: finalConversationId,
+                      id: currentBotMessageId,
+                      message:
+                        streamData.error || "❌ Failed to get a response.",
+                      response:
+                        streamData.error || "❌ Failed to get a response.",
+                      isStreaming: false,
+                    })
+                  );
+                  setBotTyping(false);
+                  toast.error("❌ AI response failed.");
+                  break;
+              }
+            }
+          );
+
+          // ✅ 6. Rename is handled by the backend — now refresh conversations list in Sidebar
+          const updatedConversations = await fetchConversations(token);
+          dispatch(setConversations(updatedConversations?.conversations || []));
+
+          // ✅ 7. Fetch updated conversation list after rename
+          const currentConv = conversations.find(
+            (c) => c.id === finalConversationId
+          );
+          if (currentConv?.name === "New Conversation") {
+            const updatedData = await fetchConversations(token);
+            if (updatedData?.conversations) {
+              dispatch(setConversations(updatedData.conversations));
+              const currentId = localStorage.getItem("conversation_id");
+              if (currentId) {
+                dispatch(setActiveConversation(Number(currentId)));
+              }
             }
           }
+        } catch (streamError) {
+          console.error("❌ Streaming error:", streamError);
+          dispatch(
+            updateMessage({
+              conversationId: finalConversationId,
+              id: currentBotMessageId,
+              message: "❌ Failed to get a response.",
+              response: "❌ Failed to get a response.",
+              isStreaming: false,
+            })
+          );
+          setBotTyping(false);
+          toast.error("❌ Message failed to send.");
         }
       } else if (files.length > 0) {
         // ✅ 8. No user message, only files
@@ -609,13 +861,6 @@ const ChatArea = ({ isGuest }) => {
     }
   };
 
-  // handle suggestion click
-  // const handleSuggestionClick = (text) => {
-  //   setInputMessage(text);
-  //   setTimeout(() => {
-  //     handleSendMessage();
-  //   }, 50);
-  // };
   const handleSuggestionClick = (text) => {
     // Remove leading dot if present
     const cleanText = text.replace(/^\.+\s*/, "");
@@ -1036,251 +1281,7 @@ const ChatArea = ({ isGuest }) => {
     setIsResponding(false);
   };
 
-  // try
-  // State and Refs
-  // const [isLiveRecording, setIsliveRecording] = useState(false);
-  // const [isProcessing, setIsProcessing] = useState(false);
-  // const [isResponding, setIsResponding] = useState(false);
-  // const [isTTSPlaying, setIsTTSPlaying] = useState(false);
-
-  // const audioContextRef = useRef(null);
-  // const audioStreamRef = useRef(null);
-  // const processorRef = useRef(null);
-  // const sourceRef = useRef(null);
-  // const wsRef = useRef(null);
-  // const silenceTimeoutRef = useRef(null);
-  // const speakingTimeoutRef = useRef(null);
-
-  // const VOLUME_THRESHOLD = 0.01;
-  // const SILENCE_DELAY = 2000;
-  // const CHUNK_DURATION_MS = 3000;
-
-  // // Start AI Voice
-  // const startAiVoice = async () => {
-  //   try {
-  //     const stream = await navigator.mediaDevices.getUserMedia({
-  //       audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
-  //     });
-
-  //     const audioContext = new AudioContext();
-  //     const source = audioContext.createMediaStreamSource(stream);
-  //     const processor = audioContext.createScriptProcessor(2048, 1, 1);
-
-  //     audioContextRef.current = audioContext;
-  //     sourceRef.current = source;
-  //     processorRef.current = processor;
-  //     audioStreamRef.current = stream; // ✅ Fixed
-
-  //     const token = localStorage.getItem("token");
-  //     const ws = new WebSocket(`
-  //      ws://localhost:5001/api/voice/ws?token=${token}`
-  //         // `wss://quantumhash-backend-1.onrender.com/api/voice/ws?token=${token}`
-  //         // `${WSS_BASE_URL}?token=${token}`
-  //       );
-  //     wsRef.current = ws;
-
-  //     ws.onopen = () => {
-  //       console.log("✅ WebSocket connected");
-  //       const conversationId = localStorage.getItem("conversation_id");
-  //       if (conversationId) {
-  //         ws.send(JSON.stringify({ type: "control", conversation_id: conversationId }));
-  //       }
-  //     };
-
-  //     ws.onclose = () => {
-  //       console.log("🔌 WebSocket disconnected");
-  //       wsRef.current = null;
-  //     };
-
-  //     ws.onerror = (err) => {
-  //       console.error("❌ WebSocket error:", err);
-  //     };
-
-  //     ws.onmessage = async (event) => {
-  //       const data = JSON.parse(event.data);
-  //       const conversationId = data.conversation_id || localStorage.getItem("conversation_id");
-  //       if (!conversationId) return;
-
-  //       if (!activeConversation) {
-  //         localStorage.setItem("conversation_id", conversationId);
-  //         dispatch(setActiveConversation(Number(conversationId)));
-  //       }
-
-  //       if (data.type === "userMessage") {
-  //         dispatch(addMessage({
-  //           conversationId,
-  //           message: {
-  //             id: Date.now(),
-  //             message: data.message,
-  //             sender: "user",
-  //             timestamp: new Date().toISOString(),
-  //             files: [],
-  //           },
-  //         }));
-  //       }
-
-  //       else if (data.type === "aiMessage") {
-  //         console.log("🤖 AI:", data.message);
-  //         await stopStream(); // Stop mic for TTS playback
-  //         setIsTTSPlaying(true);
-
-  //         try {
-  //           await streamAudio(data.message);
-  //         } catch (err) {
-  //           console.error("❌ TTS playback failed", err);
-  //         }
-
-  //         dispatch(addMessage({
-  //           conversationId,
-  //           message: {
-  //             id: Date.now() + 1,
-  //             message: data.message,
-  //             sender: "bot",
-  //             response: data.message,
-  //             timestamp: new Date().toISOString(),
-  //             files: data.files || [],
-  //           },
-  //         }));
-
-  //         setIsTTSPlaying(false);
-  //         setIsProcessing(false);
-  //         setIsResponding(false);
-  //         restartVoiceStream(); // Resume mic
-  //       }
-
-  //       else if (data.type === "processing") {
-  //         setIsProcessing(true);
-  //         setIsResponding(true);
-  //       }
-
-  //       else if (data.type === "transcriptionTooShort") {
-  //         setIsProcessing(false);
-  //         setIsResponding(false);
-  //         restartVoiceStream();
-  //       }
-
-  //       else if (data.type === "error") {
-  //         console.error("❌ WebSocket error:", data.error);
-  //         alert(data.error);
-  //         setIsProcessing(false);
-  //         setIsResponding(false);
-  //         restartVoiceStream();
-  //       }
-  //     };
-
-  //     // Audio processor setup
-  //     let audioBuffer = [];
-  //     processor.onaudioprocess = (event) => {
-  //       if (isTTSPlaying || isProcessing || isResponding) return;
-
-  //       const input = event.inputBuffer.getChannelData(0);
-  //       const volume = input.reduce((sum, val) => sum + val ** 2, 0) / input.length;
-
-  //       if (volume > VOLUME_THRESHOLD) {
-  //         clearTimeout(silenceTimeoutRef.current);
-  //         clearTimeout(speakingTimeoutRef.current);
-
-  //         speakingTimeoutRef.current = setTimeout(() => {
-  //           console.log("📤 Sending speech chunk");
-  //           sendAudio(audioBuffer);
-  //           audioBuffer = [];
-  //         }, CHUNK_DURATION_MS);
-  //       } else {
-  //         clearTimeout(silenceTimeoutRef.current);
-  //         silenceTimeoutRef.current = setTimeout(() => {
-  //           console.log("🛑 Silence detected, stopping stream...");
-  //           stopStream();
-  //         }, SILENCE_DELAY);
-  //       }
-
-  //       const pcm = new Float32Array(input);
-  //       audioBuffer.push(...pcm);
-  //     };
-
-  //     source.connect(processor);
-  //     processor.connect(audioContext.destination);
-  //     setIsliveRecording(true);
-  //   } catch (err) {
-  //     console.error("🎤 Error starting voice:", err);
-  //   }
-  // };
-
-  // // Convert Float32 PCM to Int16 and send to WebSocket
-  // const sendAudio = (float32Pcm) => {
-  //   if (wsRef.current?.readyState !== 1) return;
-
-  //   const int16Array = floatTo16BitPCM(float32Pcm);
-  //   const blob = new Blob([int16Array], { type: "audio/webm" });
-  //   const reader = new FileReader();
-
-  //   reader.onloadend = () => {
-  //     const base64 = reader.result.split(",")[1];
-  //     if (base64.length > 50) {
-  //       wsRef.current.send(JSON.stringify({
-  //         type: "transcribe",
-  //         audio_data: base64,
-  //       }));
-  //     }
-  //   };
-
-  //   reader.readAsDataURL(blob);
-  // };
-
-  // const floatTo16BitPCM = (float32Array) => {
-  //   const int16Array = new Int16Array(float32Array.length);
-  //   for (let i = 0; i < float32Array.length; i++) {
-  //     int16Array[i] = Math.max(-1, Math.min(1, float32Array[i])) * 0x7fff;
-  //   }
-  //   return int16Array;
-  // };
-
-  // // Stop voice stream safely
-  // const stopStream = async () => {
-  //   try {
-  //     if (processorRef.current) {
-  //       processorRef.current.disconnect();
-  //       processorRef.current = null;
-  //     }
-
-  //     if (sourceRef.current) {
-  //       sourceRef.current.disconnect();
-  //       sourceRef.current = null;
-  //     }
-
-  //     if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-  //       await audioContextRef.current.close();
-  //       audioContextRef.current = null;
-  //     }
-
-  //     if (audioStreamRef.current) {
-  //       audioStreamRef.current.getTracks().forEach(track => track.stop());
-  //       audioStreamRef.current = null;
-  //     }
-
-  //     clearTimeout(silenceTimeoutRef.current);
-  //     clearTimeout(speakingTimeoutRef.current);
-  //     setIsliveRecording(false);
-  //   } catch (err) {
-  //     console.warn("⚠️ Error during stopStream:", err);
-  //   }
-  // };
-
-  // const restartVoiceStream = async () => {
-  //   await stopStream();
-  //   setTimeout(startAiVoice, 300);
-  // };
-
-  // const stopAiVoice = async () => {
-  //   await stopStream();
-  //   if (wsRef.current?.readyState === 1) {
-  //     wsRef.current.send(JSON.stringify({ type: "control", action: "stop" }));
-  //     wsRef.current.close();
-  //   }
-  //   setIsResponding(false);
-  //   setIsProcessing(false);
-  //   setIsTTSPlaying(false);
-  // };
-
+   
   return (
     <div className="flex flex-col w-full h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300">
       <Navbar isGuest={isGuest} />
@@ -1399,70 +1400,97 @@ const ChatArea = ({ isGuest }) => {
                           </button>
                         </motion.div>
                       )} */}
-                    {msg.response && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="relative p-3 rounded-lg break-words dark:bg-[#282828]  text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3 select-text">
-                        <div className="flex items-start gap-2">
-                          <div className="p-1 rounded-full select-none">
-                            <img
-                              src="./logo.png"
-                              className="h-5 w-5"
-                              alt="Bot Logo"
-                            />
-                          </div>
-                          <div className="flex flex-col w-full mr-7 text-xs md:text-lg select-text space-y-2 font-centurygothic">
-                            {/* <ChatbotMarkdown
-                              content={msg.response}
-                              messageId={msg.id}
-                              isNewMessage={msg.isNewMessage || false}
-                            /> */}
-                            <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                              {msg.response}
-                            </ReactMarkdown>
-                            {/* <ChatbotMarkdown content={msg.response}  /> */}
-                          </div>
-                        </div>
-                        {/* copy button  */}
-                        <button
-                          onClick={() => handleCopyCode(msg.response)}
-                          className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition select-none">
-                          {copied ? (
-                            <span className="flex items-center">
-                              <CheckCircle size={16} color="#4cd327" />
-                              <span className="ml-2">Copied!</span>
-                            </span>
-                          ) : (
-                            <span className="flex items-center">
-                              <Copy size={16} />
-                              {/* <span className="ml-2">Copy</span> */}
-                            </span>
-                          )}
-                        </button>
-                      </motion.div>
-                    )}
+                    {/* BOT RESPONSE */}
+                    {/* BOT RESPONSE */}
+{/* BOT RESPONSE */}
+{/* BOT RESPONSE */}
+{msg.response && (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="relative p-3 rounded-lg break-words dark:bg-[#282828] text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3"
+  >
+    <div className="flex items-start gap-2">
+      <div className="p-1 rounded-full">
+        <img
+          src="./logo.png"
+          className="h-5 w-5"
+          alt="Bot Logo"
+        />
+      </div>
+      <div className="w-full mr-7 font-centurygothic">
+        <ChatbotMarkdown 
+          ref={(ref) => markdownRefs.current[msg.id] = ref}
+          content={msg.response} 
+        />
+      </div>
+    </div>
+    {/* Updated copy button */}
+  <button
+      onClick={(e) => {
+        e.stopPropagation();
+        handleCopyCode(msg.response, msg.id);
+      }}
+      className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition"
+    >
+      {copied ? (
+        <CheckCircle size={16} color="#4cd327" />
+      ) : (
+        <Copy size={16} />
+      )}
+    </button>
+
+  </motion.div>
+)}
+
+
+
+
+
                     {msg.suggestions && msg.suggestions.length > 0 && (
-                      <div className="mt-2  p-4  font-centurygothic ">
-                        <p className="text-xs md:text-base text-gray-800 text-bold dark:text-gray-300 mb-2 font-medium">
+                      <div className="mt-2 p-4 font-centurygothic">
+                        <motion.p
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4 }}
+                          className="text-xs md:text-base text-gray-800 text-bold dark:text-gray-300 mb-2 font-medium">
                           Would you like to know more?
-                        </p>
+                        </motion.p>
                         <div className="flex flex-wrap gap-2">
                           {msg.suggestions.map((suggestion, index) => (
-                            <button
+                            <motion.button
                               key={index}
+                              initial={{ opacity: 0, y: 30, scale: 0.9 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              transition={{
+                                duration: 0.6,
+                                delay: index * 0.15, // ✅ Perfect timing - not too fast, not too slow
+                                ease: [0.25, 0.46, 0.45, 0.94], // ✅ Custom easing for smooth feel
+                                type: "spring",
+                                stiffness: 100,
+                                damping: 15,
+                              }}
                               onClick={() => {
                                 const cleanSuggestion = suggestion.replace(
                                   /^\.+\s*/,
                                   ""
-                                ); // Remove leading dots
+                                );
                                 setInputMessage(cleanSuggestion);
                                 handleSendMessage(cleanSuggestion);
                               }}
-                              className="px-4 py-1.5  flex justify-between text-left w-full font-bold rounded-full bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-700 text-gray-900 dark:text-white text-xs md:text-sm   shadow-sm hover:text-blue-500 transition-all duration-200 ease-in-out">
+                              className="px-4 py-1.5 flex justify-between text-left w-full font-bold rounded-full 
+                     bg-gradient-to-r from-gray-100 to-gray-200 
+                     dark:from-gray-700 dark:to-gray-800 
+                     hover:from-gray-200 hover:to-gray-300 
+                     dark:hover:from-gray-600 dark:hover:to-gray-700 
+                     text-gray-900 dark:text-white 
+                     hover:text-blue-500 dark:hover:text-blue-400
+                     text-xs md:text-sm shadow-sm 
+                     cursor-pointer select-none
+                     transition-all duration-300 ease-out
+                     hover:shadow-lg">
                               {suggestion.replace(/^[.]/, "")} <span>+</span>
-                              {/* {suggestion} */}
-                            </button>
+                            </motion.button>
                           ))}
                         </div>
                       </div>
@@ -1489,10 +1517,10 @@ const ChatArea = ({ isGuest }) => {
                         alt="Bot Logo"
                       />
                     </div>
-                    <span className="text-xs md:text-lg font-mono">Thinking</span>
-                    <span className="animate-typingDots text-xs md:text-lg font-mono">
-                      
+                    <span className="text-xs md:text-lg font-mono">
+                      Thinking
                     </span>
+                    <span className="animate-typingDots text-xs md:text-lg font-mono"></span>
                   </div>
                 </motion.div>
               )}
@@ -1761,47 +1789,48 @@ const ChatArea = ({ isGuest }) => {
 
             {/* Mic Button */}
             {/* Mic Button */}
-<div className="relative">
-  <div
-    className={`cursor-pointer border-[0.5px] text-black dark:text-white border-gray-800 dark:border-gray-300 rounded-full p-2 
+            <div className="relative">
+              <div
+                className={`cursor-pointer border-[0.5px] text-black dark:text-white border-gray-800 dark:border-gray-300 rounded-full p-2 
 ${
   isRecording
     ? "bg-red-500 animate-pulse text-white"
     : "hover:bg-gray-300 dark:hover:bg-gray-700"
-} transition-all duration-300 ${!isGuest ? 'opacity-50 cursor-not-allowed' : ''}`}
-    onClick={() => {
-      if (isGuest) {
-        handleLoginPrompt();
-        return;
-      }
-      if (!isGuest) return; // Disable for logged-in users
-      isRecording ? stopRecording() : startRecording();
-    }}
-    onMouseEnter={() => setShowMicTooltip(true)}
-    onMouseLeave={() => setShowMicTooltip(false)}>
-    {/* {isRecording ? <MicOff size={16} /> : <Mic size={16} />} */}
-    <span className="md:block hidden">
-      {isRecording ? <MicOff size={16} /> : <Mic size={16} />}{" "}
-    </span>
+} transition-all duration-300 ${
+                  !isGuest ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+                onClick={() => {
+                  if (isGuest) {
+                    handleLoginPrompt();
+                    return;
+                  }
+                  if (!isGuest) return; // Disable for logged-in users
+                  isRecording ? stopRecording() : startRecording();
+                }}
+                onMouseEnter={() => setShowMicTooltip(true)}
+                onMouseLeave={() => setShowMicTooltip(false)}>
+                {/* {isRecording ? <MicOff size={16} /> : <Mic size={16} />} */}
+                <span className="md:block hidden">
+                  {isRecording ? <MicOff size={16} /> : <Mic size={16} />}{" "}
+                </span>
 
-    <span className="block md:hidden">
-      {isRecording ? <MicOff size={12} /> : <Mic size={12} />}{" "}
-    </span>
-  </div>
+                <span className="block md:hidden">
+                  {isRecording ? <MicOff size={12} /> : <Mic size={12} />}{" "}
+                </span>
+              </div>
 
-  {showMicTooltip && (
-    <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900  rounded-lg shadow-md">
-      {!isGuest ? "Coming Soon" : (isRecording ? "Stop" : "Dictate")}
-      <div
-        className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 
+              {showMicTooltip && (
+                <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900  rounded-lg shadow-md">
+                  {!isGuest ? "Coming Soon" : isRecording ? "Stop" : "Dictate"}
+                  <div
+                    className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 
       border-l-[6px] border-l-transparent 
       border-r-[6px] border-r-transparent 
       border-t-[6px] border-t-zinc-900"
-      />
-    </div>
-  )}
-</div>
-
+                  />
+                </div>
+              )}
+            </div>
 
             {/* <div className=" voice mode working commented for live users"> */}
             {/* <div className="relative voice-controls text-gray-800 dark:text-white">
@@ -1913,7 +1942,9 @@ ${
           </div>
         </div>
       </div>
-<p className="mx-auto text-gray-400 dark:text-gray-700 text-xs md:text-sm font-mono font-bold">AI generated content for reference only</p>
+      <p className="mx-auto text-gray-400 dark:text-gray-700 text-xs md:text-sm font-mono font-bold">
+        AI generated content for reference only
+      </p>
       {/* Tailwind Typing Animation */}
       <style>
         {`
@@ -2144,6 +2175,26 @@ ${
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;
+}
+// double-click select text 
+/* Ensure text selection works properly */
+.markdown-content * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
+.markdown-content .select-none {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+/* Prevent text selection interference */
+.markdown-content {
+  pointer-events: auto;
 }
 
 

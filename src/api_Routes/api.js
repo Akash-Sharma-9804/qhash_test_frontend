@@ -177,30 +177,132 @@ export const fetchConversationHistory = async (conversationId, token) => {
 // Send a message
  
 
+// export const sendMessage = async (
+//   conversationId,
+//   message,
+//   userId,
+//   token,
+//   extracted_summary_raw = "",
+//   uploaded_file_metadata = [] // ⬅️ New param!
+// ) => {
+//   const response = await axios.post(
+//     `${API_BASE_URL}/chat`,
+//     {
+//       userMessage: message,
+//       conversation_id: conversationId,
+//       user_id: userId,
+//       extracted_summary: extracted_summary_raw,
+//       uploaded_file_metadata // ✅ Pass this to backend
+//     },
+//     {
+//       headers: { Authorization: `Bearer ${token}` },
+//     }
+//   );
+//   return response.data;
+// };
+  
 export const sendMessage = async (
   conversationId,
   message,
   userId,
   token,
   extracted_summary_raw = "",
-  uploaded_file_metadata = [] // ⬅️ New param!
+  uploaded_file_metadata = [],
+  onStreamChunk = null // Callback for streaming chunks
 ) => {
-  const response = await axios.post(
-    `${API_BASE_URL}/chat`,
-    {
+  const response = await fetch(`${API_BASE_URL}/chat`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
       userMessage: message,
       conversation_id: conversationId,
       user_id: userId,
       extracted_summary: extracted_summary_raw,
-      uploaded_file_metadata // ✅ Pass this to backend
-    },
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  );
-  return response.data;
-};
+      uploaded_file_metadata
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
   
+  let buffer = '';
+  let fullResponse = '';
+  let metadata = null;
+  let suggestions = [];
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+      
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            const data = JSON.parse(line);
+            
+            switch (data.type) {
+              case 'start':
+                metadata = data;
+                if (onStreamChunk) {
+                  onStreamChunk({ type: 'start', data: metadata });
+                }
+                break;
+                
+              case 'content':
+                fullResponse += data.content;
+                if (onStreamChunk) {
+                  onStreamChunk({ 
+                    type: 'content', 
+                    content: data.content,
+                    fullResponse: fullResponse 
+                  });
+                }
+                break;
+                
+              case 'end':
+                suggestions = data.suggestions || [];
+                if (onStreamChunk) {
+                  onStreamChunk({ 
+                    type: 'end', 
+                    suggestions: suggestions,
+                    fullResponse: fullResponse 
+                  });
+                }
+                break;
+                
+              case 'error':
+                throw new Error(data.error);
+            }
+          } catch (parseError) {
+            console.error('Error parsing streaming data:', parseError);
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return {
+    response: fullResponse,
+    suggestions: suggestions,
+    files: metadata?.uploaded_files || [],
+    conversation_id: metadata?.conversation_id || conversationId,
+    ...metadata
+  };
+};
 
 
 // Create a new conversation (Auto-call on Login/Signup)
@@ -239,17 +341,17 @@ export const renameConversation = async (conversationId, newName, token) => {
 };
 
 // soft delete function 
-export const deleteConversation = async (id, token, dispatch) => {
+export const deleteConversation = async (id, token) => {
   try {
-    await axios.patch(`${API_BASE_URL}/chat/conversations/${id}/delete`, {}, {
+    const response = await axios.patch(`${API_BASE_URL}/chat/conversations/${id}/delete`, {}, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
- 
-    
+    return response.data; // Return the backend response
   } catch (error) {
     console.error("❌ Error deleting conversation:", error);
+    throw error;
   }
 };
 

@@ -1,7 +1,4 @@
-
-
-
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef, useImperativeHandle, forwardRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -15,43 +12,9 @@ import "prismjs/components/prism-python";
 import "prismjs/components/prism-json";
 import "prismjs/components/prism-markdown";
 
-export default function ChatbotMarkdown({ content, messageId, isNewMessage = false }) {
-  const [typedContent, setTypedContent] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
+const ChatbotMarkdown = forwardRef(({ content }, ref) => {
   const [copied, setCopied] = useState(false);
-  const typingIntervalRef = useRef(null);
-  const lastMessageIdRef = useRef(null);
-
-  useEffect(() => {
-    if (!content) return;
-
-    if (typingIntervalRef.current) {
-      clearInterval(typingIntervalRef.current);
-    }
-
-    const shouldType = isNewMessage || (messageId && messageId !== lastMessageIdRef.current);
-    if (shouldType) {
-      lastMessageIdRef.current = messageId;
-      setTypedContent("");
-      setIsTyping(true);
-      let i = 0;
-      typingIntervalRef.current = setInterval(() => {
-        i++;
-        setTypedContent(content.slice(0, i));
-        if (i >= content.length) {
-          clearInterval(typingIntervalRef.current);
-          setIsTyping(false);
-        }
-      }, 10);
-    } else {
-      setTypedContent(content);
-      setIsTyping(false);
-    }
-
-    return () => {
-      if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
-    };
-  }, [content, messageId, isNewMessage]);
+  const containerRef = useRef(null);
 
   const handleCopyCode = (code) => {
     navigator.clipboard.writeText(code);
@@ -59,10 +22,121 @@ export default function ChatbotMarkdown({ content, messageId, isNewMessage = fal
     setTimeout(() => setCopied(false), 1000);
   };
 
+  // Function to extract formatted text from the rendered DOM
+  const getFormattedText = () => {
+    if (!containerRef.current) return content;
+
+    const element = containerRef.current;
+    let formattedText = '';
+
+    // Function to recursively extract text with formatting
+    const extractText = (node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent;
+      }
+
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const tagName = node.tagName.toLowerCase();
+        let childText = '';
+        
+        // Get text from all child nodes
+        for (let child of node.childNodes) {
+          childText += extractText(child);
+        }
+
+        // Format based on the element type
+        switch (tagName) {
+          case 'h1':
+          case 'h2':
+          case 'h3':
+          case 'h4':
+          case 'h5':
+          case 'h6':
+            return `${childText}\n\n`;
+          
+          case 'p':
+            return `${childText}\n\n`;
+          
+          case 'strong':
+          case 'b':
+            return childText; // Keep the text as is, it's already bold in rendering
+          
+          case 'em':
+          case 'i':
+            return childText; // Keep the text as is, it's already italic in rendering
+          
+          case 'code':
+            if (node.parentElement?.tagName.toLowerCase() === 'pre') {
+              return childText; // Block code
+            }
+            return childText; // Inline code
+          
+          case 'pre':
+            return `${childText}\n\n`;
+          
+          case 'li':
+            const listParent = node.parentElement?.tagName.toLowerCase();
+            if (listParent === 'ol') {
+              const index = Array.from(node.parentElement.children).indexOf(node) + 1;
+              return `${index}. ${childText}\n`;
+            } else {
+              return `• ${childText}\n`;
+            }
+          
+          case 'ul':
+          case 'ol':
+            return `${childText}\n`;
+          
+          case 'blockquote':
+            return `${childText}\n\n`;
+          
+          case 'a':
+            return `${childText}`;
+          
+          case 'br':
+            return '\n';
+          
+          case 'hr':
+            return '---\n\n';
+          
+          case 'table':
+            return `${childText}\n`;
+          
+          case 'tr':
+            return `${childText}\n`;
+          
+          case 'th':
+          case 'td':
+            return `${childText}\t`;
+          
+          default:
+            return childText;
+        }
+      }
+
+      return '';
+    };
+
+    formattedText = extractText(element);
+    
+    // Clean up excessive whitespace while preserving structure
+    formattedText = formattedText
+      .replace(/\n\s*\n\s*\n/g, '\n\n') // Max 2 consecutive newlines
+      .replace(/\t+/g, ' ') // Replace tabs with spaces
+      .trim();
+
+    return formattedText;
+  };
+
+  // Expose the function to parent component
+  useImperativeHandle(ref, () => ({
+    getFormattedText
+  }));
+
   return (
-    <div className="relative select-text" style={{ userSelect: "text", WebkitUserSelect: "text" }}>
+    <div ref={containerRef}>
       <ReactMarkdown
-        children={typedContent}
+        children={content}
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
         components={{
@@ -74,18 +148,20 @@ export default function ChatbotMarkdown({ content, messageId, isNewMessage = fal
             if (!inline && lang) {
               return (
                 <div className="relative">
-                  <pre className="rounded-lg overflow-x-auto my-4 p-4 text-xs md:text-sm bg-gray-600 dark:bg-[#272822] text-black dark:text-white border border-gray-200 dark:border-none transition-colors duration-200 select-text">
+                  <pre className="rounded-lg overflow-x-auto my-4 p-4 text-xs md:text-sm bg-gray-600 dark:bg-[#272822] text-black dark:text-white border border-gray-200 dark:border-none transition-colors duration-200">
                     <code
-                      className={`language-${lang} select-text`}
-                      style={{ userSelect: "text", WebkitUserSelect: "text" }}
+                      className={`language-${lang}`}
                       dangerouslySetInnerHTML={{
                         __html: Prism.highlight(codeContent, Prism.languages[lang] || Prism.languages.markup, lang),
                       }}
                     />
                   </pre>
                   <button
-                    onClick={() => handleCopyCode(codeContent)}
-                    className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition select-none"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopyCode(codeContent);
+                    }}
+                    className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition"
                   >
                     {copied ? (
                       <span className="flex items-center">
@@ -104,12 +180,33 @@ export default function ChatbotMarkdown({ content, messageId, isNewMessage = fal
             }
 
             return (
-              <code
-                className="bg-gray-200 dark:bg-gray-700 text-red-600 dark:text-red-300 px-1 py-0.5 rounded text-xs md:text-sm font-mono transition-colors duration-300 select-text"
-                style={{ userSelect: "text", WebkitUserSelect: "text" }}
-              >
+              <code className="bg-gray-200 dark:bg-gray-700 text-red-600 dark:text-red-300 px-1 py-0.5 rounded text-xs md:text-sm font-mono transition-colors duration-300">
                 {children}
               </code>
+            );
+          },
+
+          p({ children }) {
+            return (
+              <p className="leading-relaxed text-black text-xs md:text-base dark:text-gray-200 mb-2">
+                {children}
+              </p>
+            );
+          },
+
+          strong({ children }) {
+            return (
+              <strong className="font-semibold text-xs md:text-base">
+                {children}
+              </strong>
+            );
+          },
+
+          em({ children }) {
+            return (
+              <em className="italic">
+                {children}
+              </em>
             );
           },
 
@@ -125,177 +222,92 @@ export default function ChatbotMarkdown({ content, messageId, isNewMessage = fal
           },
 
           li({ children }) {
-            return <li className="ml-6 list-disc text-xs md:text-base select-text">{children}</li>;
-          },
-
-          p({ children }) {
             return (
-              <p className="leading-relaxed text-black text-xs md:text-base dark:text-gray-200 select-text">
+              <li className="ml-6 list-disc text-xs md:text-base mb-1">
                 {children}
-                {isTyping && <span className="animate-pulse text-gray-500 ml-1">|</span>}
-              </p>
+              </li>
             );
           },
 
-          strong({ children }) {
-            return <strong className="font-semibold text-xs md:text-base select-text">{children}</strong>;
+          ul({ children }) {
+            return (
+              <ul className="list-disc ml-6 mb-4">
+                {children}
+              </ul>
+            );
+          },
+
+          ol({ children }) {
+            return (
+              <ol className="list-decimal ml-6 mb-4">
+                {children}
+              </ol>
+            );
+          },
+
+          h1({ children }) {
+            return (
+              <h1 className="text-2xl font-bold mb-4 text-black dark:text-white">
+                {children}
+              </h1>
+            );
+          },
+
+          h2({ children }) {
+            return (
+              <h2 className="text-xl font-bold mb-3 text-black dark:text-white">
+                {children}
+              </h2>
+            );
+          },
+
+          h3({ children }) {
+            return (
+              <h3 className="text-lg font-bold mb-2 text-black dark:text-white">
+                {children}
+              </h3>
+            );
           },
 
           blockquote({ children }) {
             return (
-              <blockquote className="border-l-4 border-gray-400 dark:border-gray-600 pl-4 italic text-gray-700 dark:text-gray-300 my-4 transition-colors duration-300 select-text">
+              <blockquote className="border-l-4 border-gray-400 dark:border-gray-600 pl-4 italic text-gray-700 dark:text-gray-300 my-4 transition-colors duration-300">
                 {children}
               </blockquote>
             );
           },
 
-          sup({ children }) {
+          table({ children }) {
             return (
-              <sup
-                className="text-xs text-blue-600 dark:text-blue-300 underline cursor-help hover:text-blue-800 dark:hover:text-blue-400 transition-colors duration-300"
-                title={Array.isArray(children) && children.length ? `Footnote: ${children[0]}` : ""}
-              >
-                {children}
-              </sup>
+              <div className="overflow-x-auto my-4">
+                <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600">
+                  {children}
+                </table>
+              </div>
             );
           },
 
-          div({ node, ...props }) {
-            if (node?.data?.hName === "div" && node?.data?.hProperties?.className?.includes("footnotes")) {
-              return (
-                <div
-                  className="mt-6 border-t pt-4 text-xs leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-[#1e1e1e] rounded-md px-4 py-2 transition-colors duration-300"
-                  {...props}
-                />
-              );
-            }
-            return <div {...props} />;
+          th({ children }) {
+            return (
+              <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 bg-gray-100 dark:bg-gray-700 font-semibold text-left">
+                {children}
+              </th>
+            );
+          },
+
+          td({ children }) {
+            return (
+              <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">
+                {children}
+              </td>
+            );
           },
         }}
       />
     </div>
   );
-}
+});
 
+ChatbotMarkdown.displayName = 'ChatbotMarkdown';
 
-
-// import React, { useState } from "react";
-// import ReactMarkdown from "react-markdown";
-// import remarkGfm from "remark-gfm";
-// import rehypeRaw from "rehype-raw";
-// import Prism from "prismjs";
-// import { Copy, CheckCircle } from "lucide-react";
-// import "prismjs/themes/prism-okaidia.css";
-// import "prismjs/components/prism-javascript";
-// import "prismjs/components/prism-python";
-// import "prismjs/components/prism-json";
-// import "prismjs/components/prism-markdown";
-
-// export default function ChatbotMarkdown({ content }) {
-//   const [copiedCode, setCopiedCode] = useState(null);
-
-//   const handleCopy = (code, index) => {
-//     navigator.clipboard.writeText(code);
-//     setCopiedCode(index);
-//     setTimeout(() => setCopiedCode(null), 1500);
-//   };
-
-//   return (
-//     <div className="prose dark:prose-invert max-w-none select-text">
-//       <ReactMarkdown
-//         children={content}
-//         remarkPlugins={[remarkGfm]}
-//         rehypePlugins={[rehypeRaw]}
-//         components={{
-//           code({ node, inline, className, children, ...props }) {
-//             const match = /language-(\w+)/.exec(className || "");
-//             const lang = match?.[1];
-//             const codeText = String(children).trim();
-//             const codeIndex = props["data-index"] || Math.random();
-
-//             if (!inline && lang) {
-//               return (
-//                 <div className="relative">
-//                   <pre className="rounded-md my-4 p-4 text-sm overflow-x-auto bg-gray-900 text-white border border-gray-700">
-//                     <code
-//                       className={`language-${lang}`}
-//                       dangerouslySetInnerHTML={{
-//                         __html: Prism.highlight(codeText, Prism.languages[lang] || Prism.languages.markup, lang),
-//                       }}
-//                     />
-//                   </pre>
-//                   <button
-//                     onClick={() => handleCopy(codeText, codeIndex)}
-//                     className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-600 hover:bg-gray-700 text-white flex items-center text-xs"
-//                   >
-//                     {copiedCode === codeIndex ? (
-//                       <>
-//                         <CheckCircle size={16} color="#4cd327" />
-//                         <span className="ml-1">Copied</span>
-//                       </>
-//                     ) : (
-//                       <>
-//                         <Copy size={16} />
-//                         <span className="ml-1">Copy</span>
-//                       </>
-//                     )}
-//                   </button>
-//                 </div>
-//               );
-//             }
-
-//             return (
-//               <code className="select-text bg-gray-200 dark:bg-gray-700 text-red-600 dark:text-red-300 px-1 py-0.5 rounded text-sm font-mono">
-//                 {children}
-//               </code>
-//             );
-//           },
-
-//           p({ children }) {
-//             return (
-//               <p className="my-2 text-base leading-relaxed text-gray-900 dark:text-gray-200">
-//                 {children}
-//               </p>
-//             );
-//           },
-
-//           a({ href, children }) {
-//             return (
-//               <a
-//                 href={href}
-//                 target="_blank"
-//                 rel="noopener noreferrer"
-//                 className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300"
-//               >
-//                 {children}
-//               </a>
-//             );
-//           },
-
-//           li({ children }) {
-//             return <li className="ml-6 list-disc text-base">{children}</li>;
-//           },
-
-//           blockquote({ children }) {
-//             return (
-//               <blockquote className="border-l-4 border-gray-400 dark:border-gray-600 pl-4 italic text-gray-700 dark:text-gray-300 my-4">
-//                 {children}
-//               </blockquote>
-//             );
-//           },
-//         }}
-//       />
-//     </div>
-//   );
-// }
-
-
-
-
-
-
- 
-
-
-
- 
+export default ChatbotMarkdown;
