@@ -53,6 +53,10 @@ import { v4 as uuidv4 } from "uuid";
 // import AudioVisualizer from 'react-audio-visualize';
 import RadialVisualizer from "./RadialVisualizer";
 import { FaMicrophone, FaStop, FaPause, FaPlay } from "react-icons/fa";
+const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+         window.innerWidth <= 768;
+};
 
 const ChatArea = ({ isGuest }) => {
   const [loading, setLoading] = useState(false);
@@ -1756,12 +1760,13 @@ const ChatArea = ({ isGuest }) => {
         {/* Text Area with Voice Visualizer */}
         <div className="relative w-full">
           {/* Textarea Input */}
-          <textarea
+          {/* <textarea
             ref={textareaRef}
             className="w-full h-auto text-xs md:text-base max-h-36 min-h-[35px] md:min-h-[44px] p-2 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
             value={inputMessage + (isRecording ? transcriptBuffer : "")}
             onChange={handleInputChange}
             onKeyDown={(e) => {
+                const isMobile = isMobileDevice();
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 if (!loading) {
@@ -1773,7 +1778,43 @@ const ChatArea = ({ isGuest }) => {
             placeholder={
               isUploading ? "" : isRecording ? "" : "Explore anything...."
             }
-          />
+          /> */}
+
+          <textarea
+  ref={textareaRef}
+  className="w-full h-auto text-xs md:text-base max-h-36 min-h-[35px] md:min-h-[44px] p-2 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
+  value={inputMessage + (isRecording ? transcriptBuffer : "")}
+  onChange={handleInputChange}
+  onKeyDown={(e) => {
+    const isMobile = isMobileDevice();
+    
+    if (e.key === "Enter") {
+      if (isMobile) {
+        // Mobile: Enter = new line, Shift+Enter = send
+        if (e.shiftKey) {
+          e.preventDefault();
+          if (!loading) {
+            handleSendMessage();
+          }
+        }
+        // Let Enter create new line naturally (don't preventDefault)
+      } else {
+        // Desktop: Enter = send, Shift+Enter = new line
+        if (!e.shiftKey) {
+          e.preventDefault();
+          if (!loading) {
+            handleSendMessage();
+          }
+        }
+        // Let Shift+Enter create new line naturally
+      }
+    }
+  }}
+  rows="1"
+  placeholder={
+    isUploading ? "" : isRecording ? "" : "Explore anything...."
+  }
+/>
 
           {/* Voice Visualizer */}
           {isRecording &&
