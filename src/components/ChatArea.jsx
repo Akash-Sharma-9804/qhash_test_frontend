@@ -53,7 +53,6 @@ import { v4 as uuidv4 } from "uuid";
 // import AudioVisualizer from 'react-audio-visualize';
 import RadialVisualizer from "./RadialVisualizer";
 import { FaMicrophone, FaStop, FaPause, FaPlay } from "react-icons/fa";
- 
 
 const ChatArea = ({ isGuest }) => {
   const [loading, setLoading] = useState(false);
@@ -103,32 +102,30 @@ const ChatArea = ({ isGuest }) => {
   // scroll button prop
   const chatContainerRef = useRef(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
-const markdownRefs = useRef({});
+  const markdownRefs = useRef({});
   // const API_BASE_URL = "https://quantumhash-backend-1.onrender.com/api"; // Replace with your backend URL
 
   const WSS_BASE_URL = import.meta.env.VITE_WSS_API_BASE_URL;
 
   // copy button
 
-const handleCopyCode = (content, messageId) => {
-  const markdownRef = markdownRefs.current[messageId];
-  
-  if (markdownRef && markdownRef.getFormattedText) {
-    // Get the formatted text from the rendered component
-    const formattedText = markdownRef.getFormattedText();
-    console.log("Formatted text to copy:", formattedText.substring(0, 200));
-    navigator.clipboard.writeText(formattedText);
-  } else {
-    // Fallback to original content
-    console.log("Fallback to raw content");
-    navigator.clipboard.writeText(content);
-  }
-  
-  setCopied(true);
-  setTimeout(() => setCopied(false), 1000);
-};
+  const handleCopyCode = (content, messageId) => {
+    const markdownRef = markdownRefs.current[messageId];
 
+    if (markdownRef && markdownRef.getFormattedText) {
+      // Get the formatted text from the rendered component
+      const formattedText = markdownRef.getFormattedText();
+      console.log("Formatted text to copy:", formattedText.substring(0, 200));
+      navigator.clipboard.writeText(formattedText);
+    } else {
+      // Fallback to original content
+      console.log("Fallback to raw content");
+      navigator.clipboard.writeText(content);
+    }
 
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1000);
+  };
 
   const handleLoginPrompt = () => setShowLoginPrompt(true);
 
@@ -182,7 +179,6 @@ const handleCopyCode = (content, messageId) => {
 
   // greeting text function starts
 
-   
   const generateGreeting = () => {
     const greetingOptions = [
       "Explore Like Never Before. The Quantum Way!!!",
@@ -211,8 +207,6 @@ const handleCopyCode = (content, messageId) => {
       }
     }, 60);
   };
-
- 
 
   const getTimeBasedGreeting = () => {
     const hour = new Date().getHours();
@@ -249,7 +243,6 @@ const handleCopyCode = (content, messageId) => {
     }
   }, [activeConversation, messages]);
 
-   
   useEffect(() => {
     // Get current conversation messages based on mode
     const currentMessages = conversationMessages; // This already handles guest vs user mode
@@ -557,163 +550,166 @@ const handleCopyCode = (content, messageId) => {
   const handleSendMessage = async (customText) => {
     //  console.log("💥 handleSendMessage fired", { customText });
     const messageText =
-    typeof customText === "string"
-      ? customText.trim()
-      : inputMessage.trim?.() || "";
-  if (!messageText && files.length === 0) return;
+      typeof customText === "string"
+        ? customText.trim()
+        : inputMessage.trim?.() || "";
+    if (!messageText && files.length === 0) return;
 
-  textareaRef.current.style.height = "44px";
-  const plainText =
-    typeof customText === "string" && customText.trim()
-      ? customText.trim()
-      : inputMessage.trim();
-  if (!plainText && files.length === 0) return;
+    textareaRef.current.style.height = "44px";
+    const plainText =
+      typeof customText === "string" && customText.trim()
+        ? customText.trim()
+        : inputMessage.trim();
+    if (!plainText && files.length === 0) return;
 
-  // ✅ Guest Mode with Streaming
-  if (isGuest) {
-    const userMessage = {
-      id: Date.now(),
-      conversationId: guestConversationId || "guest",
-      message: plainText,
-      sender: "user",
-      files: [],
-    };
-
-    setInputMessage("");
-    setFiles([]);
-    setBotTyping(true);
-    setLoading(true);
-
-    dispatch(
-      addMessage({
+    // ✅ Guest Mode with Streaming
+    if (isGuest) {
+      const userMessage = {
+        id: Date.now(),
         conversationId: guestConversationId || "guest",
-        message: userMessage,
-      })
-    );
+        message: plainText,
+        sender: "user",
+        files: [],
+      };
 
-    // Create initial bot message for streaming
-    let currentBotMessageId = Date.now() + 1;
-    let streamingResponse = "";
+      setInputMessage("");
+      setFiles([]);
+      setBotTyping(true);
+      setLoading(true);
 
-    const initialBotMessage = {
-      id: currentBotMessageId,
-      conversationId: guestConversationId || "guest",
-      message: "",
-      sender: "bot",
-      response: "",
-      isNewMessage: true,
-      suggestions: [],
-      isStreaming: true, // Flag to show it's streaming
-    };
-
-    dispatch(
-      addMessage({
-        conversationId: guestConversationId || "guest",
-        message: initialBotMessage,
-      })
-    );
-
-    console.log("📤 Sending guest message with streaming:", plainText);
-
-    try {
-      await sendGuestMessage(plainText, (streamData) => {
-        switch (streamData.type) {
-          case "start":
-            console.log("🚀 Guest stream started:", streamData.data);
-            break;
-          
-          case "content":
-            streamingResponse = streamData.fullResponse;
-            
-            // Hide typing indicator when first content arrives
-            if (streamingResponse.trim().length > 0) {
-              setBotTyping(false);
-            }
-
-            // Update the message in real-time as content streams
-            dispatch(
-              updateMessage({
-                conversationId: guestConversationId || "guest",
-                id: currentBotMessageId,
-                message: streamingResponse,
-                response: streamingResponse,
-              })
-            );
-            break;
-          
-          case "end":
-            // Final update with suggestions and complete response
-            dispatch(
-              updateMessage({
-                conversationId: guestConversationId || "guest",
-                id: currentBotMessageId,
-                message: streamData.fullResponse,
-                response: streamData.fullResponse,
-                suggestions: streamData.suggestions || [],
-                isStreaming: false,
-              })
-            );
-            setBotTyping(false);
-            
-            // Update localStorage with final messages
-            const finalUserMessage = userMessage;
-            const finalBotMessage = {
-              id: currentBotMessageId,
-              conversationId: guestConversationId || "guest",
-              message: streamData.fullResponse,
-              sender: "bot",
-              response: streamData.fullResponse,
-              suggestions: streamData.suggestions || [],
-            };
-
-            const prevGuestChat = JSON.parse(
-              localStorage.getItem("guest_chat") || "[]"
-            );
-            localStorage.setItem(
-              "guest_chat",
-              JSON.stringify([...prevGuestChat, finalUserMessage, finalBotMessage])
-            );
-            
-            console.log("✅ Guest stream completed");
-            break;
-          
-          case "error":
-            dispatch(
-              updateMessage({
-                conversationId: guestConversationId || "guest",
-                id: currentBotMessageId,
-                message: streamData.error || "❌ Failed to get a response.",
-                response: streamData.error || "❌ Failed to get a response.",
-                isStreaming: false,
-              })
-            );
-            setBotTyping(false);
-            toast.error("❌ Guest response failed.");
-            break;
-        }
-      });
-
-    } catch (error) {
-      console.error("❌ Guest mode streaming error:", error);
-      
-      // Update the bot message with error
       dispatch(
-        updateMessage({
+        addMessage({
           conversationId: guestConversationId || "guest",
-          id: currentBotMessageId,
-          message: "❌ Failed to get a response.",
-          response: "❌ Failed to get a response.",
-          isStreaming: false,
+          message: userMessage,
         })
       );
-      
-      setBotTyping(false);
-      toast.error("❌ Failed to get guest response.");
-    } finally {
-      setLoading(false);
+
+      // Create initial bot message for streaming
+      let currentBotMessageId = Date.now() + 1;
+      let streamingResponse = "";
+
+      const initialBotMessage = {
+        id: currentBotMessageId,
+        conversationId: guestConversationId || "guest",
+        message: "",
+        sender: "bot",
+        response: "",
+        isNewMessage: true,
+        suggestions: [],
+        isStreaming: true, // Flag to show it's streaming
+      };
+
+      dispatch(
+        addMessage({
+          conversationId: guestConversationId || "guest",
+          message: initialBotMessage,
+        })
+      );
+
+      console.log("📤 Sending guest message with streaming:", plainText);
+
+      try {
+        await sendGuestMessage(plainText, (streamData) => {
+          switch (streamData.type) {
+            case "start":
+              console.log("🚀 Guest stream started:", streamData.data);
+              break;
+
+            case "content":
+              streamingResponse = streamData.fullResponse;
+
+              // Hide typing indicator when first content arrives
+              if (streamingResponse.trim().length > 0) {
+                setBotTyping(false);
+              }
+
+              // Update the message in real-time as content streams
+              dispatch(
+                updateMessage({
+                  conversationId: guestConversationId || "guest",
+                  id: currentBotMessageId,
+                  message: streamingResponse,
+                  response: streamingResponse,
+                })
+              );
+              break;
+
+            case "end":
+              // Final update with suggestions and complete response
+              dispatch(
+                updateMessage({
+                  conversationId: guestConversationId || "guest",
+                  id: currentBotMessageId,
+                  message: streamData.fullResponse,
+                  response: streamData.fullResponse,
+                  suggestions: streamData.suggestions || [],
+                  isStreaming: false,
+                })
+              );
+              setBotTyping(false);
+
+              // Update localStorage with final messages
+              const finalUserMessage = userMessage;
+              const finalBotMessage = {
+                id: currentBotMessageId,
+                conversationId: guestConversationId || "guest",
+                message: streamData.fullResponse,
+                sender: "bot",
+                response: streamData.fullResponse,
+                suggestions: streamData.suggestions || [],
+              };
+
+              const prevGuestChat = JSON.parse(
+                localStorage.getItem("guest_chat") || "[]"
+              );
+              localStorage.setItem(
+                "guest_chat",
+                JSON.stringify([
+                  ...prevGuestChat,
+                  finalUserMessage,
+                  finalBotMessage,
+                ])
+              );
+
+              console.log("✅ Guest stream completed");
+              break;
+
+            case "error":
+              dispatch(
+                updateMessage({
+                  conversationId: guestConversationId || "guest",
+                  id: currentBotMessageId,
+                  message: streamData.error || "❌ Failed to get a response.",
+                  response: streamData.error || "❌ Failed to get a response.",
+                  isStreaming: false,
+                })
+              );
+              setBotTyping(false);
+              toast.error("❌ Guest response failed.");
+              break;
+          }
+        });
+      } catch (error) {
+        console.error("❌ Guest mode streaming error:", error);
+
+        // Update the bot message with error
+        dispatch(
+          updateMessage({
+            conversationId: guestConversationId || "guest",
+            id: currentBotMessageId,
+            message: "❌ Failed to get a response.",
+            response: "❌ Failed to get a response.",
+            isStreaming: false,
+          })
+        );
+
+        setBotTyping(false);
+        toast.error("❌ Failed to get guest response.");
+      } finally {
+        setLoading(false);
+      }
+      return;
     }
-    return;
-  }
     // ✅ Logged-in user flow
     const token = localStorage.getItem("token");
     const user_id = user?.user_id || localStorage.getItem("user_id");
@@ -1367,14 +1363,14 @@ const handleCopyCode = (content, messageId) => {
     setIsResponding(false);
   };
 
-   
   return (
     <div className="flex flex-col w-full h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300">
       <Navbar isGuest={isGuest} />
       {/* Chat Area starts */}
       <div
         ref={chatContainerRef}
-        className=" relative flex-1 h-[calc(100vh-160px)] w-full scrollbar-hover  md:p-4  mt-20 md:mt-0 space-y-6 overflow-auto mx-auto bg-white  dark:bg-[#121212] transition-colors duration-300">
+        className=" relative flex-1 h-[calc(100vh-160px)] w-full scrollbar-hover  md:p-4  mt-20 md:mt-0 space-y-6 overflow-auto mx-auto bg-white  dark:bg-[#121212] transition-colors duration-300"
+        style={{ zIndex: 10 }}>
         <div className="  md:w-[70%] w-full  mx-auto">
           {/* chats section starts */}
           {/* final  */}
@@ -1488,50 +1484,45 @@ const handleCopyCode = (content, messageId) => {
                       )} */}
                     {/* BOT RESPONSE */}
                     {/* BOT RESPONSE */}
-{/* BOT RESPONSE */}
-{/* BOT RESPONSE */}
-{msg.response && (
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="relative p-3 rounded-lg break-words dark:bg-[#282828] text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3"
-  >
-    <div className="flex items-start gap-2">
-      <div className="p-1 rounded-full">
-        <img
-          src="./logo.png"
-          className="h-5 w-5"
-          alt="Bot Logo"
-        />
-      </div>
-      <div className="w-full mr-7 font-centurygothic">
-        <ChatbotMarkdown 
-          ref={(ref) => markdownRefs.current[msg.id] = ref}
-          content={msg.response} 
-        />
-      </div>
-    </div>
-    {/* Updated copy button */}
-  <button
-      onClick={(e) => {
-        e.stopPropagation();
-        handleCopyCode(msg.response, msg.id);
-      }}
-      className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition"
-    >
-      {copied ? (
-        <CheckCircle size={16} color="#4cd327" />
-      ) : (
-        <Copy size={16} />
-      )}
-    </button>
-
-  </motion.div>
-)}
-
-
-
-
+                    {/* BOT RESPONSE */}
+                    {/* BOT RESPONSE */}
+                    {msg.response && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="relative p-3 rounded-lg break-words dark:bg-[#282828] text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3">
+                        <div className="flex items-start gap-2">
+                          <div className="p-1 rounded-full">
+                            <img
+                              src="./logo.png"
+                              className="h-5 w-5"
+                              alt="Bot Logo"
+                            />
+                          </div>
+                          <div className="w-full mr-7 font-centurygothic">
+                            <ChatbotMarkdown
+                              ref={(ref) =>
+                                (markdownRefs.current[msg.id] = ref)
+                              }
+                              content={msg.response}
+                            />
+                          </div>
+                        </div>
+                        {/* Updated copy button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyCode(msg.response, msg.id);
+                          }}
+                          className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition">
+                          {copied ? (
+                            <CheckCircle size={16} color="#4cd327" />
+                          ) : (
+                            <Copy size={16} />
+                          )}
+                        </button>
+                      </motion.div>
+                    )}
 
                     {msg.suggestions && msg.suggestions.length > 0 && (
                       <div className="mt-2 p-4 font-centurygothic">
@@ -2065,31 +2056,33 @@ ${
   //   content: '';
   //   animation: typingDots 1.5s steps(4, end) infinite;
   // }
-
-  /* Customize scrollbar for modern and slim look */
+ /* Customize scrollbar with minimal darker colors */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 11px;
+    height: 11px;
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: #888;
+    background-color: #4b5563;
     border-radius: 10px;
-    transition: background-color 0.3s;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: all 0.3s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background-color: #555;
+    background-color: #374151;
   }
 
   ::-webkit-scrollbar-track {
-    background-color: #f1f1f1;
+    background: transparent;
     border-radius: 10px;
   }
 
-  /* Dark mode scrollbar */
-  .dark ::-webkit-scrollbar-track {
-    background-color: #1f2937;
+  /* Dark mode scrollbar - fixed width */
+  .dark ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
   }
 
   .dark ::-webkit-scrollbar-thumb {
@@ -2097,23 +2090,22 @@ ${
   }
 
   .dark ::-webkit-scrollbar-thumb:hover {
-    background-color: #6b7280;
+    background-color: #374151;
   }
-    /* Hide scrollbar for textarea */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none; /* Chrome, Safari */
-}
 
-.scrollbar-hide {
-  -ms-overflow-style: none; /* IE/Edge */
-  scrollbar-width: none; /* Firefox */
-}
-  /* Expand scrollbar on container hover */
-.scrollbar-hover:hover::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
-}
+  .dark ::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
+  /* Hide scrollbar for textarea */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 
 @keyframes wave1 {
   0%, 100% { height: 20%; }

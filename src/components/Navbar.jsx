@@ -85,7 +85,8 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
   };
 
   return (
-    <div className="w-full pt-2 px-4 md:bg-transparent pb-2 bg-white md:dark:bg-transparent dark:bg-[#121212] fixed top-0 left-0 z-20">
+   <div className="fixed top-0 left-0 w-full pt-2 px-4 md:bg-transparent pb-2 bg-white md:dark:bg-transparent dark:bg-[#121212] z-20" style={{ width: 'calc(100% - 12px)' }}>
+
       <div className={`flex items-center gap-7 ${!isGuest ? 'justify-between' : 'sm:justify-between justify-around'}`}>
         {/* Logo */}
         <div className="relative ml-16 justify-center items-center cursor-pointer">
