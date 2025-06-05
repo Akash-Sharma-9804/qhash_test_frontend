@@ -704,7 +704,7 @@ const handleDeleteConversation = async (id) => {
 
     {/* Mobile Menu Button */}
     <button
-      className="md:hidden fixed top-4 left-4 z-30 p-1 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-all duration-500 ease-in-out"
+      className="md:hidden fixed top-4 left-4 z-50 p-1 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-all duration-500 ease-in-out"
       onClick={() => setIsOpen(!isOpen)}>
       {isOpen ? <X size={24} /> : <Menu size={24} />}
     </button>
@@ -713,3 +713,4 @@ const handleDeleteConversation = async (id) => {
 };
 
 export default Sidebar;
+
