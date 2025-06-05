@@ -43,7 +43,7 @@ export default function MessageFiles({ files }) {
               // />
               <div
               key={i}
-              className="w-[180px] h-[180px] flex flex-col items-center justify-center animate-pulse   bg-gray-500 dark:bg-gray-500 rounded-md shadow-inner">
+              className="w-[180px] h-[100px] flex flex-col items-center justify-center animate-pulse   bg-gray-500 dark:bg-gray-500 rounded-md shadow-inner">
              
               <div className="flex text-base font-bold gap-2 mt-2 font-centurygothic">
                <span className="text-black ">Reading file</span>   <div className="loader2"></div>

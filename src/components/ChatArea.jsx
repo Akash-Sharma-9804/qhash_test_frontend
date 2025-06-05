@@ -53,9 +53,14 @@ import { v4 as uuidv4 } from "uuid";
 // import AudioVisualizer from 'react-audio-visualize';
 import RadialVisualizer from "./RadialVisualizer";
 import { FaMicrophone, FaStop, FaPause, FaPlay } from "react-icons/fa";
+import RedirectModal from "./RedirectModal";
+
 const isMobileDevice = () => {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-         window.innerWidth <= 768;
+  return (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    ) || window.innerWidth <= 768
+  );
 };
 
 const ChatArea = ({ isGuest }) => {
@@ -108,6 +113,8 @@ const ChatArea = ({ isGuest }) => {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const markdownRefs = useRef({});
   // const API_BASE_URL = "https://quantumhash-backend-1.onrender.com/api"; // Replace with your backend URL
+  const [modalOpen, setModalOpen] = useState(false);
+  const [pendingUrl, setPendingUrl] = useState("");
 
   const WSS_BASE_URL = import.meta.env.VITE_WSS_API_BASE_URL;
 
@@ -132,6 +139,58 @@ const ChatArea = ({ isGuest }) => {
   };
 
   const handleLoginPrompt = () => setShowLoginPrompt(true);
+
+  // Add state to track user scroll behavior
+  const [userHasScrolledUp, setUserHasScrolledUp] = useState(false);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(false);
+
+  // Enhanced smart scroll function
+  const scrollToBottomSmooth = () => {
+    // Don't auto-scroll if user has manually scrolled up
+    if (userHasScrolledUp) {
+      console.log("⏸️ Skipping auto-scroll - user has scrolled up");
+      return;
+    }
+
+    // Check if we're already near the bottom before scrolling
+    if (chatContainerRef.current) {
+      const container = chatContainerRef.current;
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+
+      // Only scroll if we're reasonably close to bottom
+      if (distanceFromBottom > 200) {
+        console.log("⏸️ Skipping auto-scroll - too far from bottom");
+        return;
+      }
+    }
+
+    setIsAutoScrolling(true);
+
+    // Use a more gentle scroll approach
+    requestAnimationFrame(() => {
+      if (chatEndRef.current && !userHasScrolledUp) {
+        chatEndRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "end",
+          inline: "nearest",
+        });
+      }
+
+      // Reset auto-scrolling flag after animation completes
+      setTimeout(() => {
+        setIsAutoScrolling(false);
+      }, 500); // Increased timeout to match scroll animation
+    });
+  };
+
+  const handleUserScrollInterruption = () => {
+    if (isAutoScrolling) {
+      setIsAutoScrolling(false);
+      setUserHasScrolledUp(true);
+      console.log("🛑 User interrupted auto-scroll");
+    }
+  };
 
   // 1st useeffect
   useEffect(() => {
@@ -303,6 +362,63 @@ const ChatArea = ({ isGuest }) => {
       }
     }
   }, []);
+
+  // Add this useEffect after your existing useEffects (around line 200-250)
+  useEffect(() => {
+    const container = chatContainerRef.current;
+    if (!container) return;
+
+    let scrollTimeout;
+    let lastScrollTop = container.scrollTop;
+
+    const handleScroll = () => {
+      const currentScrollTop = container.scrollTop;
+      const scrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
+      const distanceFromBottom = scrollHeight - currentScrollTop - clientHeight;
+
+      // Clear previous timeout
+      clearTimeout(scrollTimeout);
+
+      // Debounce scroll detection
+      scrollTimeout = setTimeout(() => {
+        const isNearBottom = distanceFromBottom <= 100;
+
+        // Detect if user manually scrolled up (not auto-scroll)
+        if (
+          !isAutoScrolling &&
+          currentScrollTop < lastScrollTop &&
+          !isNearBottom
+        ) {
+          if (!userHasScrolledUp) {
+            setUserHasScrolledUp(true);
+            console.log("🔼 User scrolled up manually - pausing auto-scroll");
+          }
+        }
+
+        // If user scrolled back to bottom, resume auto-scroll
+        if (isNearBottom && userHasScrolledUp) {
+          setUserHasScrolledUp(false);
+          console.log("🔽 User back at bottom - resuming auto-scroll");
+        }
+
+        // Update scroll button visibility
+        setShowScrollButton(!isNearBottom);
+
+        lastScrollTop = currentScrollTop;
+      }, 50); // Reduced debounce time for more responsive detection
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+
+    // Initialize scroll state
+    handleScroll();
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, [userHasScrolledUp, isAutoScrolling]);
 
   // working handlesend message function starts
 
@@ -553,6 +669,8 @@ const ChatArea = ({ isGuest }) => {
   // };
   const handleSendMessage = async (customText) => {
     //  console.log("💥 handleSendMessage fired", { customText });
+    // Reset scroll state for new message
+    setUserHasScrolledUp(false);
     const messageText =
       typeof customText === "string"
         ? customText.trim()
@@ -636,6 +754,10 @@ const ChatArea = ({ isGuest }) => {
                   response: streamingResponse,
                 })
               );
+              // 🚀 Smart scroll with delay to allow DOM update
+              setTimeout(() => {
+                scrollToBottomSmooth();
+              }, 10);
               break;
 
             case "end":
@@ -676,6 +798,7 @@ const ChatArea = ({ isGuest }) => {
               );
 
               console.log("✅ Guest stream completed");
+              //  scrollToBottomSmooth();
               break;
 
             case "error":
@@ -846,6 +969,10 @@ const ChatArea = ({ isGuest }) => {
                       response: streamingResponse,
                     })
                   );
+                  // 🚀 Smart scroll with delay to allow DOM update
+                  setTimeout(() => {
+                    scrollToBottomSmooth();
+                  }, 10);
                   break;
 
                 case "end":
@@ -862,6 +989,7 @@ const ChatArea = ({ isGuest }) => {
                   );
                   setBotTyping(false);
                   console.log("✅ Stream completed");
+                  //  scrollToBottomSmooth();
                   break;
 
                 case "error":
@@ -1373,8 +1501,23 @@ const ChatArea = ({ isGuest }) => {
       {/* Chat Area starts */}
       <div
         ref={chatContainerRef}
+        onWheel={handleUserScrollInterruption} // Detect mouse wheel
+        onTouchMove={handleUserScrollInterruption} // Detect touch scroll
         className=" relative flex-1 h-[calc(100vh-160px)] w-full scrollbar-hover  md:p-4  mt-20 md:mt-0 space-y-6 overflow-auto mx-auto bg-white  dark:bg-[#121212] transition-colors duration-300"
-        style={{ zIndex: 10 }}>
+        style={{ zIndex: 20 }}>
+        <RedirectModal
+          open={modalOpen}
+          url={pendingUrl}
+          onConfirm={(url) => {
+            window.open(url, "_blank", "noopener,noreferrer");
+            setModalOpen(false);
+            setPendingUrl("");
+          }}
+          onCancel={() => {
+            setModalOpen(false);
+            setPendingUrl("");
+          }}
+        />
         <div className="  md:w-[70%] w-full  mx-auto">
           {/* chats section starts */}
           {/* final  */}
@@ -1503,12 +1646,16 @@ const ChatArea = ({ isGuest }) => {
                               alt="Bot Logo"
                             />
                           </div>
-                          <div className="w-full mr-7 font-centurygothic">
+                          <div className="w-full  mr-7 font-centurygothic relative">
                             <ChatbotMarkdown
                               ref={(ref) =>
                                 (markdownRefs.current[msg.id] = ref)
                               }
                               content={msg.response}
+                              onLinkClick={(url) => {
+                                setPendingUrl(url);
+                                setModalOpen(true);
+                              }}
                             />
                           </div>
                         </div>
@@ -1647,13 +1794,7 @@ const ChatArea = ({ isGuest }) => {
                   className="text-base md:text-2xl font-bold text-gray-500 dark:text-gray-300 font-centurygothic">
                   {getTimeBasedGreeting()} {user?.username}
                 </motion.p>
-                {/* <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 1.5 }}
-                    className="text-base md:text-lg text-gray-500 dark:text-gray-300">
-                    How can i help you today?
-                  </motion.p> */}
+                 
               </motion.div>
             </>
           )}
@@ -1665,7 +1806,7 @@ const ChatArea = ({ isGuest }) => {
           onMouseEnter={() => setscrollTooltip(true)}
           onMouseLeave={() => setscrollTooltip(false)}
           onClick={scrollToBottom}
-          className={`absolute bottom-[150px]  right-0 md:right-10 transform -translate-x-1/2 z-50 p-1  rounded-full shadow-lg bg-white dark:bg-gray-800 border border-black dark:border-white transition text-black dark:text-white`}
+          className={`absolute bottom-[125px] md:bottom-[160px] right-0 md:right-10 transform -translate-x-1/2 z-50 p-1  rounded-full shadow-lg bg-white dark:bg-gray-800 border border-black dark:border-white transition text-black dark:text-white`}
           aria-label="Scroll to bottom">
           {/* <CircleArrowDown /> */}
           <span className="hidden md:block">
@@ -1781,40 +1922,40 @@ const ChatArea = ({ isGuest }) => {
           /> */}
 
           <textarea
-  ref={textareaRef}
-  className="w-full h-auto text-xs md:text-base max-h-36 min-h-[35px] md:min-h-[44px] p-2 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
-  value={inputMessage + (isRecording ? transcriptBuffer : "")}
-  onChange={handleInputChange}
-  onKeyDown={(e) => {
-    const isMobile = isMobileDevice();
-    
-    if (e.key === "Enter") {
-      if (isMobile) {
-        // Mobile: Enter = new line, Shift+Enter = send
-        if (e.shiftKey) {
-          e.preventDefault();
-          if (!loading) {
-            handleSendMessage();
-          }
-        }
-        // Let Enter create new line naturally (don't preventDefault)
-      } else {
-        // Desktop: Enter = send, Shift+Enter = new line
-        if (!e.shiftKey) {
-          e.preventDefault();
-          if (!loading) {
-            handleSendMessage();
-          }
-        }
-        // Let Shift+Enter create new line naturally
-      }
-    }
-  }}
-  rows="1"
-  placeholder={
-    isUploading ? "" : isRecording ? "" : "Explore anything...."
-  }
-/>
+            ref={textareaRef}
+            className="w-full h-auto text-xs md:text-base max-h-36 min-h-[35px] md:min-h-[44px] p-2 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
+            value={inputMessage + (isRecording ? transcriptBuffer : "")}
+            onChange={handleInputChange}
+            onKeyDown={(e) => {
+              const isMobile = isMobileDevice();
+
+              if (e.key === "Enter") {
+                if (isMobile) {
+                  // Mobile: Enter = new line, Shift+Enter = send
+                  if (e.shiftKey) {
+                    e.preventDefault();
+                    if (!loading) {
+                      handleSendMessage();
+                    }
+                  }
+                  // Let Enter create new line naturally (don't preventDefault)
+                } else {
+                  // Desktop: Enter = send, Shift+Enter = new line
+                  if (!e.shiftKey) {
+                    e.preventDefault();
+                    if (!loading) {
+                      handleSendMessage();
+                    }
+                  }
+                  // Let Shift+Enter create new line naturally
+                }
+              }
+            }}
+            rows="1"
+            placeholder={
+              isUploading ? "" : isRecording ? "" : "Explore anything...."
+            }
+          />
 
           {/* Voice Visualizer */}
           {isRecording &&
@@ -1869,28 +2010,44 @@ const ChatArea = ({ isGuest }) => {
                   <Paperclip size={12} />
                 </span>
               </div>
-              {showLoginPrompt && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                  <div className="bg-white dark:bg-gray-800 p-6 rounded-xl text-center shadow-2xl">
-                    <h2 className="text-xl font-semibold mb-4 text-black dark:text-white">
-                      Login Required
-                    </h2>
-                    <p className="mb-6 text-gray-700 dark:text-gray-300">
-                      Please login or sign up to use this feature.
-                    </p>
-                    <button
-                      onClick={() => navigate("/login")}
-                      className="bg-blue-500 text-white px-4 py-2 rounded mr-2">
-                      Login
-                    </button>
-                    <button
-                      onClick={() => setShowLoginPrompt(false)}
-                      className="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
+             {showLoginPrompt && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
+    <div className="relative w-full max-w-sm bg-white dark:bg-[#1e1e1e] rounded-xl p-6 shadow-xl text-center text-black dark:text-white transition-all duration-300">
+
+      {/* Close Button */}
+      <button
+        onClick={() => setShowLoginPrompt(false)}
+        className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+        aria-label="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Heading */}
+      <h2 className="text-xl font-medium mb-2">Sign in to continue</h2>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+        Please log in or create an account to use this feature.
+      </p>
+
+      {/* Buttons */}
+      <div className="flex justify-center gap-3 flex-wrap">
+        <button
+          onClick={() => navigate("/login")}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
+        >
+          Login / Sign Up
+        </button>
+        <button
+          onClick={() => setShowLoginPrompt(false)}
+          className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-sm rounded-md text-gray-800 dark:text-white transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
               {showUploadTooltip && (
                 <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-1 md:px-2 py-1 text-[9px] md:text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">

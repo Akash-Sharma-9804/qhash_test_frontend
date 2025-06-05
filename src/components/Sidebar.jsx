@@ -440,7 +440,7 @@ const handleDeleteConversation = async (id) => {
     <div className="flex">
     {/* Sidebar starts */}
     <div
-      className={`fixed md:relative z-30 h-screen
+      className={`fixed md:relative z-50 h-screen
         ${isOpen ? "translate-x-0 w-56" : "-translate-x-full"} md:translate-x-0
         ${isCollapsed ? "md:w-16" : "md:w-56"}
         bg-slate-200 dark:bg-[#282828] p-2 flex flex-col

@@ -368,10 +368,28 @@ import "prismjs/components/prism-javascript";
 import "prismjs/components/prism-python";
 import "prismjs/components/prism-json";
 import "prismjs/components/prism-markdown";
+import RedirectModal from "./RedirectModal"; // Make sure the path is correct
 
-const ChatbotMarkdown = forwardRef(({ content }, ref) => {
+
+
+const ChatbotMarkdown = forwardRef(({ content, onLinkClick  }, ref) => {
   const [copied, setCopied] = useState(false);
   const containerRef = useRef(null);
+const [modalOpen, setModalOpen] = useState(false);
+const [pendingUrl, setPendingUrl] = useState("");
+
+ // popup links
+  const handleConfirmRedirect = (url) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+    setModalOpen(false);
+    setPendingUrl("");
+  };
+
+  const handleCancelRedirect = () => {
+    setModalOpen(false);
+    setPendingUrl("");
+  };
+
 
   const handleCopyCode = (code) => {
     navigator.clipboard.writeText(code);
@@ -491,7 +509,7 @@ const ChatbotMarkdown = forwardRef(({ content }, ref) => {
   }));
 
   return (
-    <div ref={containerRef} className="w-full max-w-full overflow-hidden">
+    <div ref={containerRef} className="w-full  max-w-full overflow-hidden">
       <ReactMarkdown
         children={content}
         remarkPlugins={[remarkGfm]}
@@ -582,9 +600,17 @@ const ChatbotMarkdown = forwardRef(({ content }, ref) => {
           },
 
           a({ node, ...props }) {
+             const handleClick = (e) => {
+    e.preventDefault();
+    if (typeof onLinkClick === "function") {
+      onLinkClick(props.href);
+    }
+  };
             return (
               <a
                 className="text-blue-600  dark:text-blue-400 underline break-all hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-300 text-sm sm:text-base"
+                href={props.href}
+      onClick={handleClick}
                 target="_blank"
                 rel="noopener noreferrer"
                 {...props}
@@ -719,6 +745,7 @@ const ChatbotMarkdown = forwardRef(({ content }, ref) => {
           },
         }}
       />
+      
     </div>
   );
 });
