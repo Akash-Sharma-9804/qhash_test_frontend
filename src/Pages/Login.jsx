@@ -3,12 +3,12 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { useDispatch } from "react-redux";
 import { loginUser } from "../store/authSlice";
-import PasswordInput from "../components/PasswordInput";
+import PasswordInput from "../components/helperComponent/PasswordInput";
 import { toast } from "react-toastify";
 import { useAuth0 } from "@auth0/auth0-react";
 import { initiateGoogleLogin } from "../api_Routes/api";
 // import ParticlesBackground from "../components/HexagonsBackground"; // adjust path if needed
-import HexagonBackground from "../components/HexagonBackground";
+import HexagonBackground from "../components/helperComponent/HexagonBackground";
 
 const Login = () => {
   const dispatch = useDispatch();

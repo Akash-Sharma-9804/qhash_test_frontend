@@ -2,9 +2,9 @@ import React from "react";
 import { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 
-import ChatArea from "../components/ChatArea";
+import ChatArea from "../components/main/ChatArea";
 
-import Sidebar from "../components/Sidebar";
+import Sidebar from "../components/main/Sidebar";
 
 const HomePage = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);

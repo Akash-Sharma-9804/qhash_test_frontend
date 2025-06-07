@@ -7,11 +7,11 @@ import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import axios from "axios"; // Assuming you'll send OTP via backend
-import OtpInput from "../components/OtpInput";
-import PasswordInput from "../components/PasswordInput";
+import OtpInput from "../components/helperComponent/OtpInput";
+import PasswordInput from "../components/helperComponent/PasswordInput";
 import { ImSpinner2 } from "react-icons/im";
 import { verifyOtp, resendOtp,initiateGoogleLogin } from "../api_Routes/api";
- import HexagonBackground from "../components/HexagonBackground";
+ import HexagonBackground from "../components/helperComponent/HexagonBackground";
 const Signup = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();

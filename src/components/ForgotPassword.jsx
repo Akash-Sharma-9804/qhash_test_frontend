@@ -4,11 +4,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { ImSpinner2 } from "react-icons/im";
 import { motion } from "framer-motion";
-import OtpInput from "./OtpInput"; // Adjust the path if needed
+import OtpInput from "./helperComponent/OtpInput"; // Adjust the path if needed
 import { IoFingerPrint } from "react-icons/io5";
 import { MoveLeft } from "lucide-react";
 import { sendForgotPasswordOtp,verifyResetOtp } from "../api_Routes/api";
-import HexagonBackground from "../components/HexagonBackground";
+import HexagonBackground from "./helperComponent/HexagonBackground";
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");

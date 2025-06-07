@@ -4,10 +4,10 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { ImSpinner2 } from "react-icons/im";
 import { motion } from "framer-motion";
-import PasswordInput from "./PasswordInput";
+import PasswordInput from "./helperComponent/PasswordInput";
 import { MdOutlinePassword } from "react-icons/md";
 import { resetPassword } from "../api_Routes/api";
-import HexagonBackground from "../components/HexagonBackground";
+import HexagonBackground from "../components/helperComponent/HexagonBackground";
 
 const ResetPassword = () => {
   const { state } = useLocation();

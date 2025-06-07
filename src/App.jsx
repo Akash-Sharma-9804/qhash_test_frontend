@@ -16,6 +16,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
  import { fetchUserDetails } from "./api_Routes/api"; // adjust path
 import OAuthSuccess from "./components/OAuthSuccess";
+import TermsAndPolicies from "./components/TermsAndPolicies";
 
 // ✅ Routes component that restores auth state from localStorage
 const AppRoutes = () => {
@@ -122,6 +123,7 @@ useEffect(() => {
 
       {/* ✅ About Us, accessible to all */}
       <Route path="/about" element={<AboutUs />} />
+       <Route path="/terms&policies" element={<TermsAndPolicies />} />
 
       {/* ✅ Wildcard redirect to homepage */}
       <Route path="*" element={<Navigate to="/" />} />
