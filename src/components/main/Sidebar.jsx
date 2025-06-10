@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import {  Link, useNavigate } from "react-router-dom";
+import "./sidebar.css";
 import {
   Sun,
   Moon,
@@ -48,6 +49,15 @@ const Sidebar = () => {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [dropdownId, setDropdownId] = useState(null);
+ // Add these new state variables for typing animation
+// Add these new state variables for typing animation (around line 35)
+const [renamingId, setRenamingId] = useState(null);
+const [tempRenameText, setTempRenameText] = useState("");
+// Update the fetchingConversationId state to handle both single ID and Set
+const [fetchingConversationId, setFetchingConversationId] = useState(null);
+
+
+
 
   const [isOpen, setIsOpen] = useState(false); // For mobile view
   const dispatch = useDispatch();
@@ -105,26 +115,65 @@ const Sidebar = () => {
   //   console.log("👀 Conversations in Redux:", conversations);
   // }, [conversations]);
 
-  useEffect(() => {
-    if (token) {
-      fetchConversations(token)
-        .then((data) => {
-          // console.log("Fetched Conversations:", data);
-          dispatch(setConversations(data.conversations || []));
-        })
-        .catch((err) => console.error("Error fetching conversations:", err));
-    }
-  }, [token, dispatch]);
+  // useEffect(() => {
+  //   if (token) {
+  //     fetchConversations(token)
+  //       .then((data) => {
+  //         // console.log("Fetched Conversations:", data);
+  //         dispatch(setConversations(data.conversations || []));
+  //       })
+  //       .catch((err) => console.error("Error fetching conversations:", err));
+  //   }
+  // }, [token, dispatch]);
+// Replace the existing useEffect for fetching conversations
+// Replace the existing useEffect for fetching conversations
+useEffect(() => {
+  if (token) {
+    fetchConversations(token)
+      .then((data) => {
+        console.log("Fetched Conversations:", data);
+        const conversations = data.conversations || [];
+        
+        // Set all conversations as fetching initially
+        const fetchingIds = new Set(conversations.map(conv => conv.id));
+        setFetchingConversationId(fetchingIds);
+        
+        // Set conversations in Redux
+        dispatch(setConversations(conversations));
+        
+        // Simulate typing animation for each conversation
+        conversations.forEach((conv, index) => {
+          setTimeout(() => {
+            setFetchingConversationId(prev => {
+              if (prev instanceof Set) {
+                const newSet = new Set(prev);
+                newSet.delete(conv.id);
+                return newSet.size > 0 ? newSet : null;
+              }
+              return prev === conv.id ? null : prev;
+            });
+          }, (index + 1) * 300); // Stagger the animations
+        });
+      })
+      .catch((err) => console.error("Error fetching conversations:", err));
+  }
+}, [token, dispatch]);
 
-  useEffect(() => {
-    const storedConversationId = localStorage.getItem("conversation_id");
-    const storedConversationName = localStorage.getItem("conversation_name");
 
-    // Update the state if the conversation name has changed in localStorage
-    if (storedConversationId && storedConversationName) {
-      dispatch(setActiveConversation(Number(storedConversationId)));
-    }
-  }, [dispatch]);
+
+
+  // useEffect(() => {
+  //   const storedConversationId = localStorage.getItem("conversation_id");
+  //   const storedConversationName = localStorage.getItem("conversation_name");
+
+  //   // Update the state if the conversation name has changed in localStorage
+  //   if (storedConversationId && storedConversationName) {
+  //     dispatch(setActiveConversation(Number(storedConversationId)));
+  //   }
+  // }, [dispatch]);
+
+   // Updated useEffect for fetching conversations with loading animation
+  
 
   // useEffect(() => {
   //   console.log("👀 Conversations in Redux:", conversations);
@@ -132,20 +181,50 @@ const Sidebar = () => {
 
    // This runs once when the component mounts.
 
+  // useEffect(() => {
+  //   if (conversations.length) {
+  //     // Check if conversations have been updated
+  //     const updatedConversation = conversations.find(
+  //       (conv) => conv.id === activeConversation
+  //     );
+  //     if (updatedConversation) {
+  //       // If there's an active conversation, update its name from Redux
+  //       localStorage.setItem("conversation_name", updatedConversation.name);
+  //     }
+  //   }
+  // }, [conversations, activeConversation, dispatch]); // Run whenever conversations or activeConversation changes
+
+  // Updated useEffect for localStorage with loading animation
+  // Replace the existing useEffect for localStorage
+// Replace the existing useEffect for localStorage
+useEffect(() => {
+  const storedConversationId = localStorage.getItem("conversation_id");
+  const storedConversationName = localStorage.getItem("conversation_name");
+
+  if (storedConversationId && storedConversationName) {
+    // Show typing animation for the stored conversation
+    setFetchingConversationId(Number(storedConversationId));
+    
+    // Simulate fetching delay with typing animation
+    setTimeout(() => {
+      dispatch(setActiveConversation(Number(storedConversationId)));
+      setFetchingConversationId(null);
+    }, 1200); // Show animation for 1.2 seconds
+  }
+}, [dispatch]);
+
+
+
   useEffect(() => {
     if (conversations.length) {
-      // Check if conversations have been updated
       const updatedConversation = conversations.find(
         (conv) => conv.id === activeConversation
       );
       if (updatedConversation) {
-        // If there's an active conversation, update its name from Redux
         localStorage.setItem("conversation_name", updatedConversation.name);
       }
     }
-  }, [conversations, activeConversation, dispatch]); // Run whenever conversations or activeConversation changes
-
-  
+  }, [conversations, activeConversation, dispatch]);
  
  
   // const handleNewChat = async () => {
@@ -214,43 +293,82 @@ const Sidebar = () => {
 };
   
 
-  const handleRename = async (id) => {
-    if (
-      !editText ||
-      conversations.find((c) => c.id === id)?.name === editText
-    ) {
-      // No change, just close rename UI
-      setEditingId(null);
-      setDropdownId(null);
-      return;
-    }
+  // const handleRename = async (id) => {
+  //   if (
+  //     !editText ||
+  //     conversations.find((c) => c.id === id)?.name === editText
+  //   ) {
+  //     // No change, just close rename UI
+  //     setEditingId(null);
+  //     setDropdownId(null);
+  //     return;
+  //   }
 
-    try {
-      await renameConversation(id, editText, token);
-      dispatch(renameConversationRedux({ id, newName: editText }));
-    } catch (err) {
-      console.error("Rename failed", err);
-    } finally {
-      setEditingId(null);
-      setDropdownId(null);
-    }
-  };
+  //   try {
+  //     await renameConversation(id, editText, token);
+  //     dispatch(renameConversationRedux({ id, newName: editText }));
+  //   } catch (err) {
+  //     console.error("Rename failed", err);
+  //   } finally {
+  //     setEditingId(null);
+  //     setDropdownId(null);
+  //   }
+  // };
  
+// Update the handleRename function
+ // Update the handleRename function
+const handleRename = async (id) => {
+  if (
+    !editText ||
+    conversations.find((c) => c.id === id)?.name === editText
+  ) {
+    setEditingId(null);
+    setDropdownId(null);
+    return;
+  }
 
+  try {
+    // Start the typing animation
+    setRenamingId(id);
+    setTempRenameText(editText);
+    setEditingId(null);
+    setDropdownId(null);
+
+    // Call the API
+    await renameConversation(id, editText, token);
+    
+    // Keep animation for a bit to show the effect
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Update Redux with the new name
+    dispatch(renameConversationRedux({ id, newName: editText }));
+    
+    // Stop the typing animation
+    setRenamingId(null);
+    setTempRenameText("");
+    
+  } catch (err) {
+    console.error("Rename failed", err);
+    setRenamingId(null);
+    setTempRenameText("");
+    toast.error("Failed to rename conversation");
+  }
+};
+
+  
+ // Your existing useEffect for auto-save rename...
   useEffect(() => {
     if (
       editingId !== null &&
       prevActiveConvRef.current &&
       prevActiveConvRef.current !== activeConversation &&
-      editingId !== activeConversation // ✅ Prevent conflict with deleted or switched conv
+      editingId !== activeConversation
     ) {
-      handleRename(editingId); // ✅ auto-save rename
+      handleRename(editingId);
     }
   
     prevActiveConvRef.current = activeConversation;
   }, [activeConversation, editingId]);
-  
-  
 
    
   // const handleDeleteConversation = async (id) => {
@@ -289,7 +407,7 @@ const handleDeleteConversation = async (id) => {
     if (deleteResponse.action === "deleted") {
       // Normal deletion - conversation deleted, others remain
       dispatch(removeConversationFromRedux(id));
-      toast.success("🗑️ Conversation deleted successfully!");
+      toast.success("🗑️ Chat deleted successfully!");
       
       if (activeConversation === id) {
         const remaining = conversations.filter((conv) => conv.id !== id);
@@ -437,14 +555,14 @@ const handleDeleteConversation = async (id) => {
   };
 
   return (
-    <div className="flex">
+    <div className="flex min-h-screen">
     {/* Sidebar starts */}
     <div
-      className={`fixed md:relative z-50 h-screen
-        ${isOpen ? "translate-x-0 w-56" : "-translate-x-full"} md:translate-x-0
-        ${isCollapsed ? "md:w-16" : "md:w-56"}
-        bg-slate-200 dark:bg-[#282828] p-2 flex flex-col
-        transition-all duration-500 ease-in-out overflow-hidden`}>
+        className={`fixed md:relative z-50 h-full md:h-screen
+    ${isOpen ? "translate-x-0 w-64" : "-translate-x-full"} md:translate-x-0
+    ${isCollapsed ? "md:w-16" : "md:w-64"}
+    bg-slate-200 dark:bg-[#282828] p-2 flex flex-col
+    transition-all duration-500 ease-in-out overflow-hidden`}>
       
       {/* Logo with Menu Button */}
       <div className="flex gap-2 items-center mb-4 flex-shrink-0">
@@ -495,6 +613,7 @@ const handleDeleteConversation = async (id) => {
 
       {/* New Chat Button */}
       <div className="mb-4 flex-shrink-0">
+        <div className="w-full sm:w-auto"> 
         <button onClick={handleNewChat}
           className={`border border-black dark:border-white p-2 bg-gradient-to-r from-[#0000B5] to-[#0076FF]
             hover:from-[#0076FF] hover:to-[#0000B5] text-white rounded-lg flex items-center
@@ -511,6 +630,7 @@ const handleDeleteConversation = async (id) => {
             New Chat
           </span>
         </button>
+        </div>
       </div>
 
       {/* Chat History - Scrollable Container with proper bottom spacing */}
@@ -543,93 +663,123 @@ const handleDeleteConversation = async (id) => {
                           ? "bg-gradient-to-r from-[#0000B5] to-[#0076FF] hover:bg-gradient-to-r hover:from-[#0076FF] hover:to-[#0000B5] text-white"
                           : "bg-slate-300 dark:bg-[#3f3f3f] border hover:bg-gray-500"
                       } my-1 mr-2`}>
-                      <div
-                        onClick={() => handleSelectConversation(conv.id)}
-                        className="flex-grow min-w-0">
-                        {editingId === conv.id ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={editText}
-                              autoFocus
-                              onChange={(e) => setEditText(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              onBlur={() => handleRename(conv.id)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter")
-                                  handleRename(conv.id);
-                                if (e.key === "Escape") {
-                                  setEditText("");
-                                  setEditingId(null);
-                                }
-                              }}
-                              className="bg-transparent border-b border-gray-400 outline-none w-full"
-                            />
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRename(conv.id);
-                              }}
-                              title="Save"
-                              className="text-green-500 hover:text-green-700 flex-shrink-0">
-                              <Save
-                                size={20}
-                                color="#4dff00"
-                                strokeWidth={2}
-                              />
-                            </button>
-                          </div>
-                        ) : (
-                          <span 
-                            title={conv.name || "New Chat"}
-                            className="block truncate pr-2">
-                            {conv.name || "New Chat"}
-                          </span>
-                        )}
-                      </div>
+                      
+<div
+  onClick={() => handleSelectConversation(conv.id)}
+  className="flex-grow min-w-0">
+  
+  {/* Show typing animation when renaming */}
+  {renamingId === conv.id ? (
+    <div className="typing-animation">
+      <span className="typing-text">
+        {tempRenameText}
+      </span>
+      <div className="typing-dots">
+        <span className="typing-dot"></span>
+        <span className="typing-dot"></span>
+        <span className="typing-dot"></span>
+      </div>
+    </div>
+  ) : fetchingConversationId === conv.id ? (
+    // Show typing animation when fetching from localStorage
+    <div className="typing-animation">
+      <span className="typing-text">
+        {conv.name || "New Chat"}
+      </span>
+      <div className="typing-dots">
+        <span className="typing-dot"></span>
+        <span className="typing-dot"></span>
+        <span className="typing-dot"></span>
+      </div>
+    </div>
+  ) : editingId === conv.id ? (
+    <div className="flex items-center gap-2">
+      <input
+        type="text"
+        value={editText}
+        autoFocus
+        onChange={(e) => setEditText(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        onBlur={() => handleRename(conv.id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter")
+            handleRename(conv.id);
+          if (e.key === "Escape") {
+            setEditText("");
+            setEditingId(null);
+          }
+        }}
+        className="bg-transparent border-b border-gray-400 outline-none w-full"
+      />
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleRename(conv.id);
+        }}
+        title="Save"
+        className="text-green-500 hover:text-green-700 flex-shrink-0">
+        <Save
+          size={20}
+          color="#4dff00"
+          strokeWidth={2}
+        />
+      </button>
+    </div>
+  ) : (
+    <span 
+      title={conv.name || "New Chat"}
+      className="block truncate pr-2">
+      {conv.name || "New Chat"}
+    </span>
+  )}
+</div>
+
 
                       {/* Dropdown trigger */}
-                      <div className="relative flex-shrink-0" data-dropdown-id={conv.id}>
-                        <span
-                          className="ml-2 flex justify-center items-center cursor-pointer p-1 hover:bg-black/10 rounded"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDropdownOpen(conv.id);
-                          }}>
-                          <ChevronDown size={16} />
-                        </span>
+                    {/* Dropdown trigger - hide when renaming */}
+                   {renamingId !== conv.id && fetchingConversationId !== conv.id && (
+  <div className="relative flex-shrink-0" data-dropdown-id={conv.id}>
+                          <span
+                            className="ml-2 flex justify-center items-center cursor-pointer p-1 hover:bg-black/10 rounded"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDropdownOpen(conv.id);
+                            }}>
+                            <ChevronDown size={16} />
+                          </span>
 
-                        {/* Dropdown menu */}
-                        {dropdownId === conv.id && (
-                          <div className="absolute right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-300 rounded shadow-md z-50 min-w-[120px]">
-                            <button
-                              className="block px-4 py-2 font-bold text-sm text-gray-700 hover:bg-gray-100 dark:bg-gray-600 w-full text-left dark:text-white"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingId(conv.id);
-                                setEditText(conv.name || "New Chat");
-                                setDropdownId(null);
-                              }}>
-                              <span className="flex gap-2 items-center"> 
-                                <Pen size={14} />
-                                Rename 
-                              </span>
-                            </button>
-                            <button
-                              className="block px-4 py-2 text-sm text-red-600 hover:bg-red-100 hover:dark:bg-red-800 font-bold hover:dark:text-black w-full text-left"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteConversation(conv.id, token, dispatch);
-                                setDropdownId(null);
-                              }}>
-                              <span className="flex gap-2 items-center"> 
-                                <Trash size={14} />
-                                Delete
-                              </span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                          {/* Dropdown menu */}
+                          {dropdownId === conv.id && (
+                            <div className="absolute right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-300 rounded shadow-md z-50 min-w-[120px]">
+                              <button
+                                className="block px-4 py-2 font-bold text-sm text-gray-700 hover:bg-gray-100 dark:bg-gray-600 w-full text-left dark:text-white"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingId(conv.id);
+                                  setEditText(conv.name || "New Chat");
+                                  setDropdownId(null);
+                                }}>
+                                <span className="flex gap-2 items-center"> 
+                                  <Pen size={14} />
+                                  Rename 
+                                </span>
+                              </button>
+                              <button
+                                className="block px-4 py-2 text-sm text-red-600 hover:bg-red-100 hover:dark:bg-red-800 font-bold hover:dark:text-black w-full text-left"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteConversation(conv.id, token, dispatch);
+                                  setDropdownId(null);
+                                }}>
+                                <span className="flex gap-2 items-center"> 
+                                  <Trash size={14} />
+                                  Delete
+                                </span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -650,7 +800,7 @@ const handleDeleteConversation = async (id) => {
       </div>
 
       {/* Footer Buttons - Always at bottom with absolute positioning */}
-      <div className={`absolute bottom-2 left-2 right-2 flex flex-col gap-3`}>
+      <div className={`absolute bottom-2 left-2 right-2 flex flex-col gap-3 w-[calc(100%-16px)]`}>
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}

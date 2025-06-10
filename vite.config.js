@@ -73,6 +73,12 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   base: "/", // make sure this matches your actual deployment path
+  server: {
+    host: 'localhost',
+    port: 5174,
+    strictPort: true, // This will fail if port 5174 is already in use
+    // open: true // This will automatically open the browser
+  },
   build: {
     outDir: "dist",
     assetsDir: "assets",

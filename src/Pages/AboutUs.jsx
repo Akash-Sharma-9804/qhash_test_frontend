@@ -30,19 +30,31 @@ const AboutUs = () => {
             AI that can power the future of technology & humanity.
             </p>
           </div>
-          <div className="flex justify-between">
-            <Link to="/homepage" className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-800 transition ">
-               Back 
-            </Link>
-          <Link to="/terms&policies"  className="inline-block px-5 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">Terms&Policies</Link>
-            <a
-              href="https://quantumhash.me"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-block px-5 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
-              Explore More
-            </a>
-          </div>
+         <div className="flex flex-col sm:flex-row justify-center sm:justify-between items-center gap-3 sm:gap-4">
+  <Link
+    to="/homepage"
+    className="w-full sm:w-auto text-center px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-800 transition"
+  >
+    Home
+  </Link>
+
+  <Link
+    to="/terms&policies"
+    className="w-full sm:w-auto text-center px-5 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition"
+  >
+    Terms & Policies
+  </Link>
+
+  <a
+    href="https://quantumhash.me"
+    target="_blank"
+    rel="noreferrer"
+    className="w-full sm:w-auto text-center px-5 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition"
+  >
+    Explore More
+  </a>
+</div>
+
         </div>
       </div>
     </div>

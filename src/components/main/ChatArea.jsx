@@ -54,6 +54,7 @@ import { v4 as uuidv4 } from "uuid";
 import RadialVisualizer from "../helperComponent/RadialVisualizer";
 import { FaMicrophone, FaStop, FaPause, FaPlay } from "react-icons/fa";
 import RedirectModal from "../helperComponent/RedirectModal";
+import BotThinking from "../helperComponent/BotThinking";
 
 const isMobileDevice = () => {
   return (
@@ -92,6 +93,7 @@ const ChatArea = ({ isGuest }) => {
   const [voiceMode, setVoiceMode] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const conversations = useSelector((state) => state.chat.conversations);
+  const [isResponding, setIsResponding] = useState(false);
 
   // guest mode
 
@@ -676,6 +678,7 @@ const ChatArea = ({ isGuest }) => {
         ? customText.trim()
         : inputMessage.trim?.() || "";
     if (!messageText && files.length === 0) return;
+    setIsResponding(true);
 
     textareaRef.current.style.height = "44px";
     const plainText =
@@ -834,6 +837,7 @@ const ChatArea = ({ isGuest }) => {
         toast.error("❌ Failed to get guest response.");
       } finally {
         setLoading(false);
+        setIsResponding(false);
       }
       return;
     }
@@ -1072,6 +1076,7 @@ const ChatArea = ({ isGuest }) => {
       // ✅ 9. Cleanup
       setUploadProgress({});
       setLoading(false); // 🔓 Re-enable send button here
+      setIsResponding(false);
     }
   };
 
@@ -1227,7 +1232,7 @@ const ChatArea = ({ isGuest }) => {
   // test2 working 14-05-25
   const [isLiveRecording, setIsliveRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isResponding, setIsResponding] = useState(false);
+  // const [isResponding, setIsResponding] = useState(false);
   const [isTTSPlaying, setIsTTSPlaying] = useState(false);
 
   const mediaRecorderRef = useRef(null);
@@ -1684,6 +1689,7 @@ const ChatArea = ({ isGuest }) => {
                           className="text-xs md:text-base text-gray-800 text-bold dark:text-gray-300 mb-2 font-medium">
                           Would you like to know more?
                         </motion.p>
+
                         <div className="flex flex-wrap gap-2">
                           {msg.suggestions.map((suggestion, index) => (
                             <motion.button
@@ -1692,13 +1698,14 @@ const ChatArea = ({ isGuest }) => {
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               transition={{
                                 duration: 0.6,
-                                delay: index * 0.15, // ✅ Perfect timing - not too fast, not too slow
-                                ease: [0.25, 0.46, 0.45, 0.94], // ✅ Custom easing for smooth feel
+                                delay: index * 0.15,
+                                ease: [0.25, 0.46, 0.45, 0.94],
                                 type: "spring",
                                 stiffness: 100,
                                 damping: 15,
                               }}
                               onClick={() => {
+                                if (isResponding) return; // ❗ Prevent while AI responding
                                 const cleanSuggestion = suggestion.replace(
                                   /^\.+\s*/,
                                   ""
@@ -1706,17 +1713,21 @@ const ChatArea = ({ isGuest }) => {
                                 setInputMessage(cleanSuggestion);
                                 handleSendMessage(cleanSuggestion);
                               }}
-                              className="px-4 py-1.5 flex justify-between text-left w-full font-bold rounded-full 
-                     bg-gradient-to-r from-gray-100 to-gray-200 
-                     dark:from-gray-700 dark:to-gray-800 
-                     hover:from-gray-200 hover:to-gray-300 
-                     dark:hover:from-gray-600 dark:hover:to-gray-700 
-                     text-gray-900 dark:text-white 
-                     hover:text-blue-500 dark:hover:text-blue-400
-                     text-xs md:text-sm shadow-sm 
-                     cursor-pointer select-none
-                     transition-all duration-300 ease-out
-                     hover:shadow-lg">
+                             disabled={isResponding}
+                              className={`px-4 py-1.5 flex justify-between text-left w-full font-bold rounded-full 
+            bg-gradient-to-r from-gray-100 to-gray-200 
+            dark:from-gray-700 dark:to-gray-800 
+            text-gray-900 dark:text-white 
+            text-xs md:text-sm shadow-sm 
+            cursor-pointer select-none
+            transition-all duration-300 ease-out
+            hover:shadow-lg 
+            ${
+              botTyping || isProcessing
+                ? "opacity-50 cursor-not-allowed pointer-events-none"
+                : "hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-700 hover:text-blue-500 dark:hover:text-blue-400"
+            }
+          `}>
                               {suggestion.replace(/^[.]/, "")} <span>+</span>
                             </motion.button>
                           ))}
@@ -1731,27 +1742,101 @@ const ChatArea = ({ isGuest }) => {
                 ))}
 
               {/* ✅ Bot Typing Animation */}
-              {(botTyping || isProcessing) && (
+              {/* {(botTyping || isProcessing) && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.5 }}
-                  className="p-3 rounded-lg w-44 md:w-80 bg-gray-500 font-centurygothic text-white self-start ml-2 mb-2  md:ml-0 mr-auto mt-3">
+                  className="p-3 rounded-lg w-44 md:w-80   font-centurygothic text-white self-start ml-2 mb-2  md:ml-0 mr-auto mt-3">
                   <div className="flex items-center gap-2">
-                    <div className="bg-gray-500 p-1 rounded-full">
+                    <div className="  p-1 rounded-full">
                       <img
                         src="./logo.png"
                         className="h-5 w-5 text-2xl animate-walkingBot"
                         alt="Bot Logo"
                       />
                     </div>
-                    <span className="text-xs md:text-lg font-mono">
-                      Thinking
-                    </span>
-                    <span className="animate-typingDots text-xs md:text-lg font-mono"></span>
+                     
+                    <span className="animate-typingDots text-black dark:text-white text-xs md:text-lg font-mono"></span>
                   </div>
                 </motion.div>
-              )}
+              )} */}
+              {/* {(botTyping || isProcessing) && (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    transition={{ duration: 0.5 }}
+    className="p-3 rounded-lg w-44 md:w-80 font-centurygothic text-white self-start ml-2 mb-2 md:ml-0 mr-auto mt-3"
+  >
+    <div className="flex items-center gap-3">
+      <div className="relative h-8 w-8">
+       
+        <div 
+          className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/40 to-indigo-600/40 backdrop-blur-sm"
+          style={{
+            animation: 'breathe 3s ease-in-out infinite'
+          }}
+        ></div>
+        
+     
+        <img
+          src="./logo.png"
+          alt="Bot Logo"
+          className="h-6 w-6 absolute top-1 left-1 z-10 rounded-full"
+          style={{
+            animation: 'thinking 1.5s ease-in-out infinite'
+          }}
+        />
+        
+
+      </div>
+
+      <span className="animate-typingDots text-black dark:text-white text-xs md:text-lg font-mono">
+         
+      </span>
+    </div>
+
+    <style jsx>{`
+      @keyframes breathe {
+        0%, 100% { 
+          transform: scale(1);
+          opacity: 0.4;
+        }
+        50% { 
+          transform: scale(1.1);
+          opacity: 0.6;
+        }
+      }
+      
+      @keyframes thinking {
+        0%, 100% { 
+          transform: translateY(0px) rotate(0deg) scale(1);
+        }
+        25% { 
+          transform: translateY(-2px) rotate(-2deg) scale(1.02);
+        }
+        50% { 
+          transform: translateY(-3px) rotate(0deg) scale(1.05);
+        }
+        75% { 
+          transform: translateY(-2px) rotate(2deg) scale(1.02);
+        }
+      }
+      
+      @keyframes pulse {
+        0%, 100% { 
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% { 
+          opacity: 0.6;
+          transform: scale(0.8);
+        }
+      }
+    `}</style>
+  </motion.div>
+)} */}
+              <BotThinking isVisible={botTyping || isProcessing} />
             </>
           ) : (
             // ✅ Greeting when no messages yet
@@ -1794,7 +1879,6 @@ const ChatArea = ({ isGuest }) => {
                   className="text-base md:text-2xl font-bold text-gray-500 dark:text-gray-300 font-centurygothic">
                   {getTimeBasedGreeting()} {user?.username}
                 </motion.p>
-                 
               </motion.div>
             </>
           )}
@@ -2010,44 +2094,41 @@ const ChatArea = ({ isGuest }) => {
                   <Paperclip size={12} />
                 </span>
               </div>
-             {showLoginPrompt && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
-    <div className="relative w-full max-w-sm bg-white dark:bg-[#1e1e1e] rounded-xl p-6 shadow-xl text-center text-black dark:text-white transition-all duration-300">
+              {showLoginPrompt && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
+                  <div className="relative w-full max-w-sm bg-white dark:bg-[#1e1e1e] rounded-xl p-6 shadow-xl text-center text-black dark:text-white transition-all duration-300">
+                    {/* Close Button */}
+                    <button
+                      onClick={() => setShowLoginPrompt(false)}
+                      className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                      aria-label="Close">
+                      <X className="w-5 h-5" />
+                    </button>
 
-      {/* Close Button */}
-      <button
-        onClick={() => setShowLoginPrompt(false)}
-        className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-        aria-label="Close"
-      >
-        <X className="w-5 h-5" />
-      </button>
+                    {/* Heading */}
+                    <h2 className="text-xl font-medium mb-2">
+                      Sign in to continue
+                    </h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                      Please log in or create an account to use this feature.
+                    </p>
 
-      {/* Heading */}
-      <h2 className="text-xl font-medium mb-2">Sign in to continue</h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        Please log in or create an account to use this feature.
-      </p>
-
-      {/* Buttons */}
-      <div className="flex justify-center gap-3 flex-wrap">
-        <button
-          onClick={() => navigate("/login")}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
-        >
-          Login / Sign Up
-        </button>
-        <button
-          onClick={() => setShowLoginPrompt(false)}
-          className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-sm rounded-md text-gray-800 dark:text-white transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
+                    {/* Buttons */}
+                    <div className="flex justify-center gap-3 flex-wrap">
+                      <button
+                        onClick={() => navigate("/login")}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors">
+                        Login / Sign Up
+                      </button>
+                      <button
+                        onClick={() => setShowLoginPrompt(false)}
+                        className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-sm rounded-md text-gray-800 dark:text-white transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {showUploadTooltip && (
                 <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-1 md:px-2 py-1 text-[9px] md:text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
@@ -2223,6 +2304,19 @@ ${
       {/* Tailwind Typing Animation */}
       <style>
         {`
+        @keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 1.2s infinite;
+}
+
+.drop-shadow-glow {
+  filter: drop-shadow(0 0 5px rgba(59,130,246,0.7));
+}
+
   /* Typing Animation */
   @keyframes typingDots {
     0%, 20% {
