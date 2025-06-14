@@ -27,6 +27,7 @@ import Navbar from "./Navbar";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import { streamAudio } from "../../utils/streamAudio";
+
 // import { useSelector, useDispatch } from "react-redux";
 import ChatbotMarkdown from "../helperComponent/ChatbotMarkdown";
 import {
@@ -49,7 +50,8 @@ import {
 } from "../../store/chatSlice2";
 import { toast } from "react-toastify";
 import MessageFiles from "../helperComponent/MessageFiles";
-import { v4 as uuidv4 } from "uuid";
+// import * as vad from "@ricky0123/vad-web";
+// import { useMicVAD } from "@ricky0123/vad-react";
 // import AudioVisualizer from 'react-audio-visualize';
 import RadialVisualizer from "../helperComponent/RadialVisualizer";
 import { FaMicrophone, FaStop, FaPause, FaPlay } from "react-icons/fa";
@@ -105,7 +107,7 @@ const ChatArea = ({ isGuest }) => {
   const recorderRef = useRef(null);
   const [isRecording, setIsRecording] = useState(false);
   const [transcriptBuffer, setTranscriptBuffer] = useState("");
-
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isUploading, setIsUploading] = useState(false); // For final transcription
 
   const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
@@ -1080,15 +1082,6 @@ const ChatArea = ({ isGuest }) => {
     }
   };
 
-  const handleSuggestionClick = (text) => {
-    // Remove leading dot if present
-    const cleanText = text.replace(/^\.+\s*/, "");
-
-    setInputMessage(cleanText);
-    setTimeout(() => {
-      handleSendMessage(cleanText); // Pass the clean text directly
-    }, 50);
-  };
   // working handlesend message ends
 
   // ✅ Remove selected file
@@ -1230,274 +1223,630 @@ const ChatArea = ({ isGuest }) => {
   // voice functions dictation part ends
 
   // test2 working 14-05-25
-  const [isLiveRecording, setIsliveRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  // const [isResponding, setIsResponding] = useState(false);
+  // ✅ Voice mode refs
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [isAISpeaking, setIsAISpeaking] = useState(false);
+  const [socketOpen, setSocketOpen] = useState(false);
+  const [currentUserMessage, setCurrentUserMessage] = useState("");
+  const [aiResponseText, setAiResponseText] = useState("");
+  const [connectionStatus, setConnectionStatus] = useState("disconnected");
   const [isTTSPlaying, setIsTTSPlaying] = useState(false);
+  const audioChunksBufferRef = useRef([]);
+  const currentTTSAudioRef = useRef(null);
 
-  const mediaRecorderRef = useRef(null);
-  const audioStreamRef = useRef(null);
-  const voiceWsRef = useRef(null);
-  const silenceTimerRef = useRef(null);
-  const isSilenceDetectedRef = useRef(false);
-  const silenceEndConfirmTimerRef = useRef(null);
-  const hasAudioBeenSentRef = useRef(false);
+  let audioContext, mediaStream, processor, socket;
 
-  const startAiVoice = async () => {
-    try {
-      // 🧠 Noise suppression enabled
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          noiseSuppression: true,
-          echoCancellation: true,
-          autoGainControl: true,
-        },
-      });
+  const [currentBotMessageId, setCurrentBotMessageId] = useState(null);
+  // OR better yet, use useRef for callback usage:
+  const currentBotMessageIdRef = useRef(null);
+  const voiceAccumulatedResponseRef = useRef("");
 
-      audioStreamRef.current = stream;
+  // tts part
+// ✅ HUMAN-LIKE: Web Audio API with natural speech processing
+const audioContextRef = useRef(null);
+const audioBufferQueueRef = useRef([]);
+const isPlayingAudioRef = useRef(false);
+const nextPlayTimeRef = useRef(0);
+const pcmBufferRef = useRef([]);
 
-      const token = localStorage.getItem("token");
-      const ws = new WebSocket(
-        // `ws://localhost:5001/api/voice/ws?token=${token}`
-        // `wss://quantumhash-backend-1.onrender.com/api/voice/ws?token=${token}`
-        `${WSS_BASE_URL}?token=${token}`
-      );
-      voiceWsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log("✅ WebSocket connected");
-
-        const storedConversationId = localStorage.getItem("conversation_id");
-        if (storedConversationId) {
-          ws.send(
-            JSON.stringify({
-              type: "control",
-              conversation_id: storedConversationId,
-            })
-          );
-        }
-      };
-
-      ws.onmessage = async (event) => {
-        const data = JSON.parse(event.data);
-        const conversationId =
-          data.conversation_id || localStorage.getItem("conversation_id");
-
-        if (!conversationId) {
-          console.error("❌ Missing conversation_id in WebSocket data.");
-          return;
-        }
-
-        // Ensure active conversation is set
-        if (!activeConversation) {
-          localStorage.setItem("conversation_id", conversationId);
-          dispatch(setActiveConversation(Number(conversationId)));
-        }
-
-        // 🧑 User Message
-        if (data.type === "userMessage") {
-          console.log("🧑 You:", data.message);
-          dispatch(
-            addMessage({
-              conversationId,
-              message: {
-                id: Date.now(),
-                message: data.message,
-                sender: "user",
-                timestamp: new Date().toISOString(),
-                files: [],
-              },
-            })
-          );
-        }
-
-        // 🤖 AI Message with TTS playback
-        else if (data.type === "aiMessage") {
-          console.log("🤖 AI:", data.message);
-          setIsTTSPlaying(true);
-
-          // Stop recording while playing TTS
-          if (mediaRecorderRef.current) {
-            mediaRecorderRef.current.onstop = () => {
-              console.log("🎤 Recording paused for TTS playback.");
-            };
-            mediaRecorderRef.current.stop();
-          }
-
-          try {
-            await streamAudio(data.message); // ⏯️ Play audio first
-          } catch (err) {
-            console.error("❌ Error during TTS playback:", err);
-          }
-
-          // Now display AI response
-          dispatch(
-            addMessage({
-              conversationId,
-              message: {
-                id: Date.now() + 1,
-                message: data.message,
-                sender: "bot",
-                response: data.message,
-                timestamp: new Date().toISOString(),
-                files: data.files || [],
-              },
-            })
-          );
-
-          setIsTTSPlaying(false);
-          setIsResponding(false);
-          setIsProcessing(false);
-          continueVoiceLoop();
-
-          if (data.refreshSidebar) {
-            const token = localStorage.getItem("token");
-            fetchConversations(token).then((updated) =>
-              dispatch(setConversations(updated.conversations))
-            );
-          }
-        }
-
-        // ⚠️ Short Transcription
-        else if (data.type === "transcriptionTooShort") {
-          console.warn("⚠️ Transcription too short");
-          setIsResponding(false);
-          setIsProcessing(false);
-          continueVoiceLoop();
-        }
-
-        // ⏳ AI is processing
-        else if (data.type === "processing") {
-          setIsResponding(true);
-        }
-
-        // ❌ Error handling
-        else if (data.type === "error") {
-          console.error("❌ Error:", data.error);
-          alert(data.error);
-          setIsResponding(false);
-          setIsProcessing(false);
-          continueVoiceLoop();
-        }
-      };
-
-      startRecorder(stream);
-      detectSilence(stream);
-    } catch (err) {
-      console.error("🎤 Voice error:", err);
-    }
-  };
-
-  const startRecorder = (stream) => {
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: "audio/webm",
-      audioBitsPerSecond: 64000,
+const initializeTTSAudio = () => {
+  try {
+    // Create Web Audio Context for human-like playback
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 24000
     });
+    
+    audioBufferQueueRef.current = [];
+    pcmBufferRef.current = [];
+    isPlayingAudioRef.current = false;
+    nextPlayTimeRef.current = 0;
+    
+    setIsTTSPlaying(true);
+    console.log('🔊 Human-like Web Audio API initialized');
+  } catch (error) {
+    console.error('❌ Failed to initialize Web Audio API:', error);
+    setIsTTSPlaying(true);
+  }
+};
 
-    hasAudioBeenSentRef.current = false;
+const handleTTSChunk = (base64Audio, encoding = 'linear16', sampleRate = 24000) => {
+  try {
+    console.log(`🔊 Processing human-like audio chunk: ${base64Audio.length} chars`);
+    
+    // Decode base64 to PCM
+    const binaryString = atob(base64Audio);
+    const pcmData = new Int16Array(binaryString.length / 2);
+    
+    for (let i = 0; i < pcmData.length; i++) {
+      const byte1 = binaryString.charCodeAt(i * 2);
+      const byte2 = binaryString.charCodeAt(i * 2 + 1);
+      pcmData[i] = (byte2 << 8) | byte1;
+    }
+    
+    // Add to continuous buffer
+    pcmBufferRef.current.push(pcmData);
+    
+    // Process larger chunks for more natural speech flow
+    const totalSamples = pcmBufferRef.current.reduce((sum, chunk) => sum + chunk.length, 0);
+    
+    // Process when we have ~800ms of audio for natural pacing
+    if (totalSamples >= 19200) { // 800ms at 24kHz for more natural chunks
+      processHumanLikeAudioBuffer();
+    }
+    
+  } catch (error) {
+    console.error('❌ Error processing audio chunk:', error);
+  }
+};
 
-    mediaRecorder.ondataavailable = (event) => {
-      if (
-        event.data.size > 0 &&
-        !isSilenceDetectedRef.current &&
-        voiceWsRef.current?.readyState === 1
-      ) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64Audio = reader.result.split(",")[1];
-          if (base64Audio.length > 50) {
-            voiceWsRef.current.send(
-              JSON.stringify({
-                type: "transcribe", // 🚀 Match backend: send for transcription
-                audio_data: base64Audio,
-              })
-            );
-            hasAudioBeenSentRef.current = true;
-            setIsProcessing(true);
+const processHumanLikeAudioBuffer = async () => {
+  try {
+    if (!audioContextRef.current || pcmBufferRef.current.length === 0) return;
+    
+    // Combine all PCM data
+    const totalLength = pcmBufferRef.current.reduce((sum, chunk) => sum + chunk.length, 0);
+    const combinedPCM = new Int16Array(totalLength);
+    
+    let offset = 0;
+    for (const chunk of pcmBufferRef.current) {
+      combinedPCM.set(chunk, offset);
+      offset += chunk.length;
+    }
+    
+    // Clear buffer
+    pcmBufferRef.current = [];
+    
+    // ✅ HUMAN-LIKE PROCESSING: Apply natural speech effects
+    const processedPCM = applyHumanLikeEffects(combinedPCM);
+    
+    // Convert PCM to Float32 for Web Audio API
+    const float32Data = new Float32Array(processedPCM.length);
+    for (let i = 0; i < processedPCM.length; i++) {
+      float32Data[i] = processedPCM[i] / 32768.0;
+    }
+    
+    // Create AudioBuffer
+    const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, 24000);
+    audioBuffer.getChannelData(0).set(float32Data);
+    
+    // Schedule with natural pacing
+    scheduleHumanLikeAudioBuffer(audioBuffer);
+    
+    console.log(`🔊 Scheduled ${float32Data.length} samples with human-like processing`);
+    
+  } catch (error) {
+    console.error('❌ Error processing human-like audio buffer:', error);
+  }
+};
+
+// ✅ HUMAN-LIKE EFFECTS: Make speech more natural
+const applyHumanLikeEffects = (pcmData) => {
+  try {
+    // 1. Slight volume normalization for consistent levels
+    const normalizedData = normalizeAudio(pcmData);
+    
+    // 2. Add subtle natural variations
+    const naturalData = addNaturalVariations(normalizedData);
+    
+    // 3. Smooth transitions between chunks
+    const smoothedData = smoothTransitions(naturalData);
+    
+    return smoothedData;
+  } catch (error) {
+    console.error('❌ Error applying human-like effects:', error);
+    return pcmData; // Return original if processing fails
+  }
+};
+
+const normalizeAudio = (pcmData) => {
+  // Find peak amplitude
+  let maxAmplitude = 0;
+  for (let i = 0; i < pcmData.length; i++) {
+    maxAmplitude = Math.max(maxAmplitude, Math.abs(pcmData[i]));
+  }
+  
+  // Normalize to ~70% of max to avoid clipping and sound more natural
+  const targetAmplitude = 32768 * 0.7;
+  const normalizationFactor = maxAmplitude > 0 ? targetAmplitude / maxAmplitude : 1;
+  
+  const normalizedData = new Int16Array(pcmData.length);
+  for (let i = 0; i < pcmData.length; i++) {
+    normalizedData[i] = Math.round(pcmData[i] * normalizationFactor);
+  }
+  
+  return normalizedData;
+};
+
+const addNaturalVariations = (pcmData) => {
+  // Add very subtle natural variations (like human speech micro-variations)
+  const naturalData = new Int16Array(pcmData.length);
+  
+  for (let i = 0; i < pcmData.length; i++) {
+    // Add tiny random variations (±1% max) for more natural sound
+    const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
+    naturalData[i] = Math.round(pcmData[i] * (1 + variation));
+  }
+  
+  return naturalData;
+};
+
+const smoothTransitions = (pcmData) => {
+  // Apply gentle fade-in/fade-out to chunk edges for seamless transitions
+  const smoothedData = new Int16Array(pcmData.length);
+  const fadeLength = Math.min(480, pcmData.length / 10); // 20ms fade at 24kHz
+  
+  for (let i = 0; i < pcmData.length; i++) {
+    let sample = pcmData[i];
+    
+    // Fade in at the beginning
+    if (i < fadeLength) {
+      const fadeIn = i / fadeLength;
+      sample = Math.round(sample * fadeIn);
+    }
+    
+    // Fade out at the end
+    if (i >= pcmData.length - fadeLength) {
+      const fadeOut = (pcmData.length - 1 - i) / fadeLength;
+      sample = Math.round(sample * fadeOut);
+    }
+    
+    smoothedData[i] = sample;
+  }
+  
+  return smoothedData;
+};
+
+const scheduleHumanLikeAudioBuffer = (audioBuffer) => {
+  try {
+    if (!audioContextRef.current) return;
+    
+    const source = audioContextRef.current.createBufferSource();
+    
+    // ✅ HUMAN-LIKE AUDIO PROCESSING: Add subtle effects
+    const gainNode = audioContextRef.current.createGain();
+    const compressor = audioContextRef.current.createDynamicsCompressor();
+    
+    // Configure compressor for more natural speech
+    compressor.threshold.setValueAtTime(-24, audioContextRef.current.currentTime);
+    compressor.knee.setValueAtTime(30, audioContextRef.current.currentTime);
+    compressor.ratio.setValueAtTime(3, audioContextRef.current.currentTime);
+    compressor.attack.setValueAtTime(0.003, audioContextRef.current.currentTime);
+    compressor.release.setValueAtTime(0.25, audioContextRef.current.currentTime);
+    
+    // Set natural volume level
+    gainNode.gain.setValueAtTime(0.85, audioContextRef.current.currentTime);
+    
+    // Connect audio chain: source -> compressor -> gain -> destination
+    source.buffer = audioBuffer;
+    source.connect(compressor);
+    compressor.connect(gainNode);
+    gainNode.connect(audioContextRef.current.destination);
+    
+    const currentTime = audioContextRef.current.currentTime;
+    
+    // Schedule with natural pacing
+    if (!isPlayingAudioRef.current) {
+      // First chunk - start with slight delay for natural feel
+      nextPlayTimeRef.current = currentTime + 0.15; // Slightly longer delay for natural start
+      isPlayingAudioRef.current = true;
+    }
+    
+    // Schedule this buffer to play with natural timing
+    source.start(nextPlayTimeRef.current);
+    
+    // ✅ NATURAL PACING: Add small gaps between chunks for breathing room
+    const naturalGap = 0.05; // 50ms gap for natural speech rhythm
+    nextPlayTimeRef.current += audioBuffer.duration + naturalGap;
+    
+    // Handle completion
+    source.onended = () => {
+      console.log('🔊 Human-like audio buffer completed naturally');
+    };
+    
+    console.log(`🔊 Human-like audio scheduled at ${nextPlayTimeRef.current}, duration: ${audioBuffer.duration}s`);
+    
+  } catch (error) {
+    console.error('❌ Error scheduling human-like audio buffer:', error);
+  }
+};
+
+const playTTSAudio = () => {
+  // Process any remaining buffered audio
+  if (pcmBufferRef.current.length > 0) {
+    processHumanLikeAudioBuffer();
+  }
+  
+  // Set completion timeout with natural timing
+  setTimeout(() => {
+    if (audioContextRef.current) {
+      const remainingTime = nextPlayTimeRef.current - audioContextRef.current.currentTime;
+      
+      setTimeout(() => {
+        setIsTTSPlaying(false);
+        isPlayingAudioRef.current = false;
+        console.log('🔊 All human-like TTS audio completed naturally');
+      }, Math.max(remainingTime * 1000, 1500)); // Longer timeout for natural completion
+    }
+  }, 800); // Longer initial delay
+  
+  console.log('🔊 Human-like TTS playback finalized');
+};
+
+const cleanupTTSAudio = () => {
+  try {
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close();
+    }
+    
+    audioContextRef.current = null;
+    audioBufferQueueRef.current = [];
+    pcmBufferRef.current = [];
+    isPlayingAudioRef.current = false;
+    nextPlayTimeRef.current = 0;
+    setIsTTSPlaying(false);
+    
+    console.log('🔊 Human-like audio cleanup complete');
+  } catch (error) {
+    console.error('❌ Error during audio cleanup:', error);
+  }
+};
+
+
+
+  // Update your startVoiceMode function
+  const startVoiceMode = async () => {
+    try {
+      setUserHasScrolledUp(false);
+      setIsVoiceMode(true);
+      setIsProcessing(true);
+      setShowVoiceOverlay(true);
+
+      // Initialize audio context and mic stream
+      audioContext = new AudioContext({ sampleRate: 16000 });
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const input = audioContext.createMediaStreamSource(mediaStream);
+
+      // Optional: apply filter to reduce background noise
+      const filter = audioContext.createBiquadFilter();
+      filter.type = "lowshelf";
+      filter.frequency.setValueAtTime(1000, audioContext.currentTime);
+      filter.gain.setValueAtTime(-10, audioContext.currentTime);
+
+      input.connect(filter);
+
+      // Create audio processor node (deprecated but works widely)
+      processor = audioContext.createScriptProcessor(4096, 1, 1);
+      filter.connect(processor);
+      processor.connect(audioContext.destination);
+
+      // Connect to WebSocket server
+      const token = localStorage.getItem("token");
+      const conversationId = activeConversation; // from Redux/state
+      const socket = new WebSocket(
+        `${WSS_BASE_URL}?token=${token}&conversation_id=${conversationId}`
+      );
+      socketRef.current = socket; // ✅ Store in ref
+
+      socket.onopen = () => {
+        console.log("🔌 WebSocket connected");
+        setSocketOpen(true);
+        setConnectionStatus("connected");
+        setIsProcessing(false);
+
+        processor.onaudioprocess = (e) => {
+          if (socket.readyState === WebSocket.OPEN) {
+            const inputData = e.inputBuffer.getChannelData(0);
+            const int16Data = convertFloat32ToInt16(inputData);
+            socket.send(int16Data);
           }
         };
-        reader.readAsDataURL(event.data);
-      }
-    };
+      };
 
-    mediaRecorder.onstart = () => {
-      console.log("🎙️ Recording started");
-      setIsliveRecording(true);
-    };
+      // ✅ Move the socket.onmessage handler here (outside of any other function)
+      socket.onmessage = (msg) => {
+        const data = JSON.parse(msg.data);
+        console.log("📥 [WebSocket Message]", data);
 
-    mediaRecorder.onstop = () => {
-      console.log("⏹️ Recording stopped");
-      setIsliveRecording(false);
+        switch (data.type) {
+          case "connected":
+            console.log("✅ WebSocket connected:", data.message);
+            break;
 
-      if (!hasAudioBeenSentRef.current) {
-        console.warn("⚠️ No audio sent. Retrying...");
-        continueVoiceLoop();
-      }
-    };
+          case "transcript":
+            // Live transcript from Deepgram
+            console.log("📝 [Live Transcript]", data.text);
+            setVoiceTranscript(data.text);
+            break;
 
-    mediaRecorderRef.current = mediaRecorder;
-    mediaRecorder.start(3000); // 🔄 send audio every 3 seconds
-  };
+          case "user-message":
+            // Final user message after processing
+            console.log("👤 [User Message]", data.text);
+            setVoiceTranscript(""); // Clear live transcript
 
-  const continueVoiceLoop = () => {
-    if (!audioStreamRef.current) return;
-    startRecorder(audioStreamRef.current); // 🔁 restart recording
-  };
+            // ✅ Add user message to Redux store
+            const userMessage = {
+              id: Date.now(),
+              message: data.text,
+              sender: "user",
+              files: [],
+              conversationId: data.conversation_id,
+            };
 
-  const detectSilence = (stream) => {
-    const audioContext = new AudioContext();
-    const analyser = audioContext.createAnalyser();
-    const microphone = audioContext.createMediaStreamSource(stream);
-    const data = new Uint8Array(analyser.frequencyBinCount);
+            dispatch(
+              addMessage({
+                conversationId: data.conversation_id,
+                message: userMessage,
+              })
+            );
+            break;
 
-    analyser.fftSize = 2048;
-    microphone.connect(analyser);
+          case "bot-typing":
+            // AI is processing/typing
+            console.log("🤖 [Bot Typing]", data.status);
+            setIsAISpeaking(data.status);
+            setBotTyping(data.status);
+            break;
 
-    const checkSilence = () => {
-      analyser.getByteFrequencyData(data);
-      const volume = data.reduce((a, b) => a + b, 0) / data.length;
+          case "tts-start":
+            console.log("🔊 TTS started");
+            initializeTTSAudio();
+            break;
 
-      if (volume < 10) {
-        if (!isSilenceDetectedRef.current) {
-          silenceTimerRef.current = setTimeout(() => {
-            isSilenceDetectedRef.current = true;
-            console.log("🔇 Silence detected, waiting for confirmation...");
+          case "tts-audio-chunk":
+            console.log("🔊 Got audio chunk");
+  handleTTSChunk(data.audio, data.encoding, data.sample_rate);
+  break;
 
-            silenceEndConfirmTimerRef.current = setTimeout(() => {
-              console.log("🛑 Confirmed silence — stopping recorder");
-              mediaRecorderRef.current?.stop();
-            }, 2000);
-          }, 3000);
+          case "tts-end":
+            console.log("🔊 TTS finished, playing audio");
+            playTTSAudio();
+            break;
+
+          case "start":
+            // AI response stream started
+            console.log("🚀 [AI Response Start]", data);
+            setIsAISpeaking(true);
+            setBotTyping(true);
+
+            // ✅ Reset accumulated response for new message
+            voiceAccumulatedResponseRef.current = "";
+
+            // ✅ Create initial bot message for streaming
+            const newBotMessageId = Date.now() + 1;
+            const initialBotMessage = {
+              id: newBotMessageId,
+              message: "",
+              sender: "bot",
+              response: "",
+              files: data.uploaded_files || [],
+              suggestions: [],
+              isNewMessage: true,
+              isStreaming: true,
+            };
+
+            // Store the message ID using ref for callback access
+            currentBotMessageIdRef.current = newBotMessageId;
+
+            dispatch(
+              addMessage({
+                conversationId: data.conversation_id,
+                message: initialBotMessage,
+              })
+            );
+            break;
+
+          case "content":
+            // AI response chunk - accumulate and update the streaming message
+            console.log("🤖 [AI Chunk]", data.content);
+
+            // ✅ Accumulate the content (same pattern as handleSendMessage)
+            voiceAccumulatedResponseRef.current += data.content;
+            const currentFullResponse = voiceAccumulatedResponseRef.current;
+
+            // Hide typing when first content arrives
+            if (currentFullResponse.trim().length > 0) {
+              setBotTyping(false);
+            }
+
+            // ✅ Only update if we have a valid message ID
+            if (currentBotMessageIdRef.current) {
+              dispatch(
+                updateMessage({
+                  conversationId: activeConversation,
+                  id: currentBotMessageIdRef.current,
+                  message: currentFullResponse, // ✅ Use accumulated response
+                  response: currentFullResponse, // ✅ Use accumulated response
+                })
+              );
+
+              // ✅ Smart scroll to show new content
+              setTimeout(() => {
+                scrollToBottomSmooth();
+              }, 10);
+            }
+            break;
+
+          case "end":
+            // AI response completed
+            console.log("✅ [AI Response Complete]", data);
+            setIsAISpeaking(false);
+            setBotTyping(false);
+
+            // ✅ Final update with complete response and suggestions
+            if (currentBotMessageIdRef.current) {
+              // Use the full_response from backend or fallback to accumulated
+              const finalResponse =
+                data.full_response || voiceAccumulatedResponseRef.current;
+
+              dispatch(
+                updateMessage({
+                  conversationId: activeConversation,
+                  id: currentBotMessageIdRef.current,
+                  message: finalResponse,
+                  response: finalResponse,
+                  suggestions: data.suggestions || [],
+                  isStreaming: false,
+                })
+              );
+            }
+
+            // Reset the message ID and accumulated response
+            currentBotMessageIdRef.current = null;
+            voiceAccumulatedResponseRef.current = "";
+            break;
+
+          case "conversation_renamed":
+            // Conversation was renamed - refresh conversation list
+            console.log("🏷️ [Conversation Renamed]", data.new_name);
+            // ✅ Refresh conversations list
+            if (token) {
+              fetchConversations(token).then((updatedConversations) => {
+                dispatch(
+                  setConversations(updatedConversations?.conversations || [])
+                );
+              });
+            }
+            break;
+
+          case "error":
+            // Error occurred
+            console.error("❌ [Voice Error]", data.error);
+            setIsAISpeaking(false);
+            setBotTyping(false);
+
+            // ✅ Show error message in chat
+            const errorMessage = {
+              id: Date.now(),
+              message: `❌ Error: ${data.error}`,
+              sender: "bot",
+              response: `❌ Error: ${data.error}`,
+              error: true,
+            };
+
+            dispatch(
+              addMessage({
+                conversationId: activeConversation,
+                message: errorMessage,
+              })
+            );
+
+            toast.error(`❌ Voice Error: ${data.error}`);
+            break;
+
+          default:
+            console.log("🔍 [Unknown Message Type]", data);
+            break;
         }
-      } else {
-        if (isSilenceDetectedRef.current) {
-          console.log("🎤 User resumed speaking — cancelling silence stop");
-        }
-        isSilenceDetectedRef.current = false;
-        clearTimeout(silenceTimerRef.current);
-        clearTimeout(silenceEndConfirmTimerRef.current);
-      }
+      };
 
-      requestAnimationFrame(checkSilence);
-    };
+      socket.onclose = () => {
+        console.log("❌ WebSocket closed");
+        setConnectionStatus("disconnected");
+        cleanup();
+      };
 
-    checkSilence();
+      socket.onerror = (e) => {
+        console.error("WebSocket error:", e);
+        setConnectionStatus("error");
+        cleanup();
+      };
+    } catch (err) {
+      console.error("Voice mode error:", err);
+      cleanup();
+    }
   };
 
-  const stopAiVoice = () => {
-    mediaRecorderRef.current?.stop();
-    audioStreamRef.current?.getTracks().forEach((track) => track.stop());
+  // ✅ Update stopVoiceMode function
+  const stopVoiceMode = () => {
+    console.log("🎤 stopVoiceMode called");
 
-    if (voiceWsRef.current?.readyState === 1) {
-      voiceWsRef.current.send(
-        JSON.stringify({ type: "control", action: "stop" })
-      );
-      voiceWsRef.current.close();
+    const socket = socketRef.current;
+    if (!socket) {
+      console.warn("⚠️ No socket instance found.");
+      cleanup();
+      return;
     }
 
-    setIsliveRecording(false);
-    setIsProcessing(false);
-    setIsResponding(false);
+    try {
+      if (socket.readyState === WebSocket.OPEN) {
+        console.log("🟢 WebSocket is OPEN, sending stop-voice...");
+        socket.send(JSON.stringify({ type: "stop-voice" }));
+        setTimeout(() => {
+          socket?.close();
+          console.log("🔌 WebSocket closed from frontend ✅");
+        }, 100);
+      } else if (socket.readyState === WebSocket.CONNECTING) {
+        console.warn("⏳ WebSocket is CONNECTING, will retry...");
+        const waitAndStop = setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN) {
+            clearInterval(waitAndStop);
+            console.log("🟢 WebSocket became OPEN, sending stop-voice...");
+            socket.send(JSON.stringify({ type: "stop-voice" }));
+            setTimeout(() => {
+              socket?.close();
+              console.log("🔌 WebSocket closed from frontend ✅");
+            }, 100);
+          } else if (socket.readyState >= WebSocket.CLOSING) {
+            clearInterval(waitAndStop);
+            console.warn(
+              "❌ WebSocket closed before we could send stop-voice."
+            );
+          }
+        }, 50);
+      } else {
+        console.warn(
+          "⚠️ WebSocket not open or connecting, cannot stop properly"
+        );
+      }
+    } catch (err) {
+      console.warn("⚠️ Failed to send stop-voice or close socket:", err);
+    }
+
+    setIsVoiceMode(false);
+    setVoiceTranscript("");
+    setShowVoiceOverlay(false);
+    currentBotMessageIdRef.current = null; // ✅ Reset message ID using ref
+    voiceAccumulatedResponseRef.current = ""; // ✅ Reset accumulated response
+    cleanupTTSAudio(); // Add this line
+    cleanup();
+  };
+
+  const cleanup = () => {
+    processor?.disconnect();
+    audioContext?.close();
+    mediaStream?.getTracks().forEach((track) => track.stop());
+  };
+
+  const convertFloat32ToInt16 = (buffer) => {
+    const l = buffer.length;
+    const int16 = new Int16Array(l);
+    for (let i = 0; i < l; i++) {
+      const s = Math.max(-1, Math.min(1, buffer[i]));
+      int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return int16.buffer;
   };
 
   return (
@@ -1542,27 +1891,6 @@ const ChatArea = ({ isGuest }) => {
                     {/* USER MESSAGE */}
                     {(msg.sender === "user" ||
                       (!msg.sender && msg.message)) && (
-                      // <motion.div
-                      //   initial={{ opacity: 0, y: 10 }}
-                      //   animate={{ opacity: 1, y: 0 }}
-                      //   className="relative p-3 rounded-lg mt-2 break-words text-sm shadow-md bg-[#f4f4f5] dark:bg-indigo-500 text-[#1e293b] dark:text-white max-w-2xl w-fit self-end ml-auto">
-                      //   <div className="flex items-start gap-2">
-                      //     <div className="p-1 rounded-full">
-                      //       {/* <CircleUserRound
-                      //         size={20}
-                      //         color="black"
-                      //         strokeWidth={2.25}
-                      //       /> */}
-                      //       <img src={user?.user_img} className="h-8 w-8 rounded-full object-cover" alt="" />
-                      //     </div>
-                      //     <div className="flex flex-col w-full mr-7 overflow-auto text-justify text-xs md:text-base space-y-2 font-centurygothic">
-                      //       <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                      //         {msg.message}
-                      //       </ReactMarkdown>
-                      //       {/* <ChatbotMarkdown content={msg.message} /> */}
-                      //     </div>
-                      //   </div>
-                      // </motion.div>
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -1602,47 +1930,12 @@ const ChatArea = ({ isGuest }) => {
                     )}
 
                     {/* BOT RESPONSE */}
-                    {/* {msg.response && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="relative p-3 rounded-lg break-words text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3">
-                          <div className="flex items-start gap-2">
-                            <div className="p-1 rounded-full">
-                              <img
-                                src="./logo.png"
-                                className="h-5 w-5"
-                                alt="Bot Logo"
-                              />
-                            </div>
-                            <div className="flex flex-col w-full mr-7 overflow-auto text-xs md:text-base select-text text-justify space-y-2 font-centurygothic">
-                              <ChatbotMarkdown content={msg.response} />
-                              <ChatbotMarkdown
-                                content={msg.response}
-                                messageId={msg.id}
-                                isNewMessage={msg.isNewMessage || false}
-                              />
-                            </div>
-                          </div>
-                          copy button 
-                          <button
-                            onClick={() =>
-                              navigator.clipboard.writeText(msg.response)
-                            }
-                            className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition">
-                            <Copy size={14} />
-                          </button>
-                        </motion.div>
-                      )} */}
-                    {/* BOT RESPONSE */}
-                    {/* BOT RESPONSE */}
-                    {/* BOT RESPONSE */}
                     {/* BOT RESPONSE */}
                     {msg.response && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative p-3 rounded-lg break-words dark:bg-[#282828] text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3">
+                        className="relative p-3 rounded-lg break-words  dark:bg-[#282828] text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3">
                         <div className="flex items-start gap-2">
                           <div className="p-1 rounded-full">
                             <img
@@ -1651,7 +1944,23 @@ const ChatArea = ({ isGuest }) => {
                               alt="Bot Logo"
                             />
                           </div>
-                          <div className="w-full  mr-7 font-centurygothic relative">
+                          <div className="w-full mr-2 font-centurygothic relative">
+                            {/* Sticky Copy Button */}
+                            <div className="sticky top-0 float-right z-20  ">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyCode(msg.response, msg.id);
+                                }}
+                                className="p-1 rounded-md bg-gray-500/80 hover:bg-gray-600/90 text-white transition-all duration-200 shadow-lg backdrop-blur-sm">
+                                {copied ? (
+                                  <CheckCircle size={16} color="#4cd327" />
+                                ) : (
+                                  <Copy size={16} />
+                                )}
+                              </button>
+                            </div>
+
                             <ChatbotMarkdown
                               ref={(ref) =>
                                 (markdownRefs.current[msg.id] = ref)
@@ -1664,19 +1973,6 @@ const ChatArea = ({ isGuest }) => {
                             />
                           </div>
                         </div>
-                        {/* Updated copy button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopyCode(msg.response, msg.id);
-                          }}
-                          className="absolute top-2 right-2 z-10 p-1 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition">
-                          {copied ? (
-                            <CheckCircle size={16} color="#4cd327" />
-                          ) : (
-                            <Copy size={16} />
-                          )}
-                        </button>
                       </motion.div>
                     )}
 
@@ -1713,7 +2009,7 @@ const ChatArea = ({ isGuest }) => {
                                 setInputMessage(cleanSuggestion);
                                 handleSendMessage(cleanSuggestion);
                               }}
-                             disabled={isResponding}
+                              disabled={isResponding}
                               className={`px-4 py-1.5 flex justify-between text-left w-full font-bold rounded-full 
             bg-gradient-to-r from-gray-100 to-gray-200 
             dark:from-gray-700 dark:to-gray-800 
@@ -1964,47 +2260,8 @@ const ChatArea = ({ isGuest }) => {
 
         {/* Textarea Input */}
 
-        {/* 
-<div className="relative w-full">
-  {/* Textarea Input */}
-        {/* <textarea
-    ref={textareaRef}
-    className="w-full h-auto max-h-36 min-h-[44px] p-3  rounded-2xl bg-white dark:bg-gray-700 text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300 transition-all duration-300 resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
-    value={inputMessage + (isRecording ? transcriptBuffer : "")}
-    onChange={handleInputChange}
-    onKeyDown={(e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSendMessage();
-      }
-    }}
-    rows="1"
-    placeholder={isRecording ? "" : "Ask me anything..."}
-  /> */}
-
         {/* Text Area with Voice Visualizer */}
         <div className="relative w-full">
-          {/* Textarea Input */}
-          {/* <textarea
-            ref={textareaRef}
-            className="w-full h-auto text-xs md:text-base max-h-36 min-h-[35px] md:min-h-[44px] p-2 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
-            value={inputMessage + (isRecording ? transcriptBuffer : "")}
-            onChange={handleInputChange}
-            onKeyDown={(e) => {
-                const isMobile = isMobileDevice();
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (!loading) {
-                  handleSendMessage();
-                }
-              }
-            }}
-            rows="1"
-            placeholder={
-              isUploading ? "" : isRecording ? "" : "Explore anything...."
-            }
-          /> */}
-
           <textarea
             ref={textareaRef}
             className="w-full h-auto text-xs md:text-base max-h-36 min-h-[35px] md:min-h-[44px] p-2 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
@@ -2152,15 +2409,13 @@ ${
   isRecording
     ? "bg-red-500 animate-pulse text-white"
     : "hover:bg-gray-300 dark:hover:bg-gray-700"
-} transition-all duration-300 ${
-                  !isGuest ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+} transition-all duration-300 ${!isGuest ? " " : ""}`}
                 onClick={() => {
                   if (isGuest) {
                     handleLoginPrompt();
                     return;
                   }
-                  if (!isGuest) return; // Disable for logged-in users
+                  // if (!isGuest) return; // Disable for logged-in users
                   isRecording ? stopRecording() : startRecording();
                 }}
                 onMouseEnter={() => setShowMicTooltip(true)}
@@ -2177,7 +2432,7 @@ ${
 
               {showMicTooltip && (
                 <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900  rounded-lg shadow-md">
-                  {!isGuest ? "Coming Soon" : isRecording ? "Stop" : "Dictate"}
+                  {isRecording ? "Stop" : "Dictate"}
                   <div
                     className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 
       border-l-[6px] border-l-transparent 
@@ -2187,83 +2442,272 @@ ${
                 </div>
               )}
             </div>
-
-            {/* <div className=" voice mode working commented for live users"> */}
-            {/* <div className="relative voice-controls text-gray-800 dark:text-white">
-              <button
-                onMouseEnter={() => setvoiceTooltip(true)}
-                onMouseLeave={() => setvoiceTooltip(false)}
-                onClick={() => {
-                  if (isGuest) return handleLoginPrompt();
-                  startAiVoice();
-                  setShowVoiceOverlay(true);
-                }}
-                className="btn-start font-bold px-4 py-2 bg-green-600  text-white rounded-xl shadow-md">
-                <span className="md:block hidden text-xs md:text-base   items-center gap-2">
-                  <AudioLines size={20} />
-                </span>
-                <span className="block md:hidden text-xs md:text-base    items-center gap-2">
-                  <AudioLines size={12} />
-                </span>
-                {voiceTooltip && (
-                  <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900  rounded-lg shadow-md whitespace-nowrap">
-                    Voice Mode
-                    <div
-                      className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 
-                  border-l-[6px] border-l-transparent 
-                  border-r-[6px] border-r-transparent 
-                  border-t-[6px] border-t-zinc-900"
-                    />
-                  </div>
-                )}
-              </button>
-            </div> */}
-            {/* voice overlay container  */}
-            {/* {showVoiceOverlay && (
-              <motion.div
-                initial={{ opacity: 0, y: 100 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 100 }}
-                className="fixed bottom-0 left-0 md:left-60 transform -translate-x-1/2 w-full md:w-[80%] h-[180px]  bg-gradient-to-t from-gray-800 via-gray-500 to-transparent backdrop-blur-lg   rounded-2xl text-white z-50 flex flex-col items-center justify-center shadow-2xl transition-all">
-                <div className="md:flex items-center justify-center gap-10 mb-4">
-                  <div className=" w-52 flex items-center justify-center flex-col">
-                    <div className=" w-20 h-20  md:w-40 md:h-40  ">
-                      <RadialVisualizer audioStream={audioStreamRef.current} />
-                    </div> */}
-            {/* Voice status */}
-            {/* <div className="  text-sm font-semibold text-center h-6 flex items-center">
-                      {isProcessing && (
-                        <p className="text-yellow-400 animate-pulse">
-                          ⏳ AI thinking...
-                        </p>
-                      )}
-                      {isResponding && (
-                        <p className="text-green-400 animate-pulse">
-                          🤖 Responding...
-                        </p>
-                      )}
-                      {!isProcessing && !isResponding && isLiveRecording && (
-                        <div className="text-blue-400 flex items-center gap-1">
-                          <span>🎧 Listening</span>
-                          <span className="animate-typingDots ml-1"></span>
-                        </div>
-                      )}
+            {/* voice mode  */}
+            <div className="voice-mode-section">
+              <div className="relative voice-controls text-gray-800 dark:text-white">
+                <button
+                  onMouseEnter={() => setvoiceTooltip(true)}
+                  onMouseLeave={() => setvoiceTooltip(false)}
+                  onClick={startVoiceMode}
+                  disabled={isVoiceMode || isProcessing}
+                  className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
+                    isVoiceMode
+                      ? "bg-red-600 text-white cursor-not-allowed"
+                      : "bg-green-600 hover:bg-green-700 text-white"
+                  } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
+                  <span className="md:block hidden text-xs md:text-base items-center gap-2">
+                    <AudioLines size={20} />
+                  </span>
+                  <span className="block md:hidden text-xs md:text-base items-center gap-2">
+                    <AudioLines size={12} />
+                  </span>
+                  {voiceTooltip && (
+                    <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
+                      {isVoiceMode ? "Voice Active" : "Voice Mode"}
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900" />
                     </div>
-                  </div> */}
+                  )}
+                </button>
+              </div>
 
-            {/* Stop button */}
-            {/* <button
-                    onClick={() => {
-                      stopAiVoice();
-                      setShowVoiceOverlay(false);
-                    }}
-                    className=" mt-5 md:mt-0 px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full shadow-lg transition duration-300">
-                    🛑 Stop Voice
-                  </button>
-                </div>
-              </motion.div> */}
-            {/* )} */}
-            {/* </div> */}
+              {/* Professional Voice Overlay - Custom Layout */}
+              {showVoiceOverlay && (
+                <motion.div
+                  initial={{ opacity: 0, y: 100 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 100 }}
+                  className="fixed bottom-0 left-0 right-0 w-screen h-screen md:h-full  md:transform md:-translate-x-1/2 md:w-screen bg-gradient-to-t from-gray-900 via-gray-700 to-transparent backdrop-blur-lg rounded-t-2xl md:rounded-2xl text-white z-50 flex flex-col md:flex-row items-center justify-center shadow-2xl px-4 md:px-6 py-4">
+                  {/* MOBILE LAYOUT: Vertical Stack */}
+                  <div className="flex flex-col md:hidden items-center justify-center gap-4 w-full">
+                   {/* 1. Rotating Green Animation */}
+<div className="flex items-center justify-center">
+  <div className="w-16 h-16 relative">
+    <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 rotating-border"></div>
+    <div className="absolute inset-2 rounded-full border-2 border-transparent border-b-green-300 border-l-green-300 rotating-border-reverse"></div>
+    <div className="absolute inset-4 rounded-full bg-green-400/20 pulsing-glow"></div>
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div
+        className={`transition-all duration-300 ${
+          isAISpeaking ? "animate-bounce" : "animate-pulse"
+        }`}>
+        <img
+          src="./logo.png"
+          className="w-6 h-6 block dark:hidden"
+          alt="Logo"
+        />
+        <img
+          src="./q.png"
+          className="w-6 h-6 hidden dark:block"
+          alt="Logo"
+        />
+      </div>
+    </div>
+    {/* Bigger and darker ripples */}
+    <div className="absolute -inset-4 rounded-full border-2 border-green-500/60 animate-ping"></div>
+    <div className="absolute -inset-8 rounded-full border-2 border-green-600/50 animate-ping animation-delay-300"></div>
+    <div className="absolute -inset-12 rounded-full border border-green-700/40 animate-ping animation-delay-600"></div>
+  </div>
+</div>
+
+
+                    {/* 2. Status Display */}
+                    <div className="text-sm font-semibold text-center">
+                      {isProcessing && (
+                        <p className="text-yellow-400 animate-pulse flex items-center gap-2 justify-center">
+                          <span className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce status-dot"></span>
+                          Initializing voice mode...
+                        </p>
+                      )}
+                      {isAISpeaking && (
+                        <p className="text-blue-400 animate-pulse flex items-center gap-2 justify-center">
+                          <span className="w-3 h-3 bg-blue-400 rounded-full animate-bounce status-dot"></span>
+                          AI is responding...
+                        </p>
+                      )}
+                      {!isProcessing &&
+                        !isAISpeaking &&
+                        connectionStatus === "connected" && (
+                          <p className="text-green-400 flex items-center gap-2 justify-center">
+                            <span className="w-3 h-3 bg-green-400 rounded-full animate-pulse status-dot"></span>
+                            Listening for speech...
+                          </p>
+                        )}
+                      <div className="text-xs mt-1 flex items-center gap-1 justify-center">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            connectionStatus === "connected"
+                              ? "bg-green-400 connection-pulse"
+                              : "bg-red-400"
+                          }`}></span>
+                        <span className="text-gray-400">
+                          {connectionStatus === "connected"
+                            ? "Connected"
+                            : "Disconnected"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 3. Live Transcript */}
+                    <div className="w-full max-w-sm">
+                      <div className="p-3  flex flex-col items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm border border-green-400/30 transcript-glow">
+                        <div className="text-xs text-green-300 mb-1 flex items-center gap-1">
+                          <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
+                          Live Transcript:
+                        </div>
+                        <p className="text-sm text-white min-h-[40px] break-words">
+                          {voiceTranscript || "Listening for speech..."}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 4. Stop Button */}
+                    <button
+                      disabled={!socketOpen}
+                      onClick={() => {
+                        console.log("🖱️ Stop button clicked");
+                        stopVoiceMode();
+                      }}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full shadow-lg transition-all duration-300 flex items-center gap-2 min-w-[120px] justify-center relative overflow-hidden text-sm">
+                      <span className="absolute inset-0 bg-white/10 rounded-full animate-pulse"></span>
+                      <span className="relative z-10 flex items-center gap-2">
+                        <span>🛑</span>
+                        Stop Voice
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* DESKTOP LAYOUT: Horizontal */}
+                  <div className="hidden md:flex md:flex-col items-center justify-center gap-5 w-full max-w-4xl">
+                    {/* 1. Rotating Green Animation and Status Display (Top) */}
+                    <div className="flex flex-col gap-10  mt-32">
+                      <div className="flex items-center justify-center">
+                        <div className="w-40 h-40 relative">
+                          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 rotating-border"></div>
+                          <div className="absolute inset-2 rounded-full border-2 border-transparent border-b-green-300 border-l-green-300 rotating-border-reverse"></div>
+                          <div className="absolute inset-4 rounded-full bg-green-400/20 pulsing-glow"></div>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div
+                              className={`transition-all duration-300 ${
+                                isAISpeaking
+                                  ? "animate-bounce"
+                                  : "animate-pulse"
+                              }`}>
+                              <img
+                                src="./logo.png"
+                                className="w-16 h-16 block dark:hidden"
+                                alt="Logo"
+                              />
+                              <img
+                                src="./q.png"
+                                className="w-16 h-16 hidden dark:block"
+                                alt="Logo"
+                              />
+                            </div>
+                          </div>
+                          <div className="absolute -inset-2 rounded-full border border-green-400/30 animate-ping"></div>
+                          <div className="absolute -inset-4 rounded-full border border-green-400/20 animate-ping animation-delay-300"></div>
+                        </div>
+                      </div>
+                      {/* Status Display (Top) */}
+                      <div className="text-sm font-semibold text-center">
+                        {isProcessing && (
+                          <p className="text-yellow-400 animate-pulse flex items-center gap-2 justify-center">
+                            <span className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce status-dot"></span>
+                            Initializing voice mode...
+                          </p>
+                        )}
+                        {isAISpeaking && (
+                          <p className="text-blue-400 animate-pulse flex items-center gap-2 justify-center">
+                            <span className="w-3 h-3 bg-blue-400 rounded-full animate-bounce status-dot"></span>
+                            AI is responding...
+                          </p>
+                        )}
+                        {!isProcessing &&
+                          !isAISpeaking &&
+                          connectionStatus === "connected" && (
+                            <p className="text-green-400 flex items-center gap-2 justify-center">
+                              <span className="w-3 h-3 bg-green-400 rounded-full animate-pulse status-dot"></span>
+                              Listening for speech...
+                            </p>
+                          )}
+                        <div className="text-xs mt-1 flex items-center gap-1 justify-center">
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              connectionStatus === "connected"
+                                ? "bg-green-400 connection-pulse"
+                                : "bg-red-400"
+                            }`}></span>
+                          <span className="text-gray-400">
+                            {connectionStatus === "connected"
+                              ? "Connected"
+                              : "Disconnected"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    {/* 2. Status + Live Transcript Div */}
+                    <div className="flex flex-col items-center justify-center p-10  gap-5 w-full  ">
+                      {/* Live Transcript (Bottom) */}
+                      <div className="w-full">
+                        <div className="p-3 flex flex-col items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm border border-green-400/30 transcript-glow">
+                          <div className="text-xs text-green-300 mb-1 flex items-center  gap-1">
+                            <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
+                            Live Speech
+                          </div>
+                          <p className="text-sm text-white min-h-[40px] break-words">
+                            {voiceTranscript || "Listening for speech..."}
+                          </p>
+                        </div>
+                      </div>
+                      {/* 3. Stop Button + WebSocket Status Div */}
+                      <div className="flex flex-col gap-4 items-center">
+                        {/* WebSocket Status */}
+                        <div className="text-xs text-gray-400 bg-black/20 rounded-lg p-2 space-y-1">
+                          <div className="flex justify-between gap-4">
+                            <span>Status:</span>
+                            <span
+                              className={
+                                connectionStatus === "connected"
+                                  ? "text-green-400"
+                                  : "text-red-400"
+                              }>
+                              {connectionStatus === "connected"
+                                ? "Active"
+                                : "Inactive"}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between gap-4">
+                            <span>Audio Stream:</span>
+                            <span
+                              className={
+                                isVoiceMode ? "text-green-400" : "text-red-400"
+                              }>
+                              {isVoiceMode ? "Active" : "Inactive"}
+                            </span>
+                          </div>
+                        </div>
+                        {/* Stop Button */}
+                        <button
+                          disabled={!socketOpen}
+                          onClick={() => {
+                            console.log("🖱️ Stop button clicked");
+                            stopVoiceMode();
+                          }}
+                          className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full shadow-lg transition-all duration-300 flex items-center gap-2 min-w-[140px] justify-center relative overflow-hidden">
+                          <span className="absolute inset-0 bg-white/10 rounded-full animate-pulse"></span>
+                          <span className="relative z-10 flex items-center gap-2">
+                            <span>🛑</span>
+                            <span>Stop Voice</span>
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+
             {/* Hidden File Input */}
             <input
               type="file"
@@ -2304,6 +2748,401 @@ ${
       {/* Tailwind Typing Animation */}
       <style>
         {`
+/* ✅ Voice Mode Ripple Animations */
+.ripple-wave {
+  animation: rippleWave 2s ease-in-out infinite;
+}
+
+@keyframes rippleWave {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+    opacity: 0;
+  }
+  50% {
+    transform: translateX(0%) skewX(-15deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%) skewX(-15deg);
+    opacity: 0;
+  }
+}
+
+.processing-pulse {
+  animation: processingPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes processingPulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.02);
+  }
+}
+
+.hover-ripple {
+  animation: hoverRipple 2s ease-out infinite;
+}
+
+@keyframes hoverRipple {
+  0% {
+    transform: translateX(-100%) rotate(45deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(100%) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+/* Voice Active State */
+.voice-active {
+  box-shadow: 
+    0 0 0 0 rgba(239, 68, 68, 0.7),
+    0 0 0 10px rgba(239, 68, 68, 0.3),
+    0 0 0 20px rgba(239, 68, 68, 0.1);
+  animation: voiceActivePulse 2s infinite;
+}
+
+@keyframes voiceActivePulse {
+  0% {
+    box-shadow: 
+      0 0 0 0 rgba(239, 68, 68, 0.7),
+      0 0 0 10px rgba(239, 68, 68, 0.3),
+      0 0 0 20px rgba(239, 68, 68, 0.1);
+  }
+  70% {
+    box-shadow: 
+      0 0 0 10px rgba(239, 68, 68, 0),
+      0 0 0 20px rgba(239, 68, 68, 0),
+      0 0 0 40px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 
+      0 0 0 0 rgba(239, 68, 68, 0),
+      0 0 0 10px rgba(239, 68, 68, 0),
+      0 0 0 20px rgba(239, 68, 68, 0);
+  }
+}
+
+/* Processing State */
+.processing-state {
+  box-shadow: 
+    0 0 0 0 rgba(251, 191, 36, 0.7),
+    0 0 0 8px rgba(251, 191, 36, 0.3);
+  animation: processingStatePulse 1.5s infinite;
+}
+
+@keyframes processingStatePulse {
+  0%, 100% {
+    box-shadow: 
+      0 0 0 0 rgba(251, 191, 36, 0.7),
+      0 0 0 8px rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    box-shadow: 
+      0 0 0 8px rgba(251, 191, 36, 0),
+      0 0 0 16px rgba(251, 191, 36, 0);
+  }
+}
+
+/* Click Ripple Effect */
+.btn-voice-ripple:active::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transform: translate(-50%, -50%);
+  animation: clickRipple 0.6s ease-out;
+  z-index: 10;
+}
+
+@keyframes clickRipple {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+  }
+  100% {
+    width: 200px;
+    height: 200px;
+    opacity: 0;
+  }
+}
+
+/* Status Dots */
+.status-dot {
+  box-shadow: 0 0 10px currentColor;
+  animation: statusDotPulse 2s infinite;
+}
+
+@keyframes statusDotPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px currentColor;
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 20px currentColor;
+  }
+}
+
+/* Connection Pulse */
+.connection-pulse {
+  animation: connectionPulse 2s infinite;
+}
+
+@keyframes connectionPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.3);
+  }
+}
+
+/* Stop Button Ripple */
+.stop-pulse {
+  animation: stopPulse 2s infinite;
+}
+
+@keyframes stopPulse {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.05);
+  }
+}
+
+/* Transcript Glow */
+.transcript-glow {
+  animation: transcriptGlow 3s infinite;
+}
+
+@keyframes transcriptGlow {
+  0%, 100% {
+    border-color: rgba(34, 197, 94, 0.3);
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+  }
+  50% {
+    border-color: rgba(34, 197, 94, 0.6);
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+  }
+}
+
+/* ✅ Rotating Green Animation */
+.rotating-border {
+  animation: rotateBorder 2s linear infinite;
+}
+
+.rotating-border-reverse {
+  animation: rotateBorderReverse 3s linear infinite;
+}
+
+.pulsing-glow {
+  animation: pulsingGlow 2s ease-in-out infinite;
+}
+
+@keyframes rotateBorder {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rotateBorderReverse {
+  0% {
+    transform: rotate(360deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes pulsingGlow {
+  0%, 100% {
+    background-color: rgba(34, 197, 94, 0.2);
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    background-color: rgba(34, 197, 94, 0.4);
+    box-shadow: 0 0 30px rgba(34, 197, 94, 0.6);
+    transform: scale(1.1);
+  }
+}
+
+/* Animation delay for ripple effects */
+.animation-delay-300 {
+  animation-delay: 0.3s;
+}
+
+/* Status Dots */
+.status-dot {
+  box-shadow: 0 0 10px currentColor;
+  animation: statusDotPulse 2s infinite;
+}
+
+@keyframes statusDotPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px currentColor;
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 20px currentColor;
+  }
+}
+
+/* Connection Pulse */
+.connection-pulse {
+  animation: connectionPulse 2s infinite;
+}
+
+@keyframes connectionPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.3);
+  }
+}
+
+/* Transcript Glow */
+.transcript-glow {
+  animation: transcriptGlow 3s infinite;
+}
+
+@keyframes transcriptGlow {
+  0%, 100% {
+    border-color: rgba(34, 197, 94, 0.3);
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+  }
+  50% {
+    border-color: rgba(34, 197, 94, 0.6);
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+  }
+}
+
+/* Add these professional animations to your existing styles */
+@keyframes wave1 {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+
+@keyframes wave2 {
+  0%, 100% { height: 8px; }
+  50% { height: 20px; }
+}
+
+@keyframes wave3 {
+  0%, 100% { height: 6px; }
+  50% { height: 12px; }
+}
+
+@keyframes wave4 {
+  0%, 100% { height: 10px; }
+  50% { height: 18px; }
+}
+
+@keyframes professionalPulse {
+  0%, 100% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+@keyframes statusGlow {
+  0%, 100% { 
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.4);
+  }
+}
+
+.animate-wave1 { animation: wave1 0.8s infinite ease-in-out; }
+.animate-wave2 { animation: wave2 0.8s infinite ease-in-out 0.1s; }
+.animate-wave3 { animation: wave3 0.8s infinite ease-in-out 0.2s; }
+.animate-wave4 { animation: wave4 0.8s infinite ease-in-out 0.3s; }
+
+.animate-professional-pulse {
+  animation: professionalPulse 2s infinite;
+}
+
+.animate-status-glow {
+  animation: statusGlow 2s infinite;
+}
+
+/* Professional voice mode transitions */
+.voice-mode-enter {
+  opacity: 0;
+  transform: scale(0.9) translateY(10px);
+}
+
+.voice-mode-enter-active {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.voice-mode-exit {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.voice-mode-exit-active {
+  opacity: 0;
+  transform: scale(0.9) translateY(-10px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Professional status indicator */
+.status-indicator {
+  position: relative;
+  overflow: hidden;
+}
+
+.status-indicator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.status-indicator:hover::before {
+  left: 100%;
+}
+
+
+
         @keyframes bounce-slow {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }

@@ -616,7 +616,7 @@ const handleDeleteConversation = async (id) => {
         <div className="w-full sm:w-auto"> 
         <button onClick={handleNewChat}
           className={`border border-black dark:border-white p-2 bg-gradient-to-r from-[#0000B5] to-[#0076FF]
-            hover:from-[#0076FF] hover:to-[#0000B5] text-white rounded-lg flex items-center
+            hover:from-[#0076FF] hover:to-[#0000B5] text-white rounded-lg flex items-center 
             transition-all duration-500 ease-in-out overflow-hidden ${
               isCollapsed ? "w-12 h-12 justify-center" : "w-full"
             }`}>

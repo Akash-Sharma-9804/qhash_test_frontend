@@ -577,7 +577,7 @@ const [pendingUrl, setPendingUrl] = useState("");
 
           p({ children }) {
             return (
-              <p className="leading-relaxed text-black mr-2 text-sm sm:text-base mt-5 dark:text-gray-200 mb-2 sm:mb-3 break-words">
+              <p className="leading-relaxed text-black mr-2 text-sm sm:text-base   dark:text-gray-200 mb-2 sm:mb-3 break-words">
                 {children}
               </p>
             );

@@ -12,12 +12,14 @@
     "proxy": "https://qhash-test.onrender.com"
   },
   "engines": {
-  "node": "20.x"
-},
+    "node": "20.x"
+  },
   "dependencies": {
     "@auth0/auth0-react": "^2.3.0",
+    "@echogarden/fvad-wasm": "^0.2.0",
     "@react-oauth/google": "^0.12.1",
     "@reduxjs/toolkit": "^2.6.1",
+    "@ricky0123/vad-web": "^0.0.24",
     "@shadcn/ui": "^0.0.4",
     "@tailwindcss/typography": "^0.5.16",
     "axios": "^1.8.1",
@@ -51,7 +53,8 @@
     "tailwind-merge": "^3.0.2",
     "tesseract.js": "^6.0.0",
     "tsparticles": "^2.12.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "vad-web": "^0.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
