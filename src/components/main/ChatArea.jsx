@@ -2443,35 +2443,47 @@ ${
               )}
             </div>
             {/* voice mode  */}
-            <div className="voice-mode-section">
-              <div className="relative voice-controls text-gray-800 dark:text-white">
-                <button
-                  onMouseEnter={() => setvoiceTooltip(true)}
-                  onMouseLeave={() => setvoiceTooltip(false)}
-                  onClick={startVoiceMode}
-                  disabled={isVoiceMode || isProcessing}
-                  className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
-                    isVoiceMode
-                      ? "bg-red-600 text-white cursor-not-allowed"
-                      : "bg-green-600 hover:bg-green-700 text-white"
-                  } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
-                  <span className="md:block hidden text-xs md:text-base items-center gap-2">
-                    <AudioLines size={20} />
-                  </span>
-                  <span className="block md:hidden text-xs md:text-base items-center gap-2">
-                    <AudioLines size={12} />
-                  </span>
-                  {voiceTooltip && (
-                    <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
-                      {isVoiceMode ? "Voice Active" : "Voice Mode"}
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900" />
-                    </div>
-                  )}
-                </button>
-              </div>
+           <div className="voice-mode-section">
+  <div className="relative voice-controls text-gray-800 dark:text-white">
+    <button
+      onMouseEnter={() => setvoiceTooltip(true)}
+      onMouseLeave={() => setvoiceTooltip(false)}
+      onClick={() => {
+        // ✅ Add guest check here - same as mic button
+        if (isGuest) {
+          handleLoginPrompt();
+          return;
+        }
+        startVoiceMode();
+      }}
+      disabled={isVoiceMode || isProcessing}
+      className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
+        isVoiceMode
+          ? "bg-red-600 text-white cursor-not-allowed"
+          : "bg-green-600 hover:bg-green-700 text-white"
+      } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
+      <span className="md:block hidden text-xs md:text-base items-center gap-2">
+        <AudioLines size={20} />
+      </span>
+      <span className="block md:hidden text-xs md:text-base items-center gap-2">
+        <AudioLines size={12} />
+      </span>
+      {voiceTooltip && (
+        <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
+          {isGuest 
+            ? "Login for Voice Mode" 
+            : isVoiceMode 
+              ? "Voice Active" 
+              : "Voice Mode"
+          }
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900" />
+        </div>
+      )}
+    </button>
+  </div>
 
               {/* Professional Voice Overlay - Custom Layout */}
-              {showVoiceOverlay && (
+              {showVoiceOverlay && !isGuest && (
                 <motion.div
                   initial={{ opacity: 0, y: 100 }}
                   animate={{ opacity: 1, y: 0 }}
