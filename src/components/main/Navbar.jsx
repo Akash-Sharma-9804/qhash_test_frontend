@@ -5,6 +5,7 @@ import { logout } from "../../store/authSlice";
 import { clearChatData } from "../../store/chatSlice2";
 import { useNavigate } from "react-router-dom";
 import { Sun, Moon, CircleHelp, Menu, X, LogIn } from "lucide-react";
+import { createPortal } from 'react-dom';
 
 const Navbar = ({ setSidebarOpen, isGuest }) => {
   const [active, setActive] = useState(false);
@@ -19,6 +20,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
   // console.log("User Image URL:", user?.user_img); // Debug line
   // console.log("user", user);
   const handleLogout = () => {
+    
     dispatch(logout()); // Clears user data from auth slice
     dispatch(clearChatData()); // Clears chat data from chat slice
     dispatch({ type: "RESET" }); // Reset the entire Redux store to initial state
@@ -85,11 +87,11 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
   };
 
   return (
-   <div className="fixed top-0 left-0 w-full pt-2 px-4 md:bg-transparent pb-2 bg-white md:dark:bg-transparent dark:bg-[#121212] z-40" style={{ width: 'calc(100% - 12px)' }}>
+<div className="fixed top-0 left-0 w-full pt-2 px-4 pb-2 z-30 navbar-transparent" style={{ width: 'calc(100% - 12px)' }}>
+  <div className={`flex items-center gap-7 navbar-interactive ${!isGuest ? 'justify-between' : 'sm:justify-between justify-around'}`}>
 
-      <div className={`flex items-center gap-7 ${!isGuest ? 'justify-between' : 'sm:justify-between justify-around'}`}>
         {/* Logo */}
-        <div className="relative ml-16 justify-center items-center cursor-pointer">
+        <div className="relative ml-16 justify-center items-center cursor-pointer bg-white/80 dark:bg-[#121212]/80 backdrop-blur-sm rounded-lg px-2 py-1">
           <span className="text-2xl mt-2 flex items-center cursor-pointer sm:text-center font-bold text-black dark:text-white">
             <img
               src="./logo.png"
@@ -105,7 +107,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
               <>
                 <img
                   src="./logoName.png"
-                  className="w-fit h-6  md:hidden dark:hidden"
+                  className="w-fit h-6 md:hidden dark:hidden"
                   alt="Logo"
                 />
                 <img
@@ -118,7 +120,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
           </span>
         </div>
 
-        <div className="flex gap-4 items-center text-black dark:text-white sm:mr-6">
+        <div className="flex gap-4 items-center text-black dark:text-white sm:mr-6 bg-white/80 dark:bg-[#121212]/80 backdrop-blur-sm rounded-lg px-3 py-2">
           {isGuest ? (
             <>
               {/* Desktop Login Button */}
@@ -256,7 +258,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
             <>
               <div
                 ref={dropdownRef}
-                className="relative cursor-pointer text-black dark:text-white border-black dark:border-white rounded-full p-2"
+                className="relative  z-50 cursor-pointer text-black dark:text-white border-black dark:border-white rounded-full p-2"
                 onClick={() => setActive(!active)}>
                 <img
                   src={user?.user_img ? user.user_img : (darkMode ? "./user_light.png" : "./user.png")}
@@ -267,45 +269,77 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
                     e.target.src = darkMode ? "./user_light.png" : "./user.png";
                   }}
                 />
-                {active && (
-                  <div className="absolute top-10 rounded-lg w-48 bg-slate-500 right-7  flex items-center justify-center transition-opacity duration-300">
-                    <div className="flex flex-col justify-center py-5 gap-2 items-center">
-                      <img
-                        src={user?.user_img ? user.user_img : (darkMode ? "./user_light.png" : "./user.png")}
-                        className="h-12 w-12 rounded-full object-cover"
-                        alt="User Avatar"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = darkMode ? "./user_light.png" : "./user.png";
-                        }}
-                      />
+        {active && createPortal(
+  <>
+    <div 
+      className="fixed inset-0 z-[99998]" 
+      onClick={() => setActive(false)}
+    />
+    <div className="fixed z-[99999] top-16 right-4 rounded-lg w-48 bg-slate-500 flex items-center justify-center transition-opacity duration-300 shadow-2xl">
+      <div className="flex flex-col justify-center py-5 gap-2 items-center">
+        <img
+          src={user?.user_img ? user.user_img : (darkMode ? "./user_light.png" : "./user.png")}
+          className="h-12 w-12 rounded-full object-cover"
+          alt="User Avatar"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = darkMode ? "./user_light.png" : "./user.png";
+          }}
+        />
 
-                      {/* Username */}
-                      <span className="text-sm darkMode dark:text-white text-black">
-                        {user?.username || "Guest"}
-                      </span>
+        {/* Username */}
+        <span className="text-sm darkMode dark:text-white font-semibold text-black">
+          {user?.username || "Guest"}
+        </span>
 
-                      {/* Email */}
-                      <span className="text-xs darkMode dark:text-white text-black">
-                        {user?.email || "guest@example.com"}
-                      </span>
+        {/* Email */}
+        <span className="text-xs darkMode dark:text-white font-semibold text-black">
+          {user?.email || "guest@example.com"}
+        </span>
 
-                      {/* Logout Button */}
-                      <span
-                        className="text-base flex items-center gap-2 cursor-pointer"
-                        onClick={handleLogout}>
-                        <LogOut size={16} />
-                        Logout
-                      </span>
-                    </div>
-                  </div>
-                )}
+        {/* Logout Button */}
+        <div
+          className="text-base flex items-center gap-2 cursor-pointer hover:bg-slate-600 px-3 py-1 rounded transition-colors"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("Logout clicked"); // Debug log
+            setActive(false);
+            handleLogout();
+          }}
+        >
+          <LogOut size={16} />
+          Logout
+        </div>
+      </div>
+    </div>
+  </>,
+  document.body
+)}
+
+
               </div>
             </>
           )}
         </div>
       </div>
+      <style>
+        {
+          `.navbar-transparent {
+  pointer-events: none !important;
+}
+
+.navbar-interactive {
+  pointer-events: auto !important;
+}`
+        }
+      </style>
     </div>
+    
   );
 };
 

@@ -61,7 +61,7 @@ You're opening a new page outside this chat:
 </p>
 
 
-        <div className="bg-gray-100 dark:bg-gray-800 text-blue-600 dark:text-blue-400 p-2 rounded text-xs break-words max-h-40 overflow-auto mb-4">
+        <div className="bg-gray-100 dark:bg-gray-800 text-blue-600 dark:text-blue-400 p-2 rounded text-xs md:text-base break-words max-h-40 overflow-auto mb-4">
           {url}
         </div>
 

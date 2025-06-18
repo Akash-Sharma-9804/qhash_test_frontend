@@ -27,6 +27,7 @@ import Navbar from "./Navbar";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import { streamAudio } from "../../utils/streamAudio";
+import remarkGfm from "remark-gfm";
 
 // import { useSelector, useDispatch } from "react-redux";
 import ChatbotMarkdown from "../helperComponent/ChatbotMarkdown";
@@ -1243,276 +1244,307 @@ const ChatArea = ({ isGuest }) => {
   const voiceAccumulatedResponseRef = useRef("");
 
   // tts part
-// ✅ HUMAN-LIKE: Web Audio API with natural speech processing
-const audioContextRef = useRef(null);
-const audioBufferQueueRef = useRef([]);
-const isPlayingAudioRef = useRef(false);
-const nextPlayTimeRef = useRef(0);
-const pcmBufferRef = useRef([]);
+  // ✅ HUMAN-LIKE: Web Audio API with natural speech processing
+  const audioContextRef = useRef(null);
+  const audioBufferQueueRef = useRef([]);
+  const isPlayingAudioRef = useRef(false);
+  const nextPlayTimeRef = useRef(0);
+  const pcmBufferRef = useRef([]);
 
-const initializeTTSAudio = () => {
-  try {
-    // Create Web Audio Context for human-like playback
-    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-      sampleRate: 24000
-    });
-    
-    audioBufferQueueRef.current = [];
-    pcmBufferRef.current = [];
-    isPlayingAudioRef.current = false;
-    nextPlayTimeRef.current = 0;
-    
-    setIsTTSPlaying(true);
-    console.log('🔊 Human-like Web Audio API initialized');
-  } catch (error) {
-    console.error('❌ Failed to initialize Web Audio API:', error);
-    setIsTTSPlaying(true);
-  }
-};
+  const initializeTTSAudio = () => {
+    try {
+      // Create Web Audio Context for human-like playback
+      audioContextRef.current = new (window.AudioContext ||
+        window.webkitAudioContext)({
+        sampleRate: 24000,
+      });
 
-const handleTTSChunk = (base64Audio, encoding = 'linear16', sampleRate = 24000) => {
-  try {
-    console.log(`🔊 Processing human-like audio chunk: ${base64Audio.length} chars`);
-    
-    // Decode base64 to PCM
-    const binaryString = atob(base64Audio);
-    const pcmData = new Int16Array(binaryString.length / 2);
-    
-    for (let i = 0; i < pcmData.length; i++) {
-      const byte1 = binaryString.charCodeAt(i * 2);
-      const byte2 = binaryString.charCodeAt(i * 2 + 1);
-      pcmData[i] = (byte2 << 8) | byte1;
+      audioBufferQueueRef.current = [];
+      pcmBufferRef.current = [];
+      isPlayingAudioRef.current = false;
+      nextPlayTimeRef.current = 0;
+
+      setIsTTSPlaying(true);
+      console.log("🔊 Human-like Web Audio API initialized");
+    } catch (error) {
+      console.error("❌ Failed to initialize Web Audio API:", error);
+      setIsTTSPlaying(true);
     }
-    
-    // Add to continuous buffer
-    pcmBufferRef.current.push(pcmData);
-    
-    // Process larger chunks for more natural speech flow
-    const totalSamples = pcmBufferRef.current.reduce((sum, chunk) => sum + chunk.length, 0);
-    
-    // Process when we have ~800ms of audio for natural pacing
-    if (totalSamples >= 19200) { // 800ms at 24kHz for more natural chunks
+  };
+
+  const handleTTSChunk = (
+    base64Audio,
+    encoding = "linear16",
+    sampleRate = 24000
+  ) => {
+    try {
+      console.log(
+        `🔊 Processing human-like audio chunk: ${base64Audio.length} chars`
+      );
+
+      // Decode base64 to PCM
+      const binaryString = atob(base64Audio);
+      const pcmData = new Int16Array(binaryString.length / 2);
+
+      for (let i = 0; i < pcmData.length; i++) {
+        const byte1 = binaryString.charCodeAt(i * 2);
+        const byte2 = binaryString.charCodeAt(i * 2 + 1);
+        pcmData[i] = (byte2 << 8) | byte1;
+      }
+
+      // Add to continuous buffer
+      pcmBufferRef.current.push(pcmData);
+
+      // Process larger chunks for more natural speech flow
+      const totalSamples = pcmBufferRef.current.reduce(
+        (sum, chunk) => sum + chunk.length,
+        0
+      );
+
+      // Process when we have ~800ms of audio for natural pacing
+      if (totalSamples >= 19200) {
+        // 800ms at 24kHz for more natural chunks
+        processHumanLikeAudioBuffer();
+      }
+    } catch (error) {
+      console.error("❌ Error processing audio chunk:", error);
+    }
+  };
+
+  const processHumanLikeAudioBuffer = async () => {
+    try {
+      if (!audioContextRef.current || pcmBufferRef.current.length === 0) return;
+
+      // Combine all PCM data
+      const totalLength = pcmBufferRef.current.reduce(
+        (sum, chunk) => sum + chunk.length,
+        0
+      );
+      const combinedPCM = new Int16Array(totalLength);
+
+      let offset = 0;
+      for (const chunk of pcmBufferRef.current) {
+        combinedPCM.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      // Clear buffer
+      pcmBufferRef.current = [];
+
+      // ✅ HUMAN-LIKE PROCESSING: Apply natural speech effects
+      const processedPCM = applyHumanLikeEffects(combinedPCM);
+
+      // Convert PCM to Float32 for Web Audio API
+      const float32Data = new Float32Array(processedPCM.length);
+      for (let i = 0; i < processedPCM.length; i++) {
+        float32Data[i] = processedPCM[i] / 32768.0;
+      }
+
+      // Create AudioBuffer
+      const audioBuffer = audioContextRef.current.createBuffer(
+        1,
+        float32Data.length,
+        24000
+      );
+      audioBuffer.getChannelData(0).set(float32Data);
+
+      // Schedule with natural pacing
+      scheduleHumanLikeAudioBuffer(audioBuffer);
+
+      console.log(
+        `🔊 Scheduled ${float32Data.length} samples with human-like processing`
+      );
+    } catch (error) {
+      console.error("❌ Error processing human-like audio buffer:", error);
+    }
+  };
+
+  // ✅ HUMAN-LIKE EFFECTS: Make speech more natural
+  const applyHumanLikeEffects = (pcmData) => {
+    try {
+      // 1. Slight volume normalization for consistent levels
+      const normalizedData = normalizeAudio(pcmData);
+
+      // 2. Add subtle natural variations
+      const naturalData = addNaturalVariations(normalizedData);
+
+      // 3. Smooth transitions between chunks
+      const smoothedData = smoothTransitions(naturalData);
+
+      return smoothedData;
+    } catch (error) {
+      console.error("❌ Error applying human-like effects:", error);
+      return pcmData; // Return original if processing fails
+    }
+  };
+
+  const normalizeAudio = (pcmData) => {
+    // Find peak amplitude
+    let maxAmplitude = 0;
+    for (let i = 0; i < pcmData.length; i++) {
+      maxAmplitude = Math.max(maxAmplitude, Math.abs(pcmData[i]));
+    }
+
+    // Normalize to ~70% of max to avoid clipping and sound more natural
+    const targetAmplitude = 32768 * 0.7;
+    const normalizationFactor =
+      maxAmplitude > 0 ? targetAmplitude / maxAmplitude : 1;
+
+    const normalizedData = new Int16Array(pcmData.length);
+    for (let i = 0; i < pcmData.length; i++) {
+      normalizedData[i] = Math.round(pcmData[i] * normalizationFactor);
+    }
+
+    return normalizedData;
+  };
+
+  const addNaturalVariations = (pcmData) => {
+    // Add very subtle natural variations (like human speech micro-variations)
+    const naturalData = new Int16Array(pcmData.length);
+
+    for (let i = 0; i < pcmData.length; i++) {
+      // Add tiny random variations (±1% max) for more natural sound
+      const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
+      naturalData[i] = Math.round(pcmData[i] * (1 + variation));
+    }
+
+    return naturalData;
+  };
+
+  const smoothTransitions = (pcmData) => {
+    // Apply gentle fade-in/fade-out to chunk edges for seamless transitions
+    const smoothedData = new Int16Array(pcmData.length);
+    const fadeLength = Math.min(480, pcmData.length / 10); // 20ms fade at 24kHz
+
+    for (let i = 0; i < pcmData.length; i++) {
+      let sample = pcmData[i];
+
+      // Fade in at the beginning
+      if (i < fadeLength) {
+        const fadeIn = i / fadeLength;
+        sample = Math.round(sample * fadeIn);
+      }
+
+      // Fade out at the end
+      if (i >= pcmData.length - fadeLength) {
+        const fadeOut = (pcmData.length - 1 - i) / fadeLength;
+        sample = Math.round(sample * fadeOut);
+      }
+
+      smoothedData[i] = sample;
+    }
+
+    return smoothedData;
+  };
+
+  const scheduleHumanLikeAudioBuffer = (audioBuffer) => {
+    try {
+      if (!audioContextRef.current) return;
+
+      const source = audioContextRef.current.createBufferSource();
+
+      // ✅ HUMAN-LIKE AUDIO PROCESSING: Add subtle effects
+      const gainNode = audioContextRef.current.createGain();
+      const compressor = audioContextRef.current.createDynamicsCompressor();
+
+      // Configure compressor for more natural speech
+      compressor.threshold.setValueAtTime(
+        -24,
+        audioContextRef.current.currentTime
+      );
+      compressor.knee.setValueAtTime(30, audioContextRef.current.currentTime);
+      compressor.ratio.setValueAtTime(3, audioContextRef.current.currentTime);
+      compressor.attack.setValueAtTime(
+        0.003,
+        audioContextRef.current.currentTime
+      );
+      compressor.release.setValueAtTime(
+        0.25,
+        audioContextRef.current.currentTime
+      );
+
+      // Set natural volume level
+      gainNode.gain.setValueAtTime(0.85, audioContextRef.current.currentTime);
+
+      // Connect audio chain: source -> compressor -> gain -> destination
+      source.buffer = audioBuffer;
+      source.connect(compressor);
+      compressor.connect(gainNode);
+      gainNode.connect(audioContextRef.current.destination);
+
+      const currentTime = audioContextRef.current.currentTime;
+
+      // Schedule with natural pacing
+      if (!isPlayingAudioRef.current) {
+        // First chunk - start with slight delay for natural feel
+        nextPlayTimeRef.current = currentTime + 0.15; // Slightly longer delay for natural start
+        isPlayingAudioRef.current = true;
+      }
+
+      // Schedule this buffer to play with natural timing
+      source.start(nextPlayTimeRef.current);
+
+      // ✅ NATURAL PACING: Add small gaps between chunks for breathing room
+      const naturalGap = 0.05; // 50ms gap for natural speech rhythm
+      nextPlayTimeRef.current += audioBuffer.duration + naturalGap;
+
+      // Handle completion
+      source.onended = () => {
+        console.log("🔊 Human-like audio buffer completed naturally");
+      };
+
+      console.log(
+        `🔊 Human-like audio scheduled at ${nextPlayTimeRef.current}, duration: ${audioBuffer.duration}s`
+      );
+    } catch (error) {
+      console.error("❌ Error scheduling human-like audio buffer:", error);
+    }
+  };
+
+  const playTTSAudio = () => {
+    // Process any remaining buffered audio
+    if (pcmBufferRef.current.length > 0) {
       processHumanLikeAudioBuffer();
     }
-    
-  } catch (error) {
-    console.error('❌ Error processing audio chunk:', error);
-  }
-};
 
-const processHumanLikeAudioBuffer = async () => {
-  try {
-    if (!audioContextRef.current || pcmBufferRef.current.length === 0) return;
-    
-    // Combine all PCM data
-    const totalLength = pcmBufferRef.current.reduce((sum, chunk) => sum + chunk.length, 0);
-    const combinedPCM = new Int16Array(totalLength);
-    
-    let offset = 0;
-    for (const chunk of pcmBufferRef.current) {
-      combinedPCM.set(chunk, offset);
-      offset += chunk.length;
+    // Set completion timeout with natural timing
+    setTimeout(() => {
+      if (audioContextRef.current) {
+        const remainingTime =
+          nextPlayTimeRef.current - audioContextRef.current.currentTime;
+
+        setTimeout(() => {
+          setIsTTSPlaying(false);
+          isPlayingAudioRef.current = false;
+          console.log("🔊 All human-like TTS audio completed naturally");
+        }, Math.max(remainingTime * 1000, 1500)); // Longer timeout for natural completion
+      }
+    }, 800); // Longer initial delay
+
+    console.log("🔊 Human-like TTS playback finalized");
+  };
+
+  const cleanupTTSAudio = () => {
+    try {
+      if (
+        audioContextRef.current &&
+        audioContextRef.current.state !== "closed"
+      ) {
+        audioContextRef.current.close();
+      }
+
+      audioContextRef.current = null;
+      audioBufferQueueRef.current = [];
+      pcmBufferRef.current = [];
+      isPlayingAudioRef.current = false;
+      nextPlayTimeRef.current = 0;
+      setIsTTSPlaying(false);
+
+      console.log("🔊 Human-like audio cleanup complete");
+    } catch (error) {
+      console.error("❌ Error during audio cleanup:", error);
     }
-    
-    // Clear buffer
-    pcmBufferRef.current = [];
-    
-    // ✅ HUMAN-LIKE PROCESSING: Apply natural speech effects
-    const processedPCM = applyHumanLikeEffects(combinedPCM);
-    
-    // Convert PCM to Float32 for Web Audio API
-    const float32Data = new Float32Array(processedPCM.length);
-    for (let i = 0; i < processedPCM.length; i++) {
-      float32Data[i] = processedPCM[i] / 32768.0;
-    }
-    
-    // Create AudioBuffer
-    const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, 24000);
-    audioBuffer.getChannelData(0).set(float32Data);
-    
-    // Schedule with natural pacing
-    scheduleHumanLikeAudioBuffer(audioBuffer);
-    
-    console.log(`🔊 Scheduled ${float32Data.length} samples with human-like processing`);
-    
-  } catch (error) {
-    console.error('❌ Error processing human-like audio buffer:', error);
-  }
-};
-
-// ✅ HUMAN-LIKE EFFECTS: Make speech more natural
-const applyHumanLikeEffects = (pcmData) => {
-  try {
-    // 1. Slight volume normalization for consistent levels
-    const normalizedData = normalizeAudio(pcmData);
-    
-    // 2. Add subtle natural variations
-    const naturalData = addNaturalVariations(normalizedData);
-    
-    // 3. Smooth transitions between chunks
-    const smoothedData = smoothTransitions(naturalData);
-    
-    return smoothedData;
-  } catch (error) {
-    console.error('❌ Error applying human-like effects:', error);
-    return pcmData; // Return original if processing fails
-  }
-};
-
-const normalizeAudio = (pcmData) => {
-  // Find peak amplitude
-  let maxAmplitude = 0;
-  for (let i = 0; i < pcmData.length; i++) {
-    maxAmplitude = Math.max(maxAmplitude, Math.abs(pcmData[i]));
-  }
-  
-  // Normalize to ~70% of max to avoid clipping and sound more natural
-  const targetAmplitude = 32768 * 0.7;
-  const normalizationFactor = maxAmplitude > 0 ? targetAmplitude / maxAmplitude : 1;
-  
-  const normalizedData = new Int16Array(pcmData.length);
-  for (let i = 0; i < pcmData.length; i++) {
-    normalizedData[i] = Math.round(pcmData[i] * normalizationFactor);
-  }
-  
-  return normalizedData;
-};
-
-const addNaturalVariations = (pcmData) => {
-  // Add very subtle natural variations (like human speech micro-variations)
-  const naturalData = new Int16Array(pcmData.length);
-  
-  for (let i = 0; i < pcmData.length; i++) {
-    // Add tiny random variations (±1% max) for more natural sound
-    const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
-    naturalData[i] = Math.round(pcmData[i] * (1 + variation));
-  }
-  
-  return naturalData;
-};
-
-const smoothTransitions = (pcmData) => {
-  // Apply gentle fade-in/fade-out to chunk edges for seamless transitions
-  const smoothedData = new Int16Array(pcmData.length);
-  const fadeLength = Math.min(480, pcmData.length / 10); // 20ms fade at 24kHz
-  
-  for (let i = 0; i < pcmData.length; i++) {
-    let sample = pcmData[i];
-    
-    // Fade in at the beginning
-    if (i < fadeLength) {
-      const fadeIn = i / fadeLength;
-      sample = Math.round(sample * fadeIn);
-    }
-    
-    // Fade out at the end
-    if (i >= pcmData.length - fadeLength) {
-      const fadeOut = (pcmData.length - 1 - i) / fadeLength;
-      sample = Math.round(sample * fadeOut);
-    }
-    
-    smoothedData[i] = sample;
-  }
-  
-  return smoothedData;
-};
-
-const scheduleHumanLikeAudioBuffer = (audioBuffer) => {
-  try {
-    if (!audioContextRef.current) return;
-    
-    const source = audioContextRef.current.createBufferSource();
-    
-    // ✅ HUMAN-LIKE AUDIO PROCESSING: Add subtle effects
-    const gainNode = audioContextRef.current.createGain();
-    const compressor = audioContextRef.current.createDynamicsCompressor();
-    
-    // Configure compressor for more natural speech
-    compressor.threshold.setValueAtTime(-24, audioContextRef.current.currentTime);
-    compressor.knee.setValueAtTime(30, audioContextRef.current.currentTime);
-    compressor.ratio.setValueAtTime(3, audioContextRef.current.currentTime);
-    compressor.attack.setValueAtTime(0.003, audioContextRef.current.currentTime);
-    compressor.release.setValueAtTime(0.25, audioContextRef.current.currentTime);
-    
-    // Set natural volume level
-    gainNode.gain.setValueAtTime(0.85, audioContextRef.current.currentTime);
-    
-    // Connect audio chain: source -> compressor -> gain -> destination
-    source.buffer = audioBuffer;
-    source.connect(compressor);
-    compressor.connect(gainNode);
-    gainNode.connect(audioContextRef.current.destination);
-    
-    const currentTime = audioContextRef.current.currentTime;
-    
-    // Schedule with natural pacing
-    if (!isPlayingAudioRef.current) {
-      // First chunk - start with slight delay for natural feel
-      nextPlayTimeRef.current = currentTime + 0.15; // Slightly longer delay for natural start
-      isPlayingAudioRef.current = true;
-    }
-    
-    // Schedule this buffer to play with natural timing
-    source.start(nextPlayTimeRef.current);
-    
-    // ✅ NATURAL PACING: Add small gaps between chunks for breathing room
-    const naturalGap = 0.05; // 50ms gap for natural speech rhythm
-    nextPlayTimeRef.current += audioBuffer.duration + naturalGap;
-    
-    // Handle completion
-    source.onended = () => {
-      console.log('🔊 Human-like audio buffer completed naturally');
-    };
-    
-    console.log(`🔊 Human-like audio scheduled at ${nextPlayTimeRef.current}, duration: ${audioBuffer.duration}s`);
-    
-  } catch (error) {
-    console.error('❌ Error scheduling human-like audio buffer:', error);
-  }
-};
-
-const playTTSAudio = () => {
-  // Process any remaining buffered audio
-  if (pcmBufferRef.current.length > 0) {
-    processHumanLikeAudioBuffer();
-  }
-  
-  // Set completion timeout with natural timing
-  setTimeout(() => {
-    if (audioContextRef.current) {
-      const remainingTime = nextPlayTimeRef.current - audioContextRef.current.currentTime;
-      
-      setTimeout(() => {
-        setIsTTSPlaying(false);
-        isPlayingAudioRef.current = false;
-        console.log('🔊 All human-like TTS audio completed naturally');
-      }, Math.max(remainingTime * 1000, 1500)); // Longer timeout for natural completion
-    }
-  }, 800); // Longer initial delay
-  
-  console.log('🔊 Human-like TTS playback finalized');
-};
-
-const cleanupTTSAudio = () => {
-  try {
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close();
-    }
-    
-    audioContextRef.current = null;
-    audioBufferQueueRef.current = [];
-    pcmBufferRef.current = [];
-    isPlayingAudioRef.current = false;
-    nextPlayTimeRef.current = 0;
-    setIsTTSPlaying(false);
-    
-    console.log('🔊 Human-like audio cleanup complete');
-  } catch (error) {
-    console.error('❌ Error during audio cleanup:', error);
-  }
-};
-
-
+  };
 
   // Update your startVoiceMode function
   const startVoiceMode = async () => {
@@ -1616,8 +1648,8 @@ const cleanupTTSAudio = () => {
 
           case "tts-audio-chunk":
             console.log("🔊 Got audio chunk");
-  handleTTSChunk(data.audio, data.encoding, data.sample_rate);
-  break;
+            handleTTSChunk(data.audio, data.encoding, data.sample_rate);
+            break;
 
           case "tts-end":
             console.log("🔊 TTS finished, playing audio");
@@ -1858,7 +1890,7 @@ const cleanupTTSAudio = () => {
         onWheel={handleUserScrollInterruption} // Detect mouse wheel
         onTouchMove={handleUserScrollInterruption} // Detect touch scroll
         className=" relative flex-1 h-[calc(100vh-160px)] w-full scrollbar-hover  md:p-4  mt-20 md:mt-0 space-y-6 overflow-auto mx-auto bg-white  dark:bg-[#121212] transition-colors duration-300"
-        style={{ zIndex: 20 }}>
+        style={{  }}>
         <RedirectModal
           open={modalOpen}
           url={pendingUrl}
@@ -1894,7 +1926,7 @@ const cleanupTTSAudio = () => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white max-w-2xl w-fit self-end ml-auto">
+                        className="relative   z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white max-w-2xl w-fit self-end ml-auto">
                         <div className="flex items-start gap-2">
                           <div className="p-1 rounded-full flex-shrink-0">
                             {/* Fallback to default circle icon if user_img is not available */}
@@ -1920,7 +1952,7 @@ const cleanupTTSAudio = () => {
                             )}
                           </div>
 
-                          <div className="flex flex-col w-full mr-7  mt-1  overflow-auto text-justify text-xs md:text-base space-y-2 font-centurygothic">
+                          <div className="flex flex-col w-full mr-7  mt-1  overflow-auto text-justify text-sm md:text-base space-y-2 font-poppins">
                             <ReactMarkdown rehypePlugins={[rehypeRaw]}>
                               {msg.message}
                             </ReactMarkdown>
@@ -1935,41 +1967,28 @@ const cleanupTTSAudio = () => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative p-3 rounded-lg break-words  dark:bg-[#282828] text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3">
+                        className="relative   z-30 p-3 rounded-lg break-words  dark:bg-[#282828] text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3">
                         <div className="flex items-start gap-2">
-                          <div className="p-1 rounded-full">
+                          <div className="p-1 hidden md:block rounded-full">
                             <img
                               src="./logo.png"
                               className="h-5 w-5"
                               alt="Bot Logo"
                             />
                           </div>
-                          <div className="w-full mr-2 font-centurygothic relative">
-                            {/* Sticky Copy Button */}
-                            <div className="sticky top-0 float-right z-20  ">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCopyCode(msg.response, msg.id);
-                                }}
-                                className="p-1 rounded-md bg-gray-500/80 hover:bg-gray-600/90 text-white transition-all duration-200 shadow-lg backdrop-blur-sm">
-                                {copied ? (
-                                  <CheckCircle size={16} color="#4cd327" />
-                                ) : (
-                                  <Copy size={16} />
-                                )}
-                              </button>
-                            </div>
-
+                          {/* Replace the ChatbotMarkdown component with this */}
+                          <div className="w-full text-base md:text-lg mr-2 font-poppins relative">
                             <ChatbotMarkdown
                               ref={(ref) =>
                                 (markdownRefs.current[msg.id] = ref)
                               }
                               content={msg.response}
+                              messageId={msg.id}
                               onLinkClick={(url) => {
                                 setPendingUrl(url);
                                 setModalOpen(true);
                               }}
+                              onCopyClick={handleCopyCode}
                             />
                           </div>
                         </div>
@@ -1977,7 +1996,7 @@ const cleanupTTSAudio = () => {
                     )}
 
                     {msg.suggestions && msg.suggestions.length > 0 && (
-                      <div className="mt-2 p-4 font-centurygothic">
+                      <div className="mt-2 p-4 font-poppins">
                         <motion.p
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -2010,7 +2029,7 @@ const cleanupTTSAudio = () => {
                                 handleSendMessage(cleanSuggestion);
                               }}
                               disabled={isResponding}
-                              className={`px-4 py-1.5 flex justify-between text-left w-full font-bold rounded-full 
+                              className={`px-4 py-1.5 flex justify-between items-center text-left w-full font-semibold md:font-bold rounded-full 
             bg-gradient-to-r from-gray-100 to-gray-200 
             dark:from-gray-700 dark:to-gray-800 
             text-gray-900 dark:text-white 
@@ -2024,6 +2043,7 @@ const cleanupTTSAudio = () => {
                 : "hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-700 hover:text-blue-500 dark:hover:text-blue-400"
             }
           `}>
+            
                               {suggestion.replace(/^[.]/, "")} <span>+</span>
                             </motion.button>
                           ))}
@@ -2037,101 +2057,7 @@ const cleanupTTSAudio = () => {
                   </div>
                 ))}
 
-              {/* ✅ Bot Typing Animation */}
-              {/* {(botTyping || isProcessing) && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.5 }}
-                  className="p-3 rounded-lg w-44 md:w-80   font-centurygothic text-white self-start ml-2 mb-2  md:ml-0 mr-auto mt-3">
-                  <div className="flex items-center gap-2">
-                    <div className="  p-1 rounded-full">
-                      <img
-                        src="./logo.png"
-                        className="h-5 w-5 text-2xl animate-walkingBot"
-                        alt="Bot Logo"
-                      />
-                    </div>
-                     
-                    <span className="animate-typingDots text-black dark:text-white text-xs md:text-lg font-mono"></span>
-                  </div>
-                </motion.div>
-              )} */}
-              {/* {(botTyping || isProcessing) && (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    transition={{ duration: 0.5 }}
-    className="p-3 rounded-lg w-44 md:w-80 font-centurygothic text-white self-start ml-2 mb-2 md:ml-0 mr-auto mt-3"
-  >
-    <div className="flex items-center gap-3">
-      <div className="relative h-8 w-8">
-       
-        <div 
-          className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/40 to-indigo-600/40 backdrop-blur-sm"
-          style={{
-            animation: 'breathe 3s ease-in-out infinite'
-          }}
-        ></div>
-        
-     
-        <img
-          src="./logo.png"
-          alt="Bot Logo"
-          className="h-6 w-6 absolute top-1 left-1 z-10 rounded-full"
-          style={{
-            animation: 'thinking 1.5s ease-in-out infinite'
-          }}
-        />
-        
-
-      </div>
-
-      <span className="animate-typingDots text-black dark:text-white text-xs md:text-lg font-mono">
-         
-      </span>
-    </div>
-
-    <style jsx>{`
-      @keyframes breathe {
-        0%, 100% { 
-          transform: scale(1);
-          opacity: 0.4;
-        }
-        50% { 
-          transform: scale(1.1);
-          opacity: 0.6;
-        }
-      }
-      
-      @keyframes thinking {
-        0%, 100% { 
-          transform: translateY(0px) rotate(0deg) scale(1);
-        }
-        25% { 
-          transform: translateY(-2px) rotate(-2deg) scale(1.02);
-        }
-        50% { 
-          transform: translateY(-3px) rotate(0deg) scale(1.05);
-        }
-        75% { 
-          transform: translateY(-2px) rotate(2deg) scale(1.02);
-        }
-      }
-      
-      @keyframes pulse {
-        0%, 100% { 
-          opacity: 1;
-          transform: scale(1);
-        }
-        50% { 
-          opacity: 0.6;
-          transform: scale(0.8);
-        }
-      }
-    `}</style>
-  </motion.div>
-)} */}
+              
               <BotThinking isVisible={botTyping || isProcessing} />
             </>
           ) : (
@@ -2443,44 +2369,43 @@ ${
               )}
             </div>
             {/* voice mode  */}
-           <div className="voice-mode-section">
-  <div className="relative voice-controls text-gray-800 dark:text-white">
-    <button
-      onMouseEnter={() => setvoiceTooltip(true)}
-      onMouseLeave={() => setvoiceTooltip(false)}
-      onClick={() => {
-        // ✅ Add guest check here - same as mic button
-        if (isGuest) {
-          handleLoginPrompt();
-          return;
-        }
-        startVoiceMode();
-      }}
-      disabled={isVoiceMode || isProcessing}
-      className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
-        isVoiceMode
-          ? "bg-red-600 text-white cursor-not-allowed"
-          : "bg-green-600 hover:bg-green-700 text-white"
-      } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
-      <span className="md:block hidden text-xs md:text-base items-center gap-2">
-        <AudioLines size={20} />
-      </span>
-      <span className="block md:hidden text-xs md:text-base items-center gap-2">
-        <AudioLines size={12} />
-      </span>
-      {voiceTooltip && (
-        <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
-          {isGuest 
-            ? "Login for Voice Mode" 
-            : isVoiceMode 
-              ? "Voice Active" 
-              : "Voice Mode"
-          }
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900" />
-        </div>
-      )}
-    </button>
-  </div>
+            <div className="voice-mode-section">
+              <div className="relative voice-controls text-gray-800 dark:text-white">
+                <button
+                  onMouseEnter={() => setvoiceTooltip(true)}
+                  onMouseLeave={() => setvoiceTooltip(false)}
+                  onClick={() => {
+                    // ✅ Add guest check here - same as mic button
+                    if (isGuest) {
+                      handleLoginPrompt();
+                      return;
+                    }
+                    startVoiceMode();
+                  }}
+                  disabled={isVoiceMode || isProcessing}
+                  className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
+                    isVoiceMode
+                      ? "bg-red-600 text-white cursor-not-allowed"
+                      : "bg-green-600 hover:bg-green-700 text-white"
+                  } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
+                  <span className="md:block hidden text-xs md:text-base items-center gap-2">
+                    <AudioLines size={20} />
+                  </span>
+                  <span className="block md:hidden text-xs md:text-base items-center gap-2">
+                    <AudioLines size={12} />
+                  </span>
+                  {voiceTooltip && (
+                    <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
+                      {isGuest
+                        ? "Login for Voice Mode"
+                        : isVoiceMode
+                        ? "Voice Active"
+                        : "Voice Mode"}
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900" />
+                    </div>
+                  )}
+                </button>
+              </div>
 
               {/* Professional Voice Overlay - Custom Layout */}
               {showVoiceOverlay && !isGuest && (
@@ -2491,36 +2416,35 @@ ${
                   className="fixed bottom-0 left-0 right-0 w-screen h-screen md:h-full  md:transform md:-translate-x-1/2 md:w-screen bg-gradient-to-t from-gray-900 via-gray-700 to-transparent backdrop-blur-lg rounded-t-2xl md:rounded-2xl text-white z-50 flex flex-col md:flex-row items-center justify-center shadow-2xl px-4 md:px-6 py-4">
                   {/* MOBILE LAYOUT: Vertical Stack */}
                   <div className="flex flex-col md:hidden items-center justify-center gap-4 w-full">
-                   {/* 1. Rotating Green Animation */}
-<div className="flex items-center justify-center">
-  <div className="w-16 h-16 relative">
-    <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 rotating-border"></div>
-    <div className="absolute inset-2 rounded-full border-2 border-transparent border-b-green-300 border-l-green-300 rotating-border-reverse"></div>
-    <div className="absolute inset-4 rounded-full bg-green-400/20 pulsing-glow"></div>
-    <div className="absolute inset-0 flex items-center justify-center">
-      <div
-        className={`transition-all duration-300 ${
-          isAISpeaking ? "animate-bounce" : "animate-pulse"
-        }`}>
-        <img
-          src="./logo.png"
-          className="w-6 h-6 block dark:hidden"
-          alt="Logo"
-        />
-        <img
-          src="./q.png"
-          className="w-6 h-6 hidden dark:block"
-          alt="Logo"
-        />
-      </div>
-    </div>
-    {/* Bigger and darker ripples */}
-    <div className="absolute -inset-4 rounded-full border-2 border-green-500/60 animate-ping"></div>
-    <div className="absolute -inset-8 rounded-full border-2 border-green-600/50 animate-ping animation-delay-300"></div>
-    <div className="absolute -inset-12 rounded-full border border-green-700/40 animate-ping animation-delay-600"></div>
-  </div>
-</div>
-
+                    {/* 1. Rotating Green Animation */}
+                    <div className="flex items-center justify-center">
+                      <div className="w-16 h-16 relative">
+                        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 rotating-border"></div>
+                        <div className="absolute inset-2 rounded-full border-2 border-transparent border-b-green-300 border-l-green-300 rotating-border-reverse"></div>
+                        <div className="absolute inset-4 rounded-full bg-green-400/20 pulsing-glow"></div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div
+                            className={`transition-all duration-300 ${
+                              isAISpeaking ? "animate-bounce" : "animate-pulse"
+                            }`}>
+                            <img
+                              src="./logo.png"
+                              className="w-6 h-6 block dark:hidden"
+                              alt="Logo"
+                            />
+                            <img
+                              src="./q.png"
+                              className="w-6 h-6 hidden dark:block"
+                              alt="Logo"
+                            />
+                          </div>
+                        </div>
+                        {/* Bigger and darker ripples */}
+                        <div className="absolute -inset-4 rounded-full border-2 border-green-500/60 animate-ping"></div>
+                        <div className="absolute -inset-8 rounded-full border-2 border-green-600/50 animate-ping animation-delay-300"></div>
+                        <div className="absolute -inset-12 rounded-full border border-green-700/40 animate-ping animation-delay-600"></div>
+                      </div>
+                    </div>
 
                     {/* 2. Status Display */}
                     <div className="text-sm font-semibold text-center">
@@ -3398,25 +3322,7 @@ ${
   -ms-user-select: none !important;
 }
 // double-click select text 
-/* Ensure text selection works properly */
-.markdown-content * {
-  user-select: text !important;
-  -webkit-user-select: text !important;
-  -moz-user-select: text !important;
-  -ms-user-select: text !important;
-}
 
-.markdown-content .select-none {
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
-}
-
-/* Prevent text selection interference */
-.markdown-content {
-  pointer-events: auto;
-}
 
 
 `}

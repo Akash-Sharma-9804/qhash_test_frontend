@@ -555,7 +555,7 @@ const handleDeleteConversation = async (id) => {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex  min-h-screen">
     {/* Sidebar starts */}
     <div
         className={`fixed md:relative z-50 h-full md:h-screen
@@ -671,7 +671,7 @@ const handleDeleteConversation = async (id) => {
   {/* Show typing animation when renaming */}
   {renamingId === conv.id ? (
     <div className="typing-animation">
-      <span className="typing-text">
+      <span className="typing-text uppercase">
         {tempRenameText}
       </span>
       <div className="typing-dots">
@@ -683,7 +683,7 @@ const handleDeleteConversation = async (id) => {
   ) : fetchingConversationId === conv.id ? (
     // Show typing animation when fetching from localStorage
     <div className="typing-animation">
-      <span className="typing-text">
+      <span className="typing-text uppercase">
         {conv.name || "New Chat"}
       </span>
       <div className="typing-dots">
@@ -709,7 +709,7 @@ const handleDeleteConversation = async (id) => {
             setEditingId(null);
           }
         }}
-        className="bg-transparent border-b border-gray-400 outline-none w-full"
+        className="bg-transparent border-b border-gray-400 outline-none w-full uppercase"
       />
       <button
         onClick={(e) => {
@@ -728,7 +728,7 @@ const handleDeleteConversation = async (id) => {
   ) : (
     <span 
       title={conv.name || "New Chat"}
-      className="block truncate pr-2">
+      className="block truncate pr-2 uppercase">
       {conv.name || "New Chat"}
     </span>
   )}

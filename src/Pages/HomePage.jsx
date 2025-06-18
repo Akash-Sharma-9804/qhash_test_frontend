@@ -15,7 +15,7 @@ const HomePage = () => {
   const isGuest = !user;
 
   return (
-    <div className=" font-mono  h-screen overflow-hidden   text-white   ">
+    <div className=" font-poppins  h-screen overflow-hidden   text-white   ">
       <div className="flex h-screen overflow-auto">
        {!isGuest && (
   <Sidebar

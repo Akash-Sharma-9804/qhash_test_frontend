@@ -11,6 +11,7 @@ export default {
         manrope: ['Manrope', 'sans-serif'],
         kanit: ['Kanit', 'sans-serif'],
         centurygothic: ['"Century Gothic"', 'sans-serif'],
+         poppins: ['Poppins', 'sans-serif'],
       },
       transitionProperty: {
         colors: "color, background-color, border-color",
