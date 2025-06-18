@@ -1926,7 +1926,7 @@ const ChatArea = ({ isGuest }) => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative   z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white max-w-2xl w-fit self-end ml-auto">
+                        className="relative   z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white  max-w-full self-end ml-auto">
                         <div className="flex items-start gap-2">
                           <div className="p-1 rounded-full flex-shrink-0">
                             {/* Fallback to default circle icon if user_img is not available */}
@@ -3322,6 +3322,7 @@ ${
   -ms-user-select: none !important;
 }
 // double-click select text 
+
 
 
 
