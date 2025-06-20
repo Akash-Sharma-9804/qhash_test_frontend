@@ -1646,16 +1646,35 @@ function preprocessMessage(msg) {
   return msg;
 }
 
+// Add this useEffect for mobile viewport handling
+useEffect(() => {
+  const setVH = () => {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+  };
+  
+  setVH();
+  window.addEventListener('resize', setVH);
+  window.addEventListener('orientationchange', setVH);
+  
+  return () => {
+    window.removeEventListener('resize', setVH);
+    window.removeEventListener('orientationchange', setVH);
+  };
+}, []);
+
 
   return (
-   <div className="flex flex-col w-full min-h-screen md:h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300 fixed md:relative inset-0 md:inset-auto z-40 md:z-auto">
+   <div className="flex flex-col w-full h-screen md:h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300 fixed md:relative inset-0 md:inset-auto z-40 md:z-auto" style={{ height: 'calc(var(--vh, 1vh) * 100)' }}>
+
       <Navbar isGuest={isGuest} />
       {/* Chat Area starts */}
       <div
         ref={chatContainerRef}
         onWheel={handleUserScrollInterruption} // Detect mouse wheel
         onTouchMove={handleUserScrollInterruption} // Detect touch scroll
-        className=" relative flex-1 min-h-[calc(100vh-120px)] md:h-[calc(100vh-160px)] w-full scrollbar-hover md:p-4 mt-16 md:mt-0 space-y-6 overflow-auto mx-auto bg-white dark:bg-[#121212] transition-colors duration-300"
+       className=" relative flex-1 h-[calc(100dvh-120px)] md:h-[calc(100vh-160px)] w-full scrollbar-hover md:p-4 mt-16 md:mt-0 space-y-6 overflow-auto mx-auto bg-white dark:bg-[#121212] transition-colors duration-300"
+
         style={{}}>
         <RedirectModal
           open={modalOpen}
