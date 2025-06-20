@@ -1646,10 +1646,44 @@ function preprocessMessage(msg) {
   return msg;
 }
 
+// Enhanced mobile viewport handling
+useEffect(() => {
+  const setMobileVH = () => {
+    // Method 1: CSS Custom Properties
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+    
+    // Method 2: Direct body height for mobile
+    if (window.innerWidth <= 768) {
+      document.body.style.height = `${window.innerHeight}px`;
+      document.documentElement.style.height = `${window.innerHeight}px`;
+    }
+  };
+
+  // Set initial values
+  setMobileVH();
+  
+  // Handle resize and orientation changes
+  window.addEventListener('resize', setMobileVH);
+  window.addEventListener('orientationchange', () => {
+    setTimeout(setMobileVH, 100); // Delay for orientation change
+  });
+  
+  // Handle viewport changes on mobile (URL bar show/hide)
+  window.addEventListener('scroll', setMobileVH);
+  
+  return () => {
+    window.removeEventListener('resize', setMobileVH);
+    window.removeEventListener('orientationchange', setMobileVH);
+    window.removeEventListener('scroll', setMobileVH);
+  };
+}, []);
+
 
 
   return (
-   <div className="flex flex-col w-full h-screen md:h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300 fixed md:relative inset-0 md:inset-auto z-40 md:z-auto" style={{ height: 'calc(var(--vh, 1vh) * 100)' }}>
+   <div className="flex flex-col w-full mobile-viewport md:h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300 fixed md:relative inset-0 md:inset-auto z-40 md:z-auto mobile-full-height">
+
 
       <Navbar isGuest={isGuest} />
       {/* Chat Area starts */}
@@ -1657,7 +1691,8 @@ function preprocessMessage(msg) {
         ref={chatContainerRef}
         onWheel={handleUserScrollInterruption} // Detect mouse wheel
         onTouchMove={handleUserScrollInterruption} // Detect touch scroll
-       className=" relative flex-1 h-[calc(100dvh-120px)] md:h-[calc(100vh-160px)] w-full scrollbar-hover md:p-4 mt-16 md:mt-0 space-y-6 overflow-auto mx-auto bg-white dark:bg-[#121212] transition-colors duration-300"
+       className="relative flex-1 h-[calc(100dvh-140px)] md:h-[calc(100vh-160px)] w-full scrollbar-hover md:p-4 mt-16 md:mt-0 space-y-6 overflow-auto mx-auto bg-white dark:bg-[#121212] transition-colors duration-300"
+
 
         style={{}}>
         <RedirectModal
@@ -3103,6 +3138,19 @@ ${
 }
 // double-click select text 
 
+/* Add this to your existing style section at the bottom */
+@supports (-webkit-touch-callout: none) {
+  .mobile-full-height {
+    height: -webkit-fill-available;
+    min-height: -webkit-fill-available;
+  }
+}
+
+.mobile-viewport {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for modern browsers */
+  height: -webkit-fill-available; /* iOS Safari */
+}
 
 
 
