@@ -120,7 +120,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
           </span>
         </div>
 
-        <div className="flex gap-4 items-center text-black dark:text-white sm:mr-6 bg-white/80 dark:bg-[#121212]/80 backdrop-blur-sm rounded-lg px-3 py-2">
+        <div className="flex gap-4 items-center text-black dark:text-white sm:mr-6    rounded-lg px-3 py-2">
           {isGuest ? (
             <>
               {/* Desktop Login Button */}
