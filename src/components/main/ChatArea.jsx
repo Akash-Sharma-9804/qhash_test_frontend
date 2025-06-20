@@ -51,6 +51,7 @@ import {
 } from "../../store/chatSlice2";
 import { toast } from "react-toastify";
 import MessageFiles from "../helperComponent/MessageFiles";
+import FileActionModal from "../helperComponent/FileActionModal";
 // import * as vad from "@ricky0123/vad-web";
 // import { useMicVAD } from "@ricky0123/vad-react";
 // import AudioVisualizer from 'react-audio-visualize';
@@ -427,251 +428,7 @@ const ChatArea = ({ isGuest }) => {
 
   // working handlesend message function starts
 
-  // const handleSendMessage = async (customText) => {
-  //   //  console.log("💥 handleSendMessage fired", { customText });
-  //   const messageText =
-  //     typeof customText === "string"
-  //       ? customText.trim()
-  //       : inputMessage.trim?.() || "";
-
-  //   if (!messageText && files.length === 0) return;
-
-  //   textareaRef.current.style.height = "44px";
-
-  //   // const plainText = messageText.trim();
-  //   const plainText =
-  //     typeof customText === "string" && customText.trim()
-  //       ? customText.trim()
-  //       : inputMessage.trim();
-
-  //   if (!plainText && files.length === 0) return;
-
-  //   // ✅ Guest Mode
-  //   if (isGuest) {
-  //     const userMessage = {
-  //       id: Date.now(),
-  //       conversationId: guestConversationId || "guest",
-  //       message: plainText,
-  //       sender: "user",
-  //       files: [],
-  //     };
-
-  //     setInputMessage("");
-  //     setFiles([]);
-  //     setBotTyping(true);
-  //     setLoading(true); // 🔐 Disable send button here
-  //     dispatch(
-  //       addMessage({
-  //         conversationId: guestConversationId || "guest",
-  //         message: userMessage,
-  //       })
-  //     );
-  //     console.log("📤 Sending guest message:", plainText);
-  //     try {
-  //       const res = await sendGuestMessage(plainText);
-
-  //       const aiResponse = res.response || "🧠 No AI response received.";
-  //       const suggestions = res.suggestions || [];
-
-  //       const botMessage = {
-  //         id: Date.now() + 1,
-  //         conversationId: guestConversationId || "guest",
-  //         message: aiResponse,
-  //         sender: "bot",
-  //         response: aiResponse,
-  //         isNewMessage: true,
-  //         suggestions, // ✅ Include suggestions if needed
-  //       };
-
-  //       dispatch(
-  //         addMessage({
-  //           conversationId: guestConversationId || "guest",
-  //           message: botMessage,
-  //         })
-  //       );
-
-  //       setBotTyping(false);
-
-  //       const prevGuestChat = JSON.parse(
-  //         localStorage.getItem("guest_chat") || "[]"
-  //       );
-  //       localStorage.setItem(
-  //         "guest_chat",
-  //         JSON.stringify([...prevGuestChat, userMessage, botMessage])
-  //       );
-
-  //       return;
-  //     } catch (error) {
-  //       console.error("❌ Guest mode error:", error);
-  //       setBotTyping(false);
-  //       toast.error("❌ Failed to get guest response.");
-  //     } finally {
-  //       setLoading(false); // 🔓 Re-enable send button here
-  //     }
-  //     return;
-  //   }
-
-  //   // ✅ Logged-in user flow
-
-  //   const token = localStorage.getItem("token");
-  //   const user_id = user?.user_id || localStorage.getItem("user_id");
-  //   const conv_id =
-  //     activeConversation || localStorage.getItem("conversation_id");
-
-  //   if (!token) {
-  //     console.error("🚨 Missing token.");
-  //     return;
-  //   }
-
-  //   if (!user_id) {
-  //     console.error("🚨 Missing user_id.");
-  //     return;
-  //   }
-
-  //   // ✅ 1. Prepare user message text (without appending file names - we'll show them separately)
-  //   // const plainText = inputMessage.trim();
-
-  //   // Create user message without embedding file names in the text
-  //   const userMessage = {
-  //     id: Date.now(),
-  //     message: plainText,
-  //     sender: "user",
-  //     files: files.map((f) => ({ name: f.name, type: f.type })),
-  //   };
-
-  //   dispatch(addMessage({ conversationId: conv_id, message: userMessage }));
-  //   setLoading(true); // 🔐 Disable send button here
-  //   setInputMessage("");
-  //   setBotTyping(true);
-  //   setFiles([]);
-  //   try {
-  //     // ✅ 2. Prepare FormData for upload
-  //     const formData = new FormData();
-  //     if (plainText) formData.append("message", plainText);
-  //     formData.append("user_id", user_id);
-  //     if (conv_id) formData.append("conversation_id", conv_id);
-  //     files.forEach((file) => {
-  //       formData.append("files", file);
-  //     });
-
-  //     // ✅ 3. Upload files
-  //     const uploadResponse = await uploadFiles(formData, token, (event) => {
-  //       const percent = Math.round((event.loaded * 100) / event.total);
-  //       const progressMap = {};
-  //       files.forEach((file) => {
-  //         progressMap[file.name] = percent;
-  //       });
-  //       setUploadProgress(progressMap);
-  //     });
-
-  //     const finalConversationId =
-  //       uploadResponse?.data?.conversation_id ||
-  //       uploadResponse?.conversation_id ||
-  //       conv_id;
-
-  //     if (!activeConversation && finalConversationId) {
-  //       dispatch(setActiveConversation(finalConversationId));
-  //     }
-
-  //     // ✅ 4. Extract metadata to send to chatbot
-  //     const uploaded_file_metadata = uploadResponse?.data?.files || [];
-
-  //     // Update the user message in redux with the proper file metadata
-  //     if (uploaded_file_metadata.length > 0) {
-  //       // Update the message with file names from the backend
-  //       dispatch(
-  //         updateMessage({
-  //           conversationId: finalConversationId,
-  //           id: userMessage.id,
-  //           files: uploaded_file_metadata,
-  //         })
-  //       );
-  //     }
-
-  //     // ✅ 5. Send message to chatbot if there's a user message
-  //     if (plainText || files.length > 0) {
-  //       const chatRes = await sendMessage(
-  //         finalConversationId,
-  //         plainText,
-  //         user_id,
-  //         token,
-  //         uploadResponse?.data?.extracted_summary_raw,
-  //         uploaded_file_metadata
-  //       );
-
-  //       const aiResponse = chatRes?.response || "🧠 No AI response received.";
-  //       const responseFiles = chatRes?.files || [];
-  //       const suggestions = chatRes?.suggestions || []; // 👈 new
-
-  //       const botMessage = {
-  //         id: Date.now() + 1,
-  //         message: aiResponse,
-  //         sender: "bot",
-  //         response: aiResponse,
-  //         files: responseFiles,
-  //         suggestions: suggestions, // 👈 attach suggestions
-  //         isNewMessage: true,
-  //       };
-
-  //       dispatch(
-  //         addMessage({
-  //           conversationId: finalConversationId,
-  //           message: botMessage,
-  //         })
-  //       );
-
-  //       // ✅ stop typing immediately after bot response is added
-  //       setBotTyping(false);
-
-  //       // ✅ 6. Rename is handled by the backend — now refresh conversations list in Sidebar
-  //       const updatedConversations = await fetchConversations(token);
-  //       dispatch(setConversations(updatedConversations?.conversations || []));
-
-  //       // ✅ 7. Fetch updated conversation list after rename
-  //       const currentConv = conversations.find(
-  //         (c) => c.id === finalConversationId
-  //       );
-  //       if (currentConv?.name === "New Conversation") {
-  //         const updatedData = await fetchConversations(token);
-  //         if (updatedData?.conversations) {
-  //           dispatch(setConversations(updatedData.conversations));
-  //           const currentId = localStorage.getItem("conversation_id");
-  //           if (currentId) {
-  //             dispatch(setActiveConversation(Number(currentId)));
-  //           }
-  //         }
-  //       }
-  //     } else if (files.length > 0) {
-  //       // ✅ 8. No user message, only files
-  //       toast.info(
-  //         uploadResponse?.data?.extracted_summary ||
-  //           "🧠 Files received, but no text was extractable.",
-  //         { position: "bottom-right" }
-  //       );
-  //       setBotTyping(false); // ✅ stop here too
-  //     }
-  //   } catch (error) {
-  //     console.error("❌ Error sending message:", error);
-  //     dispatch(
-  //       addMessage({
-  //         conversationId: conv_id,
-  //         message: {
-  //           id: Date.now() + 1,
-  //           message: "❌ Failed to get a response.",
-  //           sender: "bot",
-  //           response: "❌ Failed to get a response.",
-  //         },
-  //       })
-  //     );
-  //     toast.error("❌ Message or file upload failed.");
-  //     setBotTyping(false); // ✅ also stop here in error
-  //     setLoading(false); // 🔓 Re-enable send button here
-  //   } finally {
-  //     // ✅ 9. Cleanup
-  //     setUploadProgress({});
-  //     setLoading(false); // 🔓 Re-enable send button here
-  //   }
-  // };
+  
   const handleSendMessage = async (customText) => {
     //  console.log("💥 handleSendMessage fired", { customText });
     // Reset scroll state for new message
@@ -1122,8 +879,7 @@ const ChatArea = ({ isGuest }) => {
 
   // text area resize ends
 
-  // textarea animation
-  const canvasRef = useRef(null);
+  
 
   // voice functions dictation part starts
 
@@ -1881,16 +1637,26 @@ const ChatArea = ({ isGuest }) => {
     return int16.buffer;
   };
 
+
+function preprocessMessage(msg) {
+  // Auto-wrap full HTML in code block if detected
+  if (msg.includes('<html') || msg.includes('<!DOCTYPE')) {
+    return `\`\`\`html\n${msg}\n\`\`\``;
+  }
+  return msg;
+}
+
+
   return (
-    <div className="flex flex-col w-full h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300">
+   <div className="flex flex-col w-full h-screen md:h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300 fixed md:relative inset-0 md:inset-auto z-40 md:z-auto">
       <Navbar isGuest={isGuest} />
       {/* Chat Area starts */}
       <div
         ref={chatContainerRef}
         onWheel={handleUserScrollInterruption} // Detect mouse wheel
         onTouchMove={handleUserScrollInterruption} // Detect touch scroll
-        className=" relative flex-1 h-[calc(100vh-160px)] w-full scrollbar-hover  md:p-4  mt-20 md:mt-0 space-y-6 overflow-auto mx-auto bg-white  dark:bg-[#121212] transition-colors duration-300"
-        style={{  }}>
+        className=" relative flex-1 h-[calc(100vh-120px)] md:h-[calc(100vh-160px)] w-full scrollbar-hover md:p-4 mt-16 md:mt-0 space-y-6 overflow-auto mx-auto bg-white dark:bg-[#121212] transition-colors duration-300"
+        style={{}}>
         <RedirectModal
           open={modalOpen}
           url={pendingUrl}
@@ -1926,7 +1692,7 @@ const ChatArea = ({ isGuest }) => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative   z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white  max-w-full self-end ml-auto">
+                        className="relative   z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white  max-w-full md:max-w-2xl w-fit self-end ml-auto">
                         <div className="flex items-start gap-2">
                           <div className="p-1 rounded-full flex-shrink-0">
                             {/* Fallback to default circle icon if user_img is not available */}
@@ -1952,10 +1718,17 @@ const ChatArea = ({ isGuest }) => {
                             )}
                           </div>
 
-                          <div className="flex flex-col w-full mr-7  mt-1  overflow-auto text-justify text-sm md:text-base space-y-2 font-poppins">
-                            <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                          <div className="flex prose max-w-none dark:text-white flex-col w-full mr-7  mt-1  overflow-auto text-justify text-sm md:text-base space-y-2 font-poppins">
+                            {/* <ReactMarkdown rehypePlugins={[rehypeRaw]}>
                               {msg.message}
-                            </ReactMarkdown>
+                            </ReactMarkdown> */}
+                           
+  <ReactMarkdown>
+    {preprocessMessage(msg.message)}
+  </ReactMarkdown>
+
+
+
                           </div>
                         </div>
                       </motion.div>
@@ -1977,7 +1750,7 @@ const ChatArea = ({ isGuest }) => {
                             />
                           </div>
                           {/* Replace the ChatbotMarkdown component with this */}
-                          <div className="w-full text-base md:text-lg mr-2 font-poppins relative">
+                          <div className="w-full text-base  mr-2 font-poppins relative">
                             <ChatbotMarkdown
                               ref={(ref) =>
                                 (markdownRefs.current[msg.id] = ref)
@@ -2043,7 +1816,6 @@ const ChatArea = ({ isGuest }) => {
                 : "hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-700 hover:text-blue-500 dark:hover:text-blue-400"
             }
           `}>
-            
                               {suggestion.replace(/^[.]/, "")} <span>+</span>
                             </motion.button>
                           ))}
@@ -2057,7 +1829,6 @@ const ChatArea = ({ isGuest }) => {
                   </div>
                 ))}
 
-              
               <BotThinking isVisible={botTyping || isProcessing} />
             </>
           ) : (
@@ -2380,12 +2151,16 @@ ${
                       handleLoginPrompt();
                       return;
                     }
+                     if (!isGuest) {
+          return; // Do nothing for logged-in users
+        }
                     startVoiceMode();
                   }}
-                  disabled={isVoiceMode || isProcessing}
+                  disabled={isVoiceMode || isProcessing }
                   className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
                     isVoiceMode
                       ? "bg-red-600 text-white cursor-not-allowed"
+                      
                       : "bg-green-600 hover:bg-green-700 text-white"
                   } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
                   <span className="md:block hidden text-xs md:text-base items-center gap-2">
@@ -2396,8 +2171,10 @@ ${
                   </span>
                   {voiceTooltip && (
                     <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
-                      {isGuest
-                        ? "Login for Voice Mode"
+                      {!isGuest
+  ? "Coming Soon" // ✅ Check logged-in users FIRST
+  : isGuest
+  ? "Login for Voice Mode" 
                         : isVoiceMode
                         ? "Voice Active"
                         : "Voice Mode"}
@@ -3322,6 +3099,7 @@ ${
   -ms-user-select: none !important;
 }
 // double-click select text 
+
 
 
 

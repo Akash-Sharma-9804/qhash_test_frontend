@@ -267,7 +267,7 @@ const ChatbotMarkdown = forwardRef(
                 
                 if (!inline && match) {
                   return (
-                    <div className="relative w-full my-3 sm:my-4 group">
+                    <div className="relative w-full  my-3 sm:my-4 group">
                       <div className="relative rounded-lg mr-3 md:mr-0 overflow-hidden bg-gray-600 dark:bg-[#272822] border border-gray-200 dark:border-gray-600">
                         <div className="flex items-center justify-between px-3 py-2 bg-gray-700 dark:bg-gray-800 border-b border-gray-500 dark:border-gray-600">
                           <span className="text-xs text-gray-300 font-medium uppercase">
@@ -304,7 +304,7 @@ const ChatbotMarkdown = forwardRef(
                 
                 return (
                   <code
-                    className="bg-gray-200 dark:bg-gray-700 text-red-600 dark:text-red-300 px-1.5 py-0.5 rounded text-xs sm:text-base font-poppins"
+                    className="bg-gray-200  dark:bg-gray-700 text-red-600 dark:text-red-300 px-1.5 py-0.5 rounded text-xs sm:text-base font-poppins"
                     {...props}>
                     {children}
                   </code>

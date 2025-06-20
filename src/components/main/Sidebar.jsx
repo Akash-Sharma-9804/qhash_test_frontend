@@ -522,37 +522,61 @@ const handleDeleteConversation = async (id) => {
     };
   }, [dropdownId]);
 
-  const handleDropdownOpen = (convId) => {
-    const wasOpen = dropdownId === convId;
-    setDropdownId(wasOpen ? null : convId);
+const [dropdownPosition, setDropdownPosition] = useState({});
+
+// Add this function to calculate dropdown position:
+const calculateDropdownPosition = (convId) => {
+  const conversationElement = document.querySelector(`[data-conversation-id="${convId}"]`);
+  const scrollContainer = document.querySelector('.conversation-scroll-container');
+  
+  if (conversationElement && scrollContainer) {
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const elementRect = conversationElement.getBoundingClientRect();
     
-    // Scroll to make dropdown visible only when opening
-    if (!wasOpen) {
-      setTimeout(() => {
-        const conversationElement = document.querySelector(`[data-conversation-id="${convId}"]`);
-        const scrollContainer = document.querySelector('.conversation-scroll-container');
-        
-        if (conversationElement && scrollContainer) {
-          const containerRect = scrollContainer.getBoundingClientRect();
-          const elementRect = conversationElement.getBoundingClientRect();
-          
-          // Check if element is not fully visible
-          const isElementVisible = (
-            elementRect.top >= containerRect.top &&
-            elementRect.bottom <= containerRect.bottom
-          );
-          
-          if (!isElementVisible) {
-            conversationElement.scrollIntoView({
-              behavior: 'smooth',
-              block: 'center',
-              inline: 'nearest'
-            });
-          }
-        }
-      }, 100);
+    // Calculate available space below and above
+    const spaceBelow = containerRect.bottom - elementRect.bottom;
+    const spaceAbove = elementRect.top - containerRect.top;
+    
+    // Dropdown approximate height is 80px
+    const dropdownHeight = 80;
+    
+    // Position dropdown based on available space with minimal spacing
+    if (spaceBelow >= dropdownHeight) {
+      return { position: 'below', class: 'top-full mt-1' }; // Changed from 'top-8 mt-2' to 'top-full mt-1'
+    } else if (spaceAbove >= dropdownHeight) {
+      return { position: 'above', class: 'bottom-full mb-1' }; // Changed from 'bottom-8 mb-2' to 'bottom-full mb-1'
+    } else {
+      // If neither has enough space, position below and scroll
+      return { position: 'below-scroll', class: 'top-full mt-1' }; // Changed from 'top-8 mt-2' to 'top-full mt-1'
     }
-  };
+  }
+  
+  return { position: 'below', class: 'top-full mt-1' }; // Changed default positioning
+};
+
+ const handleDropdownOpen = (convId) => {
+  const wasOpen = dropdownId === convId;
+  
+  if (!wasOpen) {
+    // Calculate position before opening
+    const position = calculateDropdownPosition(convId);
+    setDropdownPosition(prev => ({ ...prev, [convId]: position }));
+    
+    // If we need to scroll, do it before opening
+    if (position.position === 'below-scroll') {
+      const conversationElement = document.querySelector(`[data-conversation-id="${convId}"]`);
+      if (conversationElement) {
+        conversationElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+    }
+  }
+  
+  setDropdownId(wasOpen ? null : convId);
+};
 
   return (
     <div className="flex  min-h-screen">
@@ -658,7 +682,7 @@ const handleDeleteConversation = async (id) => {
                     <div
                       key={conv.id}
                       data-conversation-id={conv.id}
-                      className={`p-2 text-[13px] text-black dark:text-white rounded-md cursor-pointer transition-all duration-300 flex justify-between items-center relative ${
+                      className={`p-2 text-[13px] font-mono text-black dark:text-white rounded-md cursor-pointer transition-all duration-300 flex justify-between items-center relative ${
                         activeConversation === conv.id
                           ? "bg-gradient-to-r from-[#0000B5] to-[#0076FF] hover:bg-gradient-to-r hover:from-[#0076FF] hover:to-[#0000B5] text-white"
                           : "bg-slate-300 dark:bg-[#3f3f3f] border hover:bg-gray-500"
@@ -671,7 +695,7 @@ const handleDeleteConversation = async (id) => {
   {/* Show typing animation when renaming */}
   {renamingId === conv.id ? (
     <div className="typing-animation">
-      <span className="typing-text uppercase">
+      <span className="typing-text">
         {tempRenameText}
       </span>
       <div className="typing-dots">
@@ -683,7 +707,7 @@ const handleDeleteConversation = async (id) => {
   ) : fetchingConversationId === conv.id ? (
     // Show typing animation when fetching from localStorage
     <div className="typing-animation">
-      <span className="typing-text uppercase">
+      <span className="typing-text ">
         {conv.name || "New Chat"}
       </span>
       <div className="typing-dots">
@@ -709,7 +733,7 @@ const handleDeleteConversation = async (id) => {
             setEditingId(null);
           }
         }}
-        className="bg-transparent border-b border-gray-400 outline-none w-full uppercase"
+        className="bg-transparent border-b border-gray-400 outline-none w-full "
       />
       <button
         onClick={(e) => {
@@ -728,7 +752,7 @@ const handleDeleteConversation = async (id) => {
   ) : (
     <span 
       title={conv.name || "New Chat"}
-      className="block truncate pr-2 uppercase">
+      className="block truncate pr-2 ">
       {conv.name || "New Chat"}
     </span>
   )}
@@ -749,35 +773,39 @@ const handleDeleteConversation = async (id) => {
                           </span>
 
                           {/* Dropdown menu */}
-                          {dropdownId === conv.id && (
-                            <div className="absolute right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-300 rounded shadow-md z-50 min-w-[120px]">
-                              <button
-                                className="block px-4 py-2 font-bold text-sm text-gray-700 hover:bg-gray-100 dark:bg-gray-600 w-full text-left dark:text-white"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingId(conv.id);
-                                  setEditText(conv.name || "New Chat");
-                                  setDropdownId(null);
-                                }}>
-                                <span className="flex gap-2 items-center"> 
-                                  <Pen size={14} />
-                                  Rename 
-                                </span>
-                              </button>
-                              <button
-                                className="block px-4 py-2 text-sm text-red-600 hover:bg-red-100 hover:dark:bg-red-800 font-bold hover:dark:text-black w-full text-left"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteConversation(conv.id, token, dispatch);
-                                  setDropdownId(null);
-                                }}>
-                                <span className="flex gap-2 items-center"> 
-                                  <Trash size={14} />
-                                  Delete
-                                </span>
-                              </button>
-                            </div>
-                          )}
+                   {dropdownId === conv.id && (
+  <div 
+    className={`absolute right-0 bg-white dark:bg-gray-800 border border-gray-300 rounded shadow-md z-50 min-w-[120px] ${
+      dropdownPosition[conv.id]?.class || 'top-full mt-1' // Changed default from 'top-8 mt-2' to 'top-full mt-1'
+    }`}
+  >
+    <button
+      className="block px-4 py-2 font-bold text-sm text-gray-700 hover:bg-gray-100 dark:bg-gray-600 w-full text-left dark:text-white"
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditingId(conv.id);
+        setEditText(conv.name || "New Chat");
+        setDropdownId(null);
+      }}>
+      <span className="flex gap-2 items-center">
+        <Pen size={14} />
+        Rename
+      </span>
+    </button>
+    <button
+      className="block px-4 py-2 text-sm text-red-600 hover:bg-red-100 hover:dark:bg-red-800 font-bold hover:dark:text-black w-full text-left"
+      onClick={(e) => {
+        e.stopPropagation();
+        handleDeleteConversation(conv.id, token, dispatch);
+        setDropdownId(null);
+      }}>
+      <span className="flex gap-2 items-center">
+        <Trash size={14} />
+        Delete
+      </span>
+    </button>
+  </div>
+)}
                         </div>
                       )}
                     </div>
