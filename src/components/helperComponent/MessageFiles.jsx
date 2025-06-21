@@ -341,11 +341,7 @@ const handleDownload = async (url, filename) => {
                   <div className="loader2"></div>
                 </div>
                 <div className="loader"></div>
-                {fileName && (
-                  <div className="text-xs text-white mt-1 truncate px-2" title={fileName}>
-                    {fileName}
-                  </div>
-                )}
+               
               </div>
             );
           }

@@ -673,6 +673,10 @@ if (fileInputRef.current) {
 
       // ✅ 4. Extract metadata to send to chatbot
       const uploaded_file_metadata = uploadResponse?.data?.files || [];
+
+      const file_upload_ids = uploadResponse?.data?._internal?.uploaded_file_ids || 
+                       uploadResponse?._internal?.uploaded_file_ids || [];
+
       // Update the user message in redux with the proper file metadata
      if (uploaded_file_metadata.length > 0) {
     const formattedFiles = uploaded_file_metadata.map(file => ({
@@ -762,6 +766,7 @@ if (uploadResponse?.summary?.failed > 0) {
             token,
             uploadResponse?.data?.extracted_summary_raw,
             uploaded_file_metadata,
+            file_upload_ids,
             // 🚀 Streaming callback
             (streamData) => {
               switch (streamData.type) {

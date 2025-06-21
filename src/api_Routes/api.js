@@ -208,6 +208,7 @@ export const sendMessage = async (
   token,
   extracted_summary_raw = "",
   uploaded_file_metadata = [],
+  file_upload_ids = [],
   onStreamChunk = null // Callback for streaming chunks
 ) => {
   const response = await fetch(`${API_BASE_URL}/chat`, {
@@ -221,7 +222,8 @@ export const sendMessage = async (
       conversation_id: conversationId,
       user_id: userId,
       extracted_summary: extracted_summary_raw,
-      uploaded_file_metadata
+      uploaded_file_metadata,
+      _file_upload_ids: file_upload_ids // ✅ ADD THIS LINE
     })
   });
 
