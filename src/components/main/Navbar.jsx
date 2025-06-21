@@ -193,65 +193,73 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
                   {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
                 </button>
 
-                {/* Mobile Menu Dropdown */}
-                {showMobileMenu && (
-                  <div className="absolute top-12 right-0  bg-white dark:bg-[#121212] backdrop-blur-sm  border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4 min-w-[200px] z-30">
-                    <div className="flex flex-col gap-4">
-                      {/* Login Button */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Login</span>
-                        <button
-                          onClick={handleLoginClick}
-                          className="bg-gradient-to-r from-[#0000B5] to-[#0076FF] hover:bg-gradient-to-r hover:from-[#0076FF] hover:to-[#0000B5] text-white p-2 rounded-lg transition-all duration-300">
-                          <LogIn size={18} />
-                        </button>
-                      </div>
+               {/* Mobile Menu Dropdown */}
+{showMobileMenu && createPortal(
+  <>
+    <div 
+      className="fixed inset-0 z-[99998]" 
+      onClick={() => setShowMobileMenu(false)}
+    />
+    <div className="fixed z-[99999] top-16 right-4 bg-white dark:bg-[#121212] backdrop-blur-sm border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4 min-w-[200px]">
+      <div className="flex flex-col gap-4">
+        {/* Login Button */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">Login</span>
+          <button
+            onClick={handleLoginClick}
+            className="bg-gradient-to-r from-[#0000B5] to-[#0076FF] hover:bg-gradient-to-r hover:from-[#0076FF] hover:to-[#0000B5] text-white p-2 rounded-lg transition-all duration-300">
+            <LogIn size={18} />
+          </button>
+        </div>
 
-                      {/* Divider */}
-                      <div className="border-t border-gray-300 dark:border-gray-600"></div>
+        {/* Divider */}
+        <div className="border-t border-gray-300 dark:border-gray-600"></div>
 
-                      {/* Theme Toggle */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Theme</span>
-                        <button
-                          onClick={toggleTheme}
-                          className={`relative overflow-hidden p-2 flex items-center gap-4 
-                               bg-[#282828] dark:bg-slate-200 text-white dark:text-black 
-                               hover:bg-slate-200 hover:text-black border border-black dark:border-white 
-                               rounded-lg cursor-pointer transition-all duration-300`}>
-                          <div className="relative w-5 h-5">
-                            <div
-                              className={`absolute inset-0 transition-transform duration-500 ${
-                                darkMode
-                                  ? "translate-x-0 opacity-100"
-                                  : "-translate-x-full opacity-0"
-                              }`}>
-                              <Sun size={18} />
-                            </div>
-                            <div
-                              className={`absolute inset-0 transition-transform duration-500 ${
-                                darkMode
-                                  ? "translate-x-full opacity-0"
-                                  : "translate-x-0 opacity-100"
-                              }`}>
-                              <Moon size={18} />
-                            </div>
-                          </div>
-                        </button>
-                      </div>
+        {/* Theme Toggle */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">Theme</span>
+          <button
+            onClick={toggleTheme}
+            className={`relative overflow-hidden p-2 flex items-center gap-4 
+                 bg-[#282828] dark:bg-slate-200 text-white dark:text-black 
+                 hover:bg-slate-200 hover:text-black border border-black dark:border-white 
+                 rounded-lg cursor-pointer transition-all duration-300`}>
+            <div className="relative w-5 h-5">
+              <div
+                className={`absolute inset-0 transition-transform duration-500 ${
+                  darkMode
+                    ? "translate-x-0 opacity-100"
+                    : "-translate-x-full opacity-0"
+                }`}>
+                <Sun size={18} />
+              </div>
+              <div
+                className={`absolute inset-0 transition-transform duration-500 ${
+                  darkMode
+                    ? "translate-x-full opacity-0"
+                    : "translate-x-0 opacity-100"
+                }`}>
+                <Moon size={18} />
+              </div>
+            </div>
+          </button>
+        </div>
 
-                      {/* About Us */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">About Us</span>
-                        <button
-                          onClick={handleAboutClick}
-                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                          <CircleHelp size={20} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+        {/* About Us */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">About Us</span>
+          <button
+            onClick={handleAboutClick}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            <CircleHelp size={20} />
+          </button>
+        </div>
+      </div>
+    </div>
+  </>,
+  document.body
+)}
+
               </div>
             </>
           ) : (
