@@ -204,7 +204,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
       <div className="flex flex-col gap-4">
         {/* Login Button */}
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Login</span>
+          <span className="text-sm dark:text-white font-medium">Login</span>
           <button
             onMouseDown={(e) => {
               e.preventDefault();
@@ -226,7 +226,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
 
         {/* Theme Toggle */}
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Theme</span>
+          <span className="text-sm dark:text-white font-medium">Theme</span>
           <button
             onMouseDown={(e) => {
               e.preventDefault();
@@ -268,7 +268,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
 
         {/* About Us */}
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">About Us</span>
+          <span className="text-sm dark:text-white font-medium">About Us</span>
           <button
             onMouseDown={(e) => {
               e.preventDefault();
@@ -280,7 +280,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
               setShowMobileMenu(false);
               navigate("/about");
             }}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white rounded-lg transition-colors">
             <CircleHelp size={20} />
           </button>
         </div>
