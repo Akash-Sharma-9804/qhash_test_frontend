@@ -28,7 +28,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import { streamAudio } from "../../utils/streamAudio";
 import remarkGfm from "remark-gfm";
-
+import "./chatarea.css";
 // import { useSelector, useDispatch } from "react-redux";
 import ChatbotMarkdown from "../helperComponent/ChatbotMarkdown";
 import {
@@ -620,14 +620,29 @@ const ChatArea = ({ isGuest }) => {
       id: Date.now(),
       message: plainText,
       sender: "user",
-      files: files.map((f) => ({ name: f.name, type: f.type })),
-    };
+       files: files.map((f) => ({ 
+    file_name: f.name,           // Original filename
+    display_name: f.name,        // For display
+    file_type: f.type,           // MIME type
+    file_size: f.size,           // File size
+    name: f.name,                // Keep for backward compatibility
+    type: f.type,
+    // ✅ ADD: Temporary processing state
+    processing: true,
+    upload_success: null               // Keep for backward compatibility
+  })),
+};
+   
     dispatch(addMessage({ conversationId: conv_id, message: userMessage }));
     setLoading(true); // 🔐 Disable send button here
     setInputMessage("");
     setBotTyping(true);
     setFiles([]);
-
+if (fileInputRef.current) {
+  fileInputRef.current.value = null; // Use null instead of empty string
+  fileInputRef.current.type = 'text';
+  fileInputRef.current.type = 'file'; // This forces a reset
+}
     try {
       // ✅ 2. Prepare FormData for upload
       const formData = new FormData();
@@ -659,16 +674,61 @@ const ChatArea = ({ isGuest }) => {
       // ✅ 4. Extract metadata to send to chatbot
       const uploaded_file_metadata = uploadResponse?.data?.files || [];
       // Update the user message in redux with the proper file metadata
-      if (uploaded_file_metadata.length > 0) {
-        // Update the message with file names from the backend
-        dispatch(
-          updateMessage({
-            conversationId: finalConversationId,
-            id: userMessage.id,
-            files: uploaded_file_metadata,
-          })
-        );
-      }
+     if (uploaded_file_metadata.length > 0) {
+    const formattedFiles = uploaded_file_metadata.map(file => ({
+      file_name: file.file_name || file.original_filename,
+      display_name: file.display_name || file.file_name,
+      file_path: file.file_path,
+      file_type: file.file_type || file.mime_type,
+      file_size: file.file_size,
+      unique_filename: file.unique_filename,
+      upload_success: file.upload_success !== false,
+      extraction_error: file.extraction_error,
+      // Keep backward compatibility
+      name: file.file_name || file.original_filename,
+      type: file.file_type || file.mime_type,
+      url: file.file_path,
+      // ✅ REMOVE: Processing state
+      processing: false
+    }));
+
+    // ✅ IMMEDIATE UPDATE: Update Redux with proper file data
+    dispatch(
+      updateMessage({
+        conversationId: finalConversationId,
+        id: userMessage.id,
+        files: formattedFiles,
+      })
+    );
+    
+    console.log("✅ Files updated in Redux:", formattedFiles);
+  }
+
+// ✅ ADD: Handle upload errors
+if (uploadResponse?.summary?.failed > 0) {
+  // Update files that failed to upload
+  const failedFiles = uploadResponse?.data?.files?.filter(f => !f.upload_success) || [];
+  if (failedFiles.length > 0) {
+    const errorFiles = failedFiles.map(file => ({
+      file_name: file.file_name || file.original_filename || "Unknown file",
+      display_name: file.display_name || file.file_name || "Unknown file",
+      file_type: file.file_type || "unknown",
+      upload_success: false,
+      error: file.error || "Upload failed",
+      name: file.file_name || "Unknown file",
+      type: file.file_type || "unknown"
+    }));
+    
+    // Update the message with error state
+    dispatch(
+      updateMessage({
+        conversationId: finalConversationId,
+        id: userMessage.id,
+        files: [...(formattedFiles || []), ...errorFiles],
+      })
+    );
+  }
+}
 
       // ✅ 5. Send message to chatbot with streaming if there's a user message
       if (plainText || files.length > 0) {
@@ -818,6 +878,21 @@ const ChatArea = ({ isGuest }) => {
       }
     } catch (error) {
       console.error("❌ Error sending message:", error);
+       // ✅ UPDATE: Mark files as failed in Redux
+  dispatch(
+    updateMessage({
+      conversationId: conv_id,
+      id: userMessage.id,
+      files: files.map(f => ({
+        file_name: f.name,
+        display_name: f.name,
+        file_type: f.type,
+        upload_success: false,
+        error: "Upload failed",
+        processing: false
+      }))
+    })
+  );
       dispatch(
         addMessage({
           conversationId: conv_id,
@@ -841,13 +916,24 @@ const ChatArea = ({ isGuest }) => {
   };
 
   // working handlesend message ends
-
+const clearFileSelection = () => {
+  setFiles([]);
+  setUploadProgress({});
+  if (fileInputRef.current) {
+    fileInputRef.current.value = '';
+  }
+};
   // ✅ Remove selected file
   const removeFile = (index) => {
-    const updatedFiles = [...files];
-    updatedFiles.splice(index, 1);
-    setFiles(updatedFiles);
-  };
+  const updatedFiles = [...files];
+  updatedFiles.splice(index, 1);
+  setFiles(updatedFiles);
+  
+  // ✅ CLEAR: Reset file input if no files left
+  if (updatedFiles.length === 0 && fileInputRef.current) {
+    fileInputRef.current.value = '';
+  }
+};
 
   // ✅ Handle file upload selection
   const handleFileUpload = (e) => {
@@ -2189,9 +2275,9 @@ ${
                       handleLoginPrompt();
                       return;
                     }
-                     if (!isGuest) {
-          return; // Do nothing for logged-in users
-        }
+        //              if (!isGuest) {
+        //   return; // Do nothing for logged-in users
+        // }
                     startVoiceMode();
                   }}
                   disabled={isVoiceMode || isProcessing }
@@ -2209,9 +2295,7 @@ ${
                   </span>
                   {voiceTooltip && (
                     <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
-                      {!isGuest
-  ? "Coming Soon" // ✅ Check logged-in users FIRST
-  : isGuest
+                      { isGuest
   ? "Login for Voice Mode" 
                         : isVoiceMode
                         ? "Voice Active"
@@ -2230,7 +2314,7 @@ ${
                   exit={{ opacity: 0, y: 100 }}
                   className="fixed bottom-0 left-0 right-0 w-screen h-screen md:h-full  md:transform md:-translate-x-1/2 md:w-screen bg-gradient-to-t from-gray-900 via-gray-700 to-transparent backdrop-blur-lg rounded-t-2xl md:rounded-2xl text-white z-50 flex flex-col md:flex-row items-center justify-center shadow-2xl px-4 md:px-6 py-4">
                   {/* MOBILE LAYOUT: Vertical Stack */}
-                  <div className="flex flex-col md:hidden items-center justify-center gap-4 w-full">
+                  <div className="flex flex-col md:hidden  items-center justify-center gap-4 w-full">
                     {/* 1. Rotating Green Animation */}
                     <div className="flex items-center justify-center">
                       <div className="w-16 h-16 relative">
@@ -2499,658 +2583,7 @@ ${
       {/* Tailwind Typing Animation */}
       <style>
         {`
-/* ✅ Voice Mode Ripple Animations */
-.ripple-wave {
-  animation: rippleWave 2s ease-in-out infinite;
-}
 
-@keyframes rippleWave {
-  0% {
-    transform: translateX(-100%) skewX(-15deg);
-    opacity: 0;
-  }
-  50% {
-    transform: translateX(0%) skewX(-15deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(100%) skewX(-15deg);
-    opacity: 0;
-  }
-}
-
-.processing-pulse {
-  animation: processingPulse 1.5s ease-in-out infinite;
-}
-
-@keyframes processingPulse {
-  0%, 100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.02);
-  }
-}
-
-.hover-ripple {
-  animation: hoverRipple 2s ease-out infinite;
-}
-
-@keyframes hoverRipple {
-  0% {
-    transform: translateX(-100%) rotate(45deg);
-    opacity: 0;
-  }
-  50% {
-    opacity: 0.6;
-  }
-  100% {
-    transform: translateX(100%) rotate(45deg);
-    opacity: 0;
-  }
-}
-
-/* Voice Active State */
-.voice-active {
-  box-shadow: 
-    0 0 0 0 rgba(239, 68, 68, 0.7),
-    0 0 0 10px rgba(239, 68, 68, 0.3),
-    0 0 0 20px rgba(239, 68, 68, 0.1);
-  animation: voiceActivePulse 2s infinite;
-}
-
-@keyframes voiceActivePulse {
-  0% {
-    box-shadow: 
-      0 0 0 0 rgba(239, 68, 68, 0.7),
-      0 0 0 10px rgba(239, 68, 68, 0.3),
-      0 0 0 20px rgba(239, 68, 68, 0.1);
-  }
-  70% {
-    box-shadow: 
-      0 0 0 10px rgba(239, 68, 68, 0),
-      0 0 0 20px rgba(239, 68, 68, 0),
-      0 0 0 40px rgba(239, 68, 68, 0);
-  }
-  100% {
-    box-shadow: 
-      0 0 0 0 rgba(239, 68, 68, 0),
-      0 0 0 10px rgba(239, 68, 68, 0),
-      0 0 0 20px rgba(239, 68, 68, 0);
-  }
-}
-
-/* Processing State */
-.processing-state {
-  box-shadow: 
-    0 0 0 0 rgba(251, 191, 36, 0.7),
-    0 0 0 8px rgba(251, 191, 36, 0.3);
-  animation: processingStatePulse 1.5s infinite;
-}
-
-@keyframes processingStatePulse {
-  0%, 100% {
-    box-shadow: 
-      0 0 0 0 rgba(251, 191, 36, 0.7),
-      0 0 0 8px rgba(251, 191, 36, 0.3);
-  }
-  50% {
-    box-shadow: 
-      0 0 0 8px rgba(251, 191, 36, 0),
-      0 0 0 16px rgba(251, 191, 36, 0);
-  }
-}
-
-/* Click Ripple Effect */
-.btn-voice-ripple:active::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.4);
-  transform: translate(-50%, -50%);
-  animation: clickRipple 0.6s ease-out;
-  z-index: 10;
-}
-
-@keyframes clickRipple {
-  0% {
-    width: 0;
-    height: 0;
-    opacity: 1;
-  }
-  100% {
-    width: 200px;
-    height: 200px;
-    opacity: 0;
-  }
-}
-
-/* Status Dots */
-.status-dot {
-  box-shadow: 0 0 10px currentColor;
-  animation: statusDotPulse 2s infinite;
-}
-
-@keyframes statusDotPulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 10px currentColor;
-  }
-  50% {
-    transform: scale(1.2);
-    box-shadow: 0 0 20px currentColor;
-  }
-}
-
-/* Connection Pulse */
-.connection-pulse {
-  animation: connectionPulse 2s infinite;
-}
-
-@keyframes connectionPulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.3);
-  }
-}
-
-/* Stop Button Ripple */
-.stop-pulse {
-  animation: stopPulse 2s infinite;
-}
-
-@keyframes stopPulse {
-  0%, 100% {
-    opacity: 0.2;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(1.05);
-  }
-}
-
-/* Transcript Glow */
-.transcript-glow {
-  animation: transcriptGlow 3s infinite;
-}
-
-@keyframes transcriptGlow {
-  0%, 100% {
-    border-color: rgba(34, 197, 94, 0.3);
-    box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
-  }
-  50% {
-    border-color: rgba(34, 197, 94, 0.6);
-    box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
-  }
-}
-
-/* ✅ Rotating Green Animation */
-.rotating-border {
-  animation: rotateBorder 2s linear infinite;
-}
-
-.rotating-border-reverse {
-  animation: rotateBorderReverse 3s linear infinite;
-}
-
-.pulsing-glow {
-  animation: pulsingGlow 2s ease-in-out infinite;
-}
-
-@keyframes rotateBorder {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes rotateBorderReverse {
-  0% {
-    transform: rotate(360deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
-}
-
-@keyframes pulsingGlow {
-  0%, 100% {
-    background-color: rgba(34, 197, 94, 0.2);
-    box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
-    transform: scale(1);
-  }
-  50% {
-    background-color: rgba(34, 197, 94, 0.4);
-    box-shadow: 0 0 30px rgba(34, 197, 94, 0.6);
-    transform: scale(1.1);
-  }
-}
-
-/* Animation delay for ripple effects */
-.animation-delay-300 {
-  animation-delay: 0.3s;
-}
-
-/* Status Dots */
-.status-dot {
-  box-shadow: 0 0 10px currentColor;
-  animation: statusDotPulse 2s infinite;
-}
-
-@keyframes statusDotPulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 10px currentColor;
-  }
-  50% {
-    transform: scale(1.2);
-    box-shadow: 0 0 20px currentColor;
-  }
-}
-
-/* Connection Pulse */
-.connection-pulse {
-  animation: connectionPulse 2s infinite;
-}
-
-@keyframes connectionPulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.3);
-  }
-}
-
-/* Transcript Glow */
-.transcript-glow {
-  animation: transcriptGlow 3s infinite;
-}
-
-@keyframes transcriptGlow {
-  0%, 100% {
-    border-color: rgba(34, 197, 94, 0.3);
-    box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
-  }
-  50% {
-    border-color: rgba(34, 197, 94, 0.6);
-    box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
-  }
-}
-
-/* Add these professional animations to your existing styles */
-@keyframes wave1 {
-  0%, 100% { height: 4px; }
-  50% { height: 16px; }
-}
-
-@keyframes wave2 {
-  0%, 100% { height: 8px; }
-  50% { height: 20px; }
-}
-
-@keyframes wave3 {
-  0%, 100% { height: 6px; }
-  50% { height: 12px; }
-}
-
-@keyframes wave4 {
-  0%, 100% { height: 10px; }
-  50% { height: 18px; }
-}
-
-@keyframes professionalPulse {
-  0%, 100% { 
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% { 
-    transform: scale(1.05);
-    opacity: 0.8;
-  }
-}
-
-@keyframes statusGlow {
-  0%, 100% { 
-    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
-  }
-  50% { 
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.4);
-  }
-}
-
-.animate-wave1 { animation: wave1 0.8s infinite ease-in-out; }
-.animate-wave2 { animation: wave2 0.8s infinite ease-in-out 0.1s; }
-.animate-wave3 { animation: wave3 0.8s infinite ease-in-out 0.2s; }
-.animate-wave4 { animation: wave4 0.8s infinite ease-in-out 0.3s; }
-
-.animate-professional-pulse {
-  animation: professionalPulse 2s infinite;
-}
-
-.animate-status-glow {
-  animation: statusGlow 2s infinite;
-}
-
-/* Professional voice mode transitions */
-.voice-mode-enter {
-  opacity: 0;
-  transform: scale(0.9) translateY(10px);
-}
-
-.voice-mode-enter-active {
-  opacity: 1;
-  transform: scale(1) translateY(0);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.voice-mode-exit {
-  opacity: 1;
-  transform: scale(1) translateY(0);
-}
-
-.voice-mode-exit-active {
-  opacity: 0;
-  transform: scale(0.9) translateY(-10px);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Professional status indicator */
-.status-indicator {
-  position: relative;
-  overflow: hidden;
-}
-
-.status-indicator::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  transition: left 0.5s;
-}
-
-.status-indicator:hover::before {
-  left: 100%;
-}
-
-
-
-        @keyframes bounce-slow {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-
-.animate-bounce-slow {
-  animation: bounce-slow 1.2s infinite;
-}
-
-.drop-shadow-glow {
-  filter: drop-shadow(0 0 5px rgba(59,130,246,0.7));
-}
-
-  /* Typing Animation */
-  @keyframes typingDots {
-    0%, 20% {
-      content: '';
-    }
-    40% {
-      content: '.';
-    }
-    60% {
-      content: '..';
-    }
-    80%, 100% {
-      content: '...';
-    }
-  }
-
-  .animate-typingDots::after {
-  display: inline-block;
-  content: '...';
-  animation: typingDots 1.5s steps(4, end) infinite;
-  font-size: 1.5rem; /* Increase size */
-  font-weight: bold; /* Make it bold */
-  line-height: 1;
-}
-
-
-  // .animate-typingDots::after {
-  //   display: inline-block;
-  //   content: '';
-  //   animation: typingDots 1.5s steps(4, end) infinite;
-  // }
- /* Customize scrollbar with minimal darker colors */
-  ::-webkit-scrollbar {
-    width: 11px;
-    height: 11px;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background-color: #4b5563;
-    border-radius: 10px;
-    border: 2px solid transparent;
-    background-clip: content-box;
-    transition: all 0.3s ease;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background-color: #374151;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 10px;
-  }
-
-  /* Dark mode scrollbar - fixed width */
-  .dark ::-webkit-scrollbar {
-    width: 11px;
-    height: 11px;
-  }
-
-  .dark ::-webkit-scrollbar-thumb {
-    background-color: #4b5563;
-  }
-
-  .dark ::-webkit-scrollbar-thumb:hover {
-    background-color: #374151;
-  }
-
-  .dark ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  /* Hide scrollbar for textarea */
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-@keyframes wave1 {
-  0%, 100% { height: 20%; }
-  50% { height: 100%; }
-}
-
-@keyframes wave2 {
-  0%, 100% { height: 40%; }
-  50% { height: 90%; }
-}
-
-@keyframes wave3 {
-  0%, 100% { height: 60%; }
-  50% { height: 70%; }
-}
-
-@keyframes wave4 {
-  0%, 100% { height: 30%; }
-  50% { height: 80%; }
-}
-
-.animate-wave1 {
-  animation: wave1 1s infinite ease-in-out;
-}
-
-.animate-wave2 {
-  animation: wave2 1s infinite ease-in-out;
-}
-
-.animate-wave3 {
-  animation: wave3 1s infinite ease-in-out;
-}
-
-.animate-wave4 {
-  animation: wave4 1s infinite ease-in-out;
-}
-
-// voice part 
-
-.voice-assistant {
-  margin-bottom: 1rem;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  background-color: #e5e7eb;
-  font-size: 0.875rem;
-}
-
-.status-badge.recording {
-  background-color: #ef4444;
-  color: white;
-  animation: pulse 1.5s infinite;
-}
-
-.interim-transcript {
-  padding: 0.5rem;
-  background-color: #f3f4f6;
-  border-radius: 0.25rem;
-  max-height: 100px;
-  overflow-y: auto;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-@keyframes botWalk {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-  100% { transform: translateY(0); }
-}
-
-.animate-walkingBot {
-  animation: botWalk 0.8s infinite;
-}
-
-// greeting animation blinker 
-.blinker {
-  display: inline-block;
-  width: 1ch;
-  animation: blink 1s step-start infinite;
-}
-
-@keyframes blink {
-  50% {
-    opacity: 0;
-  }
-}
-
-//realtime ai animation
-
-.btn-start {
-  @apply px-4 py-2 bg-green-600 text-white rounded-xl shadow-md;
-}
-
-.btn-stop {
-  @apply px-4 py-2 bg-red-600 text-white rounded-xl shadow-md;
-}
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-
-@keyframes typingDots {
-  0% {
-    content: '';
-  }
-  33% {
-    content: '.';
-  }
-  66% {
-    content: '..';
-  }
-  100% {
-    content: '...';
-  }
-}
-
-.animate-float {
-  animation: float 2s ease-in-out infinite;
-}
-
-.animate-typingDots::after {
-  content: '';
-  animation: typingDots 1s steps(3, end) infinite;
-}
-
-// response select css 
-.select-text {
-  user-select: text !important;
-  -webkit-user-select: text !important;
-  -moz-user-select: text !important;
-  -ms-user-select: text !important;
-}
-
-.select-none {
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
-}
-// double-click select text 
-
-/* Add this to your existing style section at the bottom */
-@supports (-webkit-touch-callout: none) {
-  .mobile-full-height {
-    height: -webkit-fill-available;
-    min-height: -webkit-fill-available;
-  }
-}
-
-.mobile-viewport {
-  height: 100vh;
-  height: 100dvh; /* Dynamic viewport height for modern browsers */
-  height: -webkit-fill-available; /* iOS Safari */
-}
 
 
 

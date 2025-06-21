@@ -7,7 +7,22 @@ const FileActionModal = ({ open, file, onDownload, onOpenNewTab, onCancel }) => 
   const handleCopy = () => {
     navigator.clipboard.writeText(`https://qhashai.com${file.url}`);
   };
-
+// ✅ FIX: Add download handler
+  const handleDownload = () => {
+    const fullUrl = `https://qhashai.com${file.url}`;
+    
+    // ✅ SIMPLE DOWNLOAD: Create link and force download
+    const link = document.createElement('a');
+    link.href = fullUrl;
+    link.download = file.name;
+    link.setAttribute('download', file.name); // Force download attribute
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    onCancel(); // Close modal
+  };
   const isImage = /^(jpg|jpeg|png|gif|webp)$/i.test(file.type);
 
   return (
@@ -49,13 +64,13 @@ const FileActionModal = ({ open, file, onDownload, onOpenNewTab, onCancel }) => 
               {isImage ? 'View' : 'Open'} in New Tab
             </button>
             
-            <button
-              onClick={() => onDownload(`https://qhashai.com${file.url}`, file.name)}
+             {/* <button
+              onClick={handleDownload}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm flex-1 justify-center"
             >
               <Download size={16} />
               Download
-            </button>
+            </button> */}
           </div>
 
           {/* Secondary Actions */}
