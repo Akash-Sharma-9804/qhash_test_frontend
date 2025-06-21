@@ -917,19 +917,120 @@ const ChatbotMarkdown = forwardRef(
               border-top-color: #4b5563;
             }
 
-            /* Tables */
-            .chatgpt-markdown table {
-              width: 100%;
-              border-collapse: collapse;
-              margin: 1rem 0;
-              font-size: 0.875rem;
-            }
-            .chatgpt-markdown th,
-            .chatgpt-markdown td {
-              border: 1px solid #e5e7eb;
-              padding: 0.5rem 0.75rem;
-              text-align: left;
-            }
+  /* Tables */
+.chatgpt-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+  display: table;
+  table-layout: fixed; /* Fixed layout for consistent column widths */
+  overflow-x: auto;
+}
+
+.chatgpt-markdown th,
+.chatgpt-markdown td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top; /* Align content to top */
+  word-wrap: break-word; /* Break long words */
+  overflow-wrap: break-word;
+  hyphens: auto; /* Add hyphenation for long words */
+}
+
+.chatgpt-markdown th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  white-space: nowrap; /* Keep headers on one line */
+}
+
+.chatgpt-markdown td {
+  white-space: normal; /* Allow text wrapping in cells */
+  min-height: 2.5rem; /* Minimum height for consistency */
+}
+
+/* Table wrapper for horizontal scroll */
+.chatgpt-markdown table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.chatgpt-markdown table > thead,
+.chatgpt-markdown table > tbody,
+.chatgpt-markdown table > tfoot {
+  display: table-header-group;
+  width: 100%;
+}
+
+.chatgpt-markdown table > tbody {
+  display: table-row-group;
+}
+
+.chatgpt-markdown table > thead > tr,
+.chatgpt-markdown table > tbody > tr,
+.chatgpt-markdown table > tfoot > tr {
+  display: table-row;
+}
+
+.chatgpt-markdown table > thead > tr > th,
+.chatgpt-markdown table > tbody > tr > td,
+.chatgpt-markdown table > tfoot > tr > td {
+  display: table-cell;
+  white-space: normal;
+}
+
+.dark .chatgpt-markdown th,
+.dark .chatgpt-markdown td {
+  border-color: #4b5563;
+}
+.dark .chatgpt-markdown th {
+  background-color: #374151;
+}
+
+/* Mobile responsive tables */
+@media (max-width: 768px) {
+  .chatgpt-markdown table {
+    font-size: 0.75rem;
+    table-layout: auto; /* Auto layout for mobile flexibility */
+  }
+  
+  .chatgpt-markdown th,
+  .chatgpt-markdown td {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.75rem;
+    min-width: 80px; /* Minimum width for readability */
+    max-width: 150px; /* Maximum width to prevent overflow */
+  }
+  
+  .chatgpt-markdown th {
+    white-space: normal; /* Allow header wrapping on mobile */
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+  
+  .chatgpt-markdown td {
+    line-height: 1.4; /* Better line spacing for mobile */
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .chatgpt-markdown table {
+    font-size: 0.7rem;
+  }
+  
+  .chatgpt-markdown th,
+  .chatgpt-markdown td {
+    padding: 0.25rem 0.375rem;
+    font-size: 0.7rem;
+    min-width: 60px;
+    max-width: 120px;
+  }
+}
+
             .chatgpt-markdown th {
               background-color: #f9fafb;
               font-weight: 600;
@@ -1155,6 +1256,7 @@ const ChatbotMarkdown = forwardRef(
                     </a>
                   );
                 },
+                
               }}>
               {content}
             </ReactMarkdown>
