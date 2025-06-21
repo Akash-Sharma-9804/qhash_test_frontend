@@ -193,7 +193,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
                   {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
                 </button>
 
-               {/* Mobile Menu Dropdown */}
+              {/* Mobile Menu Dropdown */}
 {showMobileMenu && createPortal(
   <>
     <div 
@@ -206,7 +206,16 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">Login</span>
           <button
-            onClick={handleLoginClick}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowMobileMenu(false);
+              navigate("/login");
+            }}
             className="bg-gradient-to-r from-[#0000B5] to-[#0076FF] hover:bg-gradient-to-r hover:from-[#0076FF] hover:to-[#0000B5] text-white p-2 rounded-lg transition-all duration-300">
             <LogIn size={18} />
           </button>
@@ -219,7 +228,19 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">Theme</span>
           <button
-            onClick={toggleTheme}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDarkMode((prev) => {
+                localStorage.setItem("darkMode", !prev);
+                return !prev;
+              });
+              setShowMobileMenu(false);
+            }}
             className={`relative overflow-hidden p-2 flex items-center gap-4 
                  bg-[#282828] dark:bg-slate-200 text-white dark:text-black 
                  hover:bg-slate-200 hover:text-black border border-black dark:border-white 
@@ -249,7 +270,16 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">About Us</span>
           <button
-            onClick={handleAboutClick}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowMobileMenu(false);
+              navigate("/about");
+            }}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
             <CircleHelp size={20} />
           </button>
@@ -259,6 +289,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
   </>,
   document.body
 )}
+
 
               </div>
             </>
