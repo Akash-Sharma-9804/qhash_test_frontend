@@ -201,6 +201,111 @@ export const fetchConversationHistory = async (conversationId, token) => {
 //   return response.data;
 // };
   
+// export const sendMessage = async (
+//   conversationId,
+//   message,
+//   userId,
+//   token,
+//   extracted_summary_raw = "",
+//   uploaded_file_metadata = [],
+//   file_upload_ids = [],
+//   onStreamChunk = null // Callback for streaming chunks
+// ) => {
+//   const response = await fetch(`${API_BASE_URL}/chat`, {
+//     method: 'POST',
+//     headers: {
+//       'Authorization': `Bearer ${token}`,
+//       'Content-Type': 'application/json',
+//     },
+//     body: JSON.stringify({
+//       userMessage: message,
+//       conversation_id: conversationId,
+//       user_id: userId,
+//       extracted_summary: extracted_summary_raw,
+//       uploaded_file_metadata,
+//       _file_upload_ids: file_upload_ids // ✅ ADD THIS LINE
+//     })
+//   });
+
+//   if (!response.ok) {
+//     throw new Error(`HTTP error! status: ${response.status}`);
+//   }
+
+//   const reader = response.body.getReader();
+//   const decoder = new TextDecoder();
+  
+//   let buffer = '';
+//   let fullResponse = '';
+//   let metadata = null;
+//   let suggestions = [];
+
+//   try {
+//     while (true) {
+//       const { done, value } = await reader.read();
+      
+//       if (done) break;
+      
+//       buffer += decoder.decode(value, { stream: true });
+//       const lines = buffer.split('\n');
+//       buffer = lines.pop() || ''; // Keep incomplete line in buffer
+      
+//       for (const line of lines) {
+//         if (line.trim()) {
+//           try {
+//             const data = JSON.parse(line);
+            
+//             switch (data.type) {
+//               case 'start':
+//                 metadata = data;
+//                 if (onStreamChunk) {
+//                   onStreamChunk({ type: 'start', data: metadata });
+//                 }
+//                 break;
+                
+//               case 'content':
+//                 fullResponse += data.content;
+//                 if (onStreamChunk) {
+//                   onStreamChunk({ 
+//                     type: 'content', 
+//                     content: data.content,
+//                     fullResponse: fullResponse 
+//                   });
+//                 }
+//                 break;
+                
+//               case 'end':
+//                 suggestions = data.suggestions || [];
+//                 if (onStreamChunk) {
+//                   onStreamChunk({ 
+//                     type: 'end', 
+//                     suggestions: suggestions,
+//                     fullResponse: fullResponse 
+//                   });
+//                 }
+//                 break;
+                
+//               case 'error':
+//                 throw new Error(data.error);
+//             }
+//           } catch (parseError) {
+//             console.error('Error parsing streaming data:', parseError);
+//           }
+//         }
+//       }
+//     }
+//   } finally {
+//     reader.releaseLock();
+//   }
+
+//   return {
+//     response: fullResponse,
+//     suggestions: suggestions,
+//     files: metadata?.uploaded_files || [],
+//     conversation_id: metadata?.conversation_id || conversationId,
+//     ...metadata
+//   };
+// };
+
 export const sendMessage = async (
   conversationId,
   message,
@@ -223,7 +328,7 @@ export const sendMessage = async (
       user_id: userId,
       extracted_summary: extracted_summary_raw,
       uploaded_file_metadata,
-      _file_upload_ids: file_upload_ids // ✅ ADD THIS LINE
+      _file_upload_ids: file_upload_ids
     })
   });
 
@@ -285,10 +390,24 @@ export const sendMessage = async (
                 break;
                 
               case 'error':
+                // ✅ ADD: Proper error handling
+                console.error('❌ Backend error received:', data.error);
+                if (onStreamChunk) {
+                  onStreamChunk({
+                    type: 'error',
+                    error: data.error,
+                    timestamp: data.timestamp
+                  });
+                }
+                // ✅ ADD: Throw error to stop processing
                 throw new Error(data.error);
             }
           } catch (parseError) {
             console.error('Error parsing streaming data:', parseError);
+            // ✅ ADD: If it's our thrown error, re-throw it
+            if (parseError.message && parseError.message !== 'Unexpected token') {
+              throw parseError;
+            }
           }
         }
       }
@@ -305,7 +424,6 @@ export const sendMessage = async (
     ...metadata
   };
 };
-
 
 // Create a new conversation (Auto-call on Login/Signup)
   export const createNewConversation = async (token) => {

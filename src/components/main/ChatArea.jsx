@@ -677,36 +677,35 @@ if (fileInputRef.current) {
       const file_upload_ids = uploadResponse?.data?._internal?.uploaded_file_ids || 
                        uploadResponse?._internal?.uploaded_file_ids || [];
 
-      // Update the user message in redux with the proper file metadata
-     if (uploaded_file_metadata.length > 0) {
-    const formattedFiles = uploaded_file_metadata.map(file => ({
-      file_name: file.file_name || file.original_filename,
-      display_name: file.display_name || file.file_name,
-      file_path: file.file_path,
-      file_type: file.file_type || file.mime_type,
-      file_size: file.file_size,
-      unique_filename: file.unique_filename,
-      upload_success: file.upload_success !== false,
-      extraction_error: file.extraction_error,
-      // Keep backward compatibility
-      name: file.file_name || file.original_filename,
-      type: file.file_type || file.mime_type,
-      url: file.file_path,
-      // ✅ REMOVE: Processing state
-      processing: false
-    }));
+     // In your handleSendMessage function, ensure file metadata is properly stored
+if (uploaded_file_metadata.length > 0) {
+  const formattedFiles = uploaded_file_metadata.map(file => ({
+    file_name: file.file_name || file.original_filename,
+    display_name: file.display_name || file.file_name,
+    file_path: file.file_path,
+    file_type: file.file_type || file.mime_type,
+    file_size: file.file_size,
+    unique_filename: file.unique_filename,
+    upload_success: file.upload_success !== false,
+    extraction_error: file.extraction_error,
+    // ✅ ADD: Ensure these are always present for icon display
+    name: file.file_name || file.original_filename,
+    type: file.file_type || file.mime_type,
+    url: file.file_path,
+    processing: false,
+    // ✅ ADD: Store original file extension for icon fallback
+    extension: file.file_name ? file.file_name.split('.').pop()?.toLowerCase() : null
+  }));
 
-    // ✅ IMMEDIATE UPDATE: Update Redux with proper file data
-    dispatch(
-      updateMessage({
-        conversationId: finalConversationId,
-        id: userMessage.id,
-        files: formattedFiles,
-      })
-    );
-    
-    console.log("✅ Files updated in Redux:", formattedFiles);
-  }
+  // Update Redux with proper file data
+  dispatch(
+    updateMessage({
+      conversationId: finalConversationId,
+      id: userMessage.id,
+      files: formattedFiles,
+    })
+  );
+}
 
 // ✅ ADD: Handle upload errors
 if (uploadResponse?.summary?.failed > 0) {
@@ -829,8 +828,9 @@ if (uploadResponse?.summary?.failed > 0) {
                       message:
                         streamData.error || "❌ Failed to get a response.",
                       response:
-                        streamData.error || "❌ Failed to get a response.",
+                        streamData.error || "❌ Failed to get a response plz try after some time.",
                       isStreaming: false,
+                       error: true,
                     })
                   );
                   setBotTyping(false);
