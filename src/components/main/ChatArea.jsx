@@ -28,7 +28,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import { streamAudio } from "../../utils/streamAudio";
 import remarkGfm from "remark-gfm";
-import "./chatarea.css";
+import "./Chatarea.css";
 // import { useSelector, useDispatch } from "react-redux";
 import ChatbotMarkdown from "../helperComponent/ChatbotMarkdown";
 import {
