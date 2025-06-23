@@ -973,101 +973,179 @@ const clearFileSelection = () => {
   
 
   // voice functions dictation part starts
+// dictate mode start 
+// Add these new states for live transcript display
+const [showLiveTranscript, setShowLiveTranscript] = useState(false);
+const [liveTranscriptText, setLiveTranscriptText] = useState("");
+const [accumulatedTranscript, setAccumulatedTranscript] = useState(""); // 👈 NEW: For full transcript
+const [isTranscriptFinal, setIsTranscriptFinal] = useState(false);
 
   // ✅ Call this to start recording
-  const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+const startRecording = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    recorderRef.current = RecordRTC(stream, {
-      type: "audio",
-      mimeType: "audio/webm;codecs=opus",
-      recorderType: RecordRTC.StereoAudioRecorder,
-      timeSlice: 1000,
-      ondataavailable: (blob) => {
-        if (socketRef.current?.readyState === WebSocket.OPEN) {
-          socketRef.current.send(blob);
+  recorderRef.current = RecordRTC(stream, {
+    type: "audio",
+    mimeType: "audio/wav", // 👈 Changed from webm to wav
+    recorderType: RecordRTC.StereoAudioRecorder,
+    desiredSampRate: 16000, // 👈 Match backend sample rate
+    numberOfAudioChannels: 1, // 👈 Mono audio for better compatibility
+    timeSlice: 1000,
+    ondataavailable: (blob) => {
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        // 👈 Convert blob to ArrayBuffer for raw audio data
+        blob.arrayBuffer().then(buffer => {
+          socketRef.current.send(buffer);
+        });
+      }
+    },
+  });
+
+  const token = localStorage.getItem("token");
+  console.log("🎙️ Token:", token);
+  
+  socketRef.current = new WebSocket(`${WSS_BASE_URL}?token=${token}&mode=dictate`);
+
+  socketRef.current.onopen = () => {
+    console.log("🎙️ Dictate WebSocket connected");
+    recorderRef.current.startRecording();
+    setIsRecording(true);
+    setShowLiveTranscript(true);
+    setLiveTranscriptText("");
+    setAccumulatedTranscript(""); // 👈 Reset accumulated transcript
+  };
+
+  socketRef.current.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    
+    if (data.type === "dictate-ready") {
+      console.log("✅ Dictate mode ready");
+      setLiveTranscriptText("Listening...");
+      setAccumulatedTranscript(""); // 👈 Reset on ready
+    }
+    
+    if (data.type === "dictate-transcript") {
+      const transcript = data.text;
+      if (transcript) {
+        console.log("📝 Live dictate transcript:", transcript);
+        
+        // 👈 NEW: Handle transcript accumulation
+        if (data.is_final) {
+          // Final transcript - add to accumulated and clear current
+          setAccumulatedTranscript((prev) => {
+            const newLine = prev.trim() ? prev + " " + transcript : transcript;
+            return newLine;
+          });
+          setLiveTranscriptText(""); // Clear current interim
+          setIsTranscriptFinal(true);
+          
+          // Also update transcript buffer for fallback
+          setTranscriptBuffer((prev) => prev + " " + transcript + " ");
+        } else {
+          // Interim transcript - show as current without adding to accumulated
+          setLiveTranscriptText(transcript);
+          setIsTranscriptFinal(false);
         }
-      },
-    });
-
-    const token = localStorage.getItem("token");
-    console.log("🎙️ Token:", token);
-    socketRef.current = new WebSocket(`${WSS_BASE_URL}?token=${token}`);
-
-    socketRef.current.onopen = () => {
-      console.log("🎙️ Voice WebSocket connected");
-      recorderRef.current.startRecording();
-      setIsRecording(true);
-    };
-
-    socketRef.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "transcript") {
-        const transcript = data.transcript;
-
-        if (transcript) {
-          console.log("📝 Live transcription:", transcript);
-
-          if (voiceMode) {
-            // Optional: live display or buffer — or just ignore for pure realtime AI
-            setTranscriptBuffer(transcript);
-          } else {
-            // Dictation mode (untouched)
-            setTranscriptBuffer((prev) => prev + " " + transcript + " ");
-          }
+        
+        if (voiceMode) {
+          setTranscriptBuffer(transcript);
         }
       }
-    };
-
-    socketRef.current.onclose = () => {
-      console.log("🔌 WebSocket closed");
-    };
-
-    socketRef.current.onerror = (err) => {
-      console.error("❌ WebSocket Error:", err);
-    };
-  };
-
-  const stopRecording = () => {
-    if (recorderRef.current) {
-      setIsUploading(true);
-      setIsRecording(false);
-      recorderRef.current.stopRecording(async () => {
-        const blob = recorderRef.current.getBlob();
-        const token = localStorage.getItem("token");
-
-        try {
-          const finalTranscript = await uploadFinalAudio(blob, token);
-
-          const trimmedTranscript = finalTranscript.trim();
-
-          if (trimmedTranscript) {
-            if (voiceMode) {
-              startRealtimeAI({
-                conversationId: activeConversation,
-                userMessage: trimmedTranscript,
-              });
-            } else {
-              setInputMessage((prev) => prev + " " + trimmedTranscript);
-            }
-          } else {
-            setInputMessage(""); // Ensure placeholder falls back to "Ask me anything..."
-          }
-        } catch (err) {
-          console.error("⚠️ Upload or transcription error", err);
-        } finally {
-          setIsUploading(false);
-          setTranscriptBuffer("");
-
-          setVoiceMode(false); // reset
-        }
-      });
     }
 
-    setTimeout(() => {
-      if (socketRef.current) socketRef.current.close();
-    }, 1000);
+    // Keep existing logic for backward compatibility
+    if (data.type === "transcript") {
+      const transcript = data.transcript;
+      if (transcript) {
+        console.log("📝 Live transcription:", transcript);
+        
+        // 👈 NEW: Also handle accumulation for backward compatibility
+        setAccumulatedTranscript((prev) => {
+          const newLine = prev.trim() ? prev + " " + transcript : transcript;
+          return newLine;
+        });
+        setLiveTranscriptText("");
+        
+        if (voiceMode) {
+          setTranscriptBuffer(transcript);
+        } else {
+          setTranscriptBuffer((prev) => prev + " " + transcript + " ");
+        }
+      }
+    }
+
+    if (data.type === "dictate-stopped") {
+      console.log("🛑 Dictate mode stopped");
+    }
   };
+
+  socketRef.current.onclose = () => {
+    console.log("🔌 Dictate WebSocket closed");
+  };
+
+  socketRef.current.onerror = (err) => {
+    console.error("❌ Dictate WebSocket Error:", err);
+  };
+};
+
+
+ const stopRecording = () => {
+  if (recorderRef.current) {
+    setIsUploading(true);
+    setIsRecording(false);
+    setLiveTranscriptText("Processing..."); // 👈 Show processing message
+    
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: "stop-dictate" }));
+    }
+
+    recorderRef.current.stopRecording(async () => {
+      const blob = recorderRef.current.getBlob();
+      const token = localStorage.getItem("token");
+
+      try {
+        const finalTranscript = await uploadFinalAudio(blob, token);
+        const trimmedTranscript = finalTranscript.trim();
+
+        if (trimmedTranscript) {
+          if (voiceMode) {
+            startRealtimeAI({
+              conversationId: activeConversation,
+              userMessage: trimmedTranscript,
+            });
+          } else {
+            setInputMessage((prev) => prev + " " + trimmedTranscript);
+          }
+        } else {
+          setInputMessage("");
+        }
+      } catch (err) {
+        console.error("⚠️ Upload or transcription error", err);
+        
+        // 👈 UPDATED: Use accumulated transcript as fallback
+        const fallbackTranscript = accumulatedTranscript.trim() || transcriptBuffer.trim();
+        if (fallbackTranscript) {
+          setInputMessage((prev) => prev + " " + fallbackTranscript);
+        }
+      } finally {
+        setIsUploading(false);
+        setTranscriptBuffer("");
+        setVoiceMode(false);
+        // 👈 Hide live transcript overlay after processing
+        setTimeout(() => {
+          setShowLiveTranscript(false);
+          setLiveTranscriptText("");
+          setAccumulatedTranscript(""); // 👈 Reset accumulated transcript
+        }, 1000);
+      }
+    });
+  }
+
+  setTimeout(() => {
+    if (socketRef.current) socketRef.current.close();
+  }, 1000);
+};
+
   // voice functions dictation part ends
 
   // test2 working 14-05-25
@@ -1393,6 +1471,7 @@ const clearFileSelection = () => {
     }
   };
 
+  // dictate mode starts 
   // Update your startVoiceMode function
   const startVoiceMode = async () => {
     try {
@@ -2087,75 +2166,75 @@ useEffect(() => {
         {/* Textarea Input */}
 
         {/* Text Area with Voice Visualizer */}
-        <div className="relative w-full">
-          <textarea
-            ref={textareaRef}
-            className="w-full h-auto text-xs md:text-base max-h-36 min-h-[35px] md:min-h-[44px] p-2 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
-            value={inputMessage + (isRecording ? transcriptBuffer : "")}
-            onChange={handleInputChange}
-            onKeyDown={(e) => {
-              const isMobile = isMobileDevice();
+       <div className="relative w-full">
+  <textarea
+    ref={textareaRef}
+    className="w-full h-auto text-xs md:text-base max-h-36 min-h-[35px] md:min-h-[44px] p-2 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
+    value={inputMessage} // 👈 CLEAN: Only inputMessage, no live transcript
+    onChange={handleInputChange}
+    onKeyDown={(e) => {
+      const isMobile = isMobileDevice();
 
-              if (e.key === "Enter") {
-                if (isMobile) {
-                  // Mobile: Enter = new line, Shift+Enter = send
-                  if (e.shiftKey) {
-                    e.preventDefault();
-                    if (!loading) {
-                      handleSendMessage();
-                    }
-                  }
-                  // Let Enter create new line naturally (don't preventDefault)
-                } else {
-                  // Desktop: Enter = send, Shift+Enter = new line
-                  if (!e.shiftKey) {
-                    e.preventDefault();
-                    if (!loading) {
-                      handleSendMessage();
-                    }
-                  }
-                  // Let Shift+Enter create new line naturally
-                }
-              }
-            }}
-            rows="1"
-            placeholder={
-              isUploading ? "" : isRecording ? "" : "Explore anything...."
+      if (e.key === "Enter") {
+        if (isMobile) {
+          // Mobile: Enter = new line, Shift+Enter = send
+          if (e.shiftKey) {
+            e.preventDefault();
+            if (!loading) {
+              handleSendMessage();
             }
-          />
+          }
+          // Let Enter create new line naturally (don't preventDefault)
+        } else {
+          // Desktop: Enter = send, Shift+Enter = new line
+          if (!e.shiftKey) {
+            e.preventDefault();
+            if (!loading) {
+              handleSendMessage();
+            }
+          }
+          // Let Shift+Enter create new line naturally
+        }
+      }
+    }}
+    rows="1"
+    placeholder={
+      isUploading ? "Processing audio..." : isRecording ? "" : "Explore anything...." // 👈 Empty placeholder when recording
+    }
+  />
 
-          {/* Voice Visualizer */}
-          {isRecording &&
-            inputMessage.length === 0 &&
-            transcriptBuffer.length === 0 && (
-              <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden">
-                <VoiceVisualizer isRecording={true} />
-              </div>
-            )}
-          {isUploading && inputMessage.length === 0 && (
-            <div className="absolute top-3 left-3 flex items-center text-sm font-bold font-centurygothic text-black dark:text-white z-20 animate-pulse pointer-events-none">
-              <svg
-                className="w-4 h-4 mr-2 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                />
-              </svg>
-              Transcribing...
-            </div>
-          )}
-        </div>
+  {/* Voice Visualizer - Only show when recording and textarea is empty */}
+  {isRecording && inputMessage.length === 0 && (
+    <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden">
+      <VoiceVisualizer isRecording={true} />
+    </div>
+  )}
+
+  {/* Processing Indicator */}
+  {isUploading && inputMessage.length === 0 && (
+    <div className="absolute top-3 left-3 flex items-center text-sm font-bold font-centurygothic text-black dark:text-white z-20 animate-pulse pointer-events-none">
+      <svg
+        className="w-4 h-4 mr-2 animate-spin"
+        fill="none"
+        viewBox="0 0 24 24">
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+        />
+      </svg>
+      Transcribing...
+    </div>
+  )}
+</div>
 
         {/* Buttons Section */}
         <div className="buttons flex justify-between  ">
@@ -2256,297 +2335,162 @@ ${
                 </span>
               </div>
 
-              {showMicTooltip && (
-                <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900  rounded-lg shadow-md">
-                  {isRecording ? "Stop" : "Dictate"}
-                  <div
-                    className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 
+           {showMicTooltip && (
+  <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900  rounded-lg shadow-md">
+    {isRecording ? "Stop (Live)" : "Dictate"} {/* 👈 Show "Live" when recording */}
+    <div
+      className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 
       border-l-[6px] border-l-transparent 
       border-r-[6px] border-r-transparent 
       border-t-[6px] border-t-zinc-900"
-                  />
-                </div>
-              )}
+    />
+  </div>
+)}
             </div>
             {/* voice mode  */}
-            <div className="voice-mode-section">
-              <div className="relative voice-controls text-gray-800 dark:text-white">
-                <button
-                  onMouseEnter={() => setvoiceTooltip(true)}
-                  onMouseLeave={() => setvoiceTooltip(false)}
-                  onClick={() => {
-                    // ✅ Add guest check here - same as mic button
-                    if (isGuest) {
-                      handleLoginPrompt();
-                      return;
-                    }
-        //              if (!isGuest) {
-        //   return; // Do nothing for logged-in users
-        // }
-                    startVoiceMode();
-                  }}
-                  disabled={isVoiceMode || isProcessing }
-                  className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
-                    isVoiceMode
-                      ? "bg-red-600 text-white cursor-not-allowed"
-                      
-                      : "bg-green-600 hover:bg-green-700 text-white"
-                  } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
-                  <span className="md:block hidden text-xs md:text-base items-center gap-2">
-                    <AudioLines size={20} />
-                  </span>
-                  <span className="block md:hidden text-xs md:text-base items-center gap-2">
-                    <AudioLines size={12} />
-                  </span>
-                  {voiceTooltip && (
-                    <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
-                      { isGuest
-  ? "Login for Voice Mode" 
-                        : isVoiceMode
-                        ? "Voice Active"
-                        : "Voice Mode"}
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900" />
-                    </div>
-                  )}
-                </button>
-              </div>
+           <div className="voice-mode-section">
+  <div className="relative voice-controls text-gray-800 dark:text-white">
+    <button
+      onMouseEnter={() => setvoiceTooltip(true)}
+      onMouseLeave={() => setvoiceTooltip(false)}
+      onClick={() => {
+        if (isGuest) {
+          handleLoginPrompt();
+          return;
+        }
+        startVoiceMode();
+      }}
+      disabled={isVoiceMode || isProcessing}
+      className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
+        isVoiceMode
+          ? "bg-red-600 text-white cursor-not-allowed"
+          : "bg-green-600 hover:bg-green-700 text-white"
+      } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
+      <span className="md:block hidden text-xs md:text-base items-center gap-2">
+        <AudioLines size={20} />
+      </span>
+      <span className="block md:hidden text-xs md:text-base items-center gap-2">
+        <AudioLines size={12} />
+      </span>
+      {voiceTooltip && (
+        <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
+          {isGuest
+            ? "Login for Voice Mode"
+            : isVoiceMode
+            ? "Voice Active"
+            : "Voice Mode"}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900" />
+        </div>
+      )}
+    </button>
+  </div>
 
-              {/* Professional Voice Overlay - Custom Layout */}
-              {showVoiceOverlay && !isGuest && (
-                <motion.div
-                  initial={{ opacity: 0, y: 100 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 100 }}
-                  className="fixed bottom-0 left-0 right-0 w-screen h-screen md:h-full  md:transform md:-translate-x-1/2 md:w-screen bg-gradient-to-t from-gray-900 via-gray-700 to-transparent backdrop-blur-lg rounded-t-2xl md:rounded-2xl text-white z-50 flex flex-col md:flex-row items-center justify-center shadow-2xl px-4 md:px-6 py-4">
-                  {/* MOBILE LAYOUT: Vertical Stack */}
-                  <div className="flex flex-col md:hidden  items-center justify-center gap-4 w-full">
-                    {/* 1. Rotating Green Animation */}
-                    <div className="flex items-center justify-center">
-                      <div className="w-16 h-16 relative">
-                        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 rotating-border"></div>
-                        <div className="absolute inset-2 rounded-full border-2 border-transparent border-b-green-300 border-l-green-300 rotating-border-reverse"></div>
-                        <div className="absolute inset-4 rounded-full bg-green-400/20 pulsing-glow"></div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div
-                            className={`transition-all duration-300 ${
-                              isAISpeaking ? "animate-bounce" : "animate-pulse"
-                            }`}>
-                            <img
-                              src="./logo.png"
-                              className="w-6 h-6 block dark:hidden"
-                              alt="Logo"
-                            />
-                            <img
-                              src="./q.png"
-                              className="w-6 h-6 hidden dark:block"
-                              alt="Logo"
-                            />
-                          </div>
-                        </div>
-                        {/* Bigger and darker ripples */}
-                        <div className="absolute -inset-4 rounded-full border-2 border-green-500/60 animate-ping"></div>
-                        <div className="absolute -inset-8 rounded-full border-2 border-green-600/50 animate-ping animation-delay-300"></div>
-                        <div className="absolute -inset-12 rounded-full border border-green-700/40 animate-ping animation-delay-600"></div>
-                      </div>
-                    </div>
-
-                    {/* 2. Status Display */}
-                    <div className="text-sm font-semibold text-center">
-                      {isProcessing && (
-                        <p className="text-yellow-400 animate-pulse flex items-center gap-2 justify-center">
-                          <span className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce status-dot"></span>
-                          Initializing voice mode...
-                        </p>
-                      )}
-                      {isAISpeaking && (
-                        <p className="text-blue-400 animate-pulse flex items-center gap-2 justify-center">
-                          <span className="w-3 h-3 bg-blue-400 rounded-full animate-bounce status-dot"></span>
-                          AI is responding...
-                        </p>
-                      )}
-                      {!isProcessing &&
-                        !isAISpeaking &&
-                        connectionStatus === "connected" && (
-                          <p className="text-green-400 flex items-center gap-2 justify-center">
-                            <span className="w-3 h-3 bg-green-400 rounded-full animate-pulse status-dot"></span>
-                            Listening for speech...
-                          </p>
-                        )}
-                      <div className="text-xs mt-1 flex items-center gap-1 justify-center">
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            connectionStatus === "connected"
-                              ? "bg-green-400 connection-pulse"
-                              : "bg-red-400"
-                          }`}></span>
-                        <span className="text-gray-400">
-                          {connectionStatus === "connected"
-                            ? "Connected"
-                            : "Disconnected"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* 3. Live Transcript */}
-                    <div className="w-full max-w-sm">
-                      <div className="p-3  flex flex-col items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm border border-green-400/30 transcript-glow">
-                        <div className="text-xs text-green-300 mb-1 flex items-center gap-1">
-                          <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
-                          Live Transcript:
-                        </div>
-                        <p className="text-sm text-white min-h-[40px] break-words">
-                          {voiceTranscript || "Listening for speech..."}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* 4. Stop Button */}
-                    <button
-                      disabled={!socketOpen}
-                      onClick={() => {
-                        console.log("🖱️ Stop button clicked");
-                        stopVoiceMode();
-                      }}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full shadow-lg transition-all duration-300 flex items-center gap-2 min-w-[120px] justify-center relative overflow-hidden text-sm">
-                      <span className="absolute inset-0 bg-white/10 rounded-full animate-pulse"></span>
-                      <span className="relative z-10 flex items-center gap-2">
-                        <span>🛑</span>
-                        Stop Voice
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* DESKTOP LAYOUT: Horizontal */}
-                  <div className="hidden md:flex md:flex-col items-center justify-center gap-5 w-full max-w-4xl">
-                    {/* 1. Rotating Green Animation and Status Display (Top) */}
-                    <div className="flex flex-col gap-10  mt-32">
-                      <div className="flex items-center justify-center">
-                        <div className="w-40 h-40 relative">
-                          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 rotating-border"></div>
-                          <div className="absolute inset-2 rounded-full border-2 border-transparent border-b-green-300 border-l-green-300 rotating-border-reverse"></div>
-                          <div className="absolute inset-4 rounded-full bg-green-400/20 pulsing-glow"></div>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div
-                              className={`transition-all duration-300 ${
-                                isAISpeaking
-                                  ? "animate-bounce"
-                                  : "animate-pulse"
-                              }`}>
-                              <img
-                                src="./logo.png"
-                                className="w-16 h-16 block dark:hidden"
-                                alt="Logo"
-                              />
-                              <img
-                                src="./q.png"
-                                className="w-16 h-16 hidden dark:block"
-                                alt="Logo"
-                              />
-                            </div>
-                          </div>
-                          <div className="absolute -inset-2 rounded-full border border-green-400/30 animate-ping"></div>
-                          <div className="absolute -inset-4 rounded-full border border-green-400/20 animate-ping animation-delay-300"></div>
-                        </div>
-                      </div>
-                      {/* Status Display (Top) */}
-                      <div className="text-sm font-semibold text-center">
-                        {isProcessing && (
-                          <p className="text-yellow-400 animate-pulse flex items-center gap-2 justify-center">
-                            <span className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce status-dot"></span>
-                            Initializing voice mode...
-                          </p>
-                        )}
-                        {isAISpeaking && (
-                          <p className="text-blue-400 animate-pulse flex items-center gap-2 justify-center">
-                            <span className="w-3 h-3 bg-blue-400 rounded-full animate-bounce status-dot"></span>
-                            AI is responding...
-                          </p>
-                        )}
-                        {!isProcessing &&
-                          !isAISpeaking &&
-                          connectionStatus === "connected" && (
-                            <p className="text-green-400 flex items-center gap-2 justify-center">
-                              <span className="w-3 h-3 bg-green-400 rounded-full animate-pulse status-dot"></span>
-                              Listening for speech...
-                            </p>
-                          )}
-                        <div className="text-xs mt-1 flex items-center gap-1 justify-center">
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              connectionStatus === "connected"
-                                ? "bg-green-400 connection-pulse"
-                                : "bg-red-400"
-                            }`}></span>
-                          <span className="text-gray-400">
-                            {connectionStatus === "connected"
-                              ? "Connected"
-                              : "Disconnected"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    {/* 2. Status + Live Transcript Div */}
-                    <div className="flex flex-col items-center justify-center p-10  gap-5 w-full  ">
-                      {/* Live Transcript (Bottom) */}
-                      <div className="w-full">
-                        <div className="p-3 flex flex-col items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm border border-green-400/30 transcript-glow">
-                          <div className="text-xs text-green-300 mb-1 flex items-center  gap-1">
-                            <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
-                            Live Speech
-                          </div>
-                          <p className="text-sm text-white min-h-[40px] break-words">
-                            {voiceTranscript || "Listening for speech..."}
-                          </p>
-                        </div>
-                      </div>
-                      {/* 3. Stop Button + WebSocket Status Div */}
-                      <div className="flex flex-col gap-4 items-center">
-                        {/* WebSocket Status */}
-                        <div className="text-xs text-gray-400 bg-black/20 rounded-lg p-2 space-y-1">
-                          <div className="flex justify-between gap-4">
-                            <span>Status:</span>
-                            <span
-                              className={
-                                connectionStatus === "connected"
-                                  ? "text-green-400"
-                                  : "text-red-400"
-                              }>
-                              {connectionStatus === "connected"
-                                ? "Active"
-                                : "Inactive"}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between gap-4">
-                            <span>Audio Stream:</span>
-                            <span
-                              className={
-                                isVoiceMode ? "text-green-400" : "text-red-400"
-                              }>
-                              {isVoiceMode ? "Active" : "Inactive"}
-                            </span>
-                          </div>
-                        </div>
-                        {/* Stop Button */}
-                        <button
-                          disabled={!socketOpen}
-                          onClick={() => {
-                            console.log("🖱️ Stop button clicked");
-                            stopVoiceMode();
-                          }}
-                          className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full shadow-lg transition-all duration-300 flex items-center gap-2 min-w-[140px] justify-center relative overflow-hidden">
-                          <span className="absolute inset-0 bg-white/10 rounded-full animate-pulse"></span>
-                          <span className="relative z-10 flex items-center gap-2">
-                            <span>🛑</span>
-                            <span>Stop Voice</span>
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
+  {/* SINGLE VOICE OVERLAY - PROPERLY RESPONSIVE */}
+  {showVoiceOverlay && !isGuest && (
+    <div className="fixed inset-0 z-50 bg-gradient-to-t from-gray-900 via-gray-700 to-transparent backdrop-blur-lg text-white flex items-center justify-center shadow-2xl px-4 py-4">
+      
+      {/* MOBILE ONLY */}
+      <div className="block md:hidden w-full max-w-sm">
+        <div className="flex flex-col items-center justify-center gap-6">
+          {/* Mobile Animation */}
+          <div className="w-20 h-20 relative">
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img
+                src="./logo.png"
+                className="w-8 h-8 block dark:hidden"
+                alt="Logo"
+              />
+              <img
+                src="./q.png"
+                className="w-8 h-8 hidden dark:block"
+                alt="Logo"
+              />
             </div>
+          </div>
+
+          {/* Mobile Status */}
+          <div className="text-sm font-semibold text-center">
+            {isProcessing && (
+              <p className="text-yellow-400 animate-pulse">Initializing...</p>
+            )}
+            {isAISpeaking && (
+              <p className="text-blue-400 animate-pulse">AI is responding...</p>
+            )}
+            {!isProcessing && !isAISpeaking && connectionStatus === "connected" && (
+              <p className="text-green-400">Listening for speech...</p>
+            )}
+          </div>
+
+          {/* Mobile Transcript */}
+          <div className="w-full p-3 bg-black/40 rounded-lg backdrop-blur-sm border border-green-400/30">
+            <p className="text-sm text-white min-h-[40px] break-words text-center">
+              {voiceTranscript || "Listening for speech..."}
+            </p>
+          </div>
+
+          {/* Mobile Stop Button */}
+          <button
+            onClick={stopVoiceMode}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full">
+            🛑 Stop Voice
+          </button>
+        </div>
+      </div>
+
+      {/* DESKTOP ONLY */}
+      <div className="hidden md:block w-full max-w-4xl">
+        <div className="flex flex-col items-center justify-center gap-8">
+          {/* Desktop Animation */}
+          <div className="w-32 h-32 relative">
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img
+                src="./logo.png"
+                className="w-12 h-12 block dark:hidden"
+                alt="Logo"
+              />
+              <img
+                src="./q.png"
+                className="w-12 h-12 hidden dark:block"
+                alt="Logo"
+              />
+            </div>
+          </div>
+
+          {/* Desktop Status */}
+          <div className="text-lg font-semibold text-center">
+            {isProcessing && (
+              <p className="text-yellow-400 animate-pulse">Initializing voice mode...</p>
+            )}
+            {isAISpeaking && (
+              <p className="text-blue-400 animate-pulse">AI is responding...</p>
+            )}
+            {!isProcessing && !isAISpeaking && connectionStatus === "connected" && (
+              <p className="text-green-400">Listening for speech...</p>
+            )}
+          </div>
+
+          {/* Desktop Transcript */}
+          <div className="w-full max-w-2xl p-4 bg-black/40 rounded-lg backdrop-blur-sm border border-green-400/30">
+            <p className="text-base text-white min-h-[60px] break-words text-center">
+              {voiceTranscript || "Listening for speech..."}
+            </p>
+          </div>
+
+          {/* Desktop Stop Button */}
+          <button
+            onClick={stopVoiceMode}
+            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full">
+            🛑 Stop Voice Mode
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
+
+
 
             {/* Hidden File Input */}
             <input
@@ -2585,16 +2529,128 @@ ${
       <p className="mx-auto text-gray-400 dark:text-gray-700 text-xs md:text-sm font-mono font-bold">
         AI generated content for reference only
       </p>
-      {/* Tailwind Typing Animation */}
-      <style>
-        {`
+    {/* Live Transcript Overlay for Dictate Mode */}
+{showLiveTranscript && (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ opacity: 1, scale: 1 }}
+    exit={{ opacity: 0, scale: 0.9 }}
+    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+  >
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 mx-4 max-w-lg w-full border border-gray-200 dark:border-gray-700">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-gray-400'}`}></div>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+            {isRecording ? "Listening..." : "Processing..."}
+          </h3>
+        </div>
+        
+        {/* Close/Stop Button */}
+        <button
+          onClick={stopRecording}
+          className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
+          disabled={isUploading}
+        >
+          {isUploading ? (
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            <X size={16} />
+          )}
+        </button>
+      </div>
 
+      {/* Live Transcript Display */}
+      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 min-h-[150px] max-h-[300px] overflow-y-auto">
+        <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+          Live Transcript:
+        </div>
+        
+        {/* 👈 NEW: Show full accumulated transcript */}
+        <div className="text-base text-gray-800 dark:text-white leading-relaxed space-y-1">
+          {/* Accumulated (Final) Transcript */}
+          {accumulatedTranscript && (
+            <div className="text-gray-800 dark:text-white">
+              {accumulatedTranscript}
+            </div>
+          )}
+          
+          {/* Current (Interim) Transcript */}
+          {liveTranscriptText && liveTranscriptText !== "Listening..." && liveTranscriptText !== "Processing..." && (
+            <div className="text-blue-600 dark:text-blue-400 italic">
+              {liveTranscriptText}
+              {isRecording && (
+                <span className="inline-block w-1 h-5 bg-blue-500 ml-1 animate-pulse"></span>
+              )}
+            </div>
+          )}
+          
+          {/* Initial State */}
+          {!accumulatedTranscript && (!liveTranscriptText || liveTranscriptText === "Listening...") && (
+            <div className="italic text-gray-500 dark:text-gray-400">
+              {liveTranscriptText || "Start speaking..."}
+            </div>
+          )}
+          
+          {/* Processing State */}
+          {liveTranscriptText === "Processing..." && (
+            <div className="italic text-yellow-600 dark:text-yellow-400">
+              Processing final transcript...
+            </div>
+          )}
+        </div>
+        
+        {/* Transcript Status */}
+        <div className="mt-3 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+          <div>
+            {accumulatedTranscript && (
+              <span className="text-green-600 dark:text-green-400">✓ {accumulatedTranscript.split(' ').length} words captured</span>
+            )}
+          </div>
+          <div>
+            {liveTranscriptText && liveTranscriptText !== "Listening..." && liveTranscriptText !== "Processing..." && (
+              <span className={isTranscriptFinal ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}>
+                {isTranscriptFinal ? "✓ Final" : "⏳ Interim"}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
 
+      {/* Instructions */}
+      <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 text-center">
+        {isRecording ? (
+          <div>
+            <div>Speak clearly into your microphone</div>
+            <div className="mt-1 text-blue-600 dark:text-blue-400">Blue text shows current speech, black text is finalized</div>
+          </div>
+        ) : (
+          "Finalizing transcription..."
+        )}
+      </div>
 
+      {/* Audio Visualizer (Optional) */}
+      {isRecording && (
+        <div className="mt-4 flex justify-center">
+          <div className="flex items-center gap-1">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className="w-1 bg-blue-500 rounded-full animate-pulse"
+                style={{
+                  height: `${Math.random() * 20 + 10}px`,
+                  animationDelay: `${i * 0.1}s`
+                }}
+              ></div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </motion.div>
+)}
 
-
-`}
-      </style>
     </div>
   );
 };
