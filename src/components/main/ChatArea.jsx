@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Send,
   Mic,
-  Copy,
+  Menu,
   MicOff,
   CircleUserRound,
   Paperclip,
@@ -68,7 +68,7 @@ const isMobileDevice = () => {
   );
 };
 
-const ChatArea = ({ isGuest }) => {
+const ChatArea = ({ isGuest, sidebarOpen, setSidebarOpen  }) => {
   const [loading, setLoading] = useState(false);
   const [botTyping, setBotTyping] = useState("");
   const [greeting, setGreeting] = useState("");
@@ -1854,7 +1854,16 @@ useEffect(() => {
   return (
    <div className="flex flex-col w-full mobile-viewport md:h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300 fixed md:relative inset-0 md:inset-auto z-40 md:z-auto mobile-full-height">
 
-
+ {/* ✅ ADD: Mobile Menu Button - Now in ChatArea with conditional z-index */}
+      {!isGuest && (
+        <button
+          className={`md:hidden fixed top-4 left-4 p-1 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-all duration-500 ease-in-out ${
+            showVoiceOverlay || showLiveTranscript ? 'z-10' : 'z-50'
+          }`}
+          onClick={() => setSidebarOpen(!sidebarOpen)}>
+          {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      )}
       <Navbar isGuest={isGuest} />
       {/* Chat Area starts */}
       <div
@@ -2387,10 +2396,10 @@ ${
 
   {/* SINGLE VOICE OVERLAY - PROPERLY RESPONSIVE */}
   {showVoiceOverlay && !isGuest && (
-    <div className="fixed inset-0 z-50 bg-gradient-to-t from-gray-900 via-gray-700 to-transparent backdrop-blur-lg text-white flex items-center justify-center shadow-2xl px-4 py-4">
+    <div className="fixed inset-0 z-[90] bg-gradient-to-t from-gray-900 via-gray-700 to-transparent backdrop-blur-lg text-white flex items-center justify-center shadow-2xl px-4 py-4">
       
       {/* MOBILE ONLY */}
-      <div className="block md:hidden w-full max-w-sm">
+      <div className="block  md:hidden w-full max-w-sm">
         <div className="flex flex-col items-center justify-center gap-6">
           {/* Mobile Animation */}
           <div className="w-20 h-20 relative">
@@ -2535,7 +2544,7 @@ ${
     initial={{ opacity: 0, scale: 0.9 }}
     animate={{ opacity: 1, scale: 1 }}
     exit={{ opacity: 0, scale: 0.9 }}
-    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
   >
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 mx-4 max-w-lg w-full border border-gray-200 dark:border-gray-700">
       {/* Header */}
@@ -2651,6 +2660,7 @@ ${
   </motion.div>
 )}
 
+  
     </div>
   );
 };

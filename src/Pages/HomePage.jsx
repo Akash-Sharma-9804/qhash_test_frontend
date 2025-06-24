@@ -22,6 +22,8 @@ const HomePage = () => {
     isGuest={isGuest}
     isCollapsed={!isSidebarOpen}
     setSidebarOpen={setSidebarOpen}
+     isOpen={isSidebarOpen}  // ✅ ADD: Pass isOpen state
+            setIsOpen={setSidebarOpen}  // ✅ ADD: Pass setIsOpen function
   />
 )}
 
@@ -30,6 +32,7 @@ const HomePage = () => {
           isGuest={isGuest}
           isCollapsed={!isSidebarOpen}
           setSidebarOpen={setSidebarOpen}
+            sidebarOpen={isSidebarOpen}  // ✅ ADD: Pass sidebar state
         />
       </div>
     </div>

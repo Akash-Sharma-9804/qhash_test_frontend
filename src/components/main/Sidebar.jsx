@@ -39,7 +39,7 @@ import isYesterday from "dayjs/plugin/isYesterday";
 import { toast } from "react-toastify";
 
 dayjs.extend(isYesterday);
-const Sidebar = () => {
+const Sidebar = ({isOpen, setIsOpen}) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const buttonRef = useRef(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -59,7 +59,7 @@ const [fetchingConversationId, setFetchingConversationId] = useState(null);
 
 
 
-  const [isOpen, setIsOpen] = useState(false); // For mobile view
+  // const [isOpen, setIsOpen] = useState(false); // For mobile view
   const dispatch = useDispatch();
   const { token } = useSelector((state) => state.auth);
   const { conversations, activeConversation } = useSelector(
@@ -880,12 +880,7 @@ const calculateDropdownPosition = (convId) => {
       </div>
     </div>
 
-    {/* Mobile Menu Button */}
-    <button
-      className="md:hidden fixed top-4 left-4 z-50 p-1 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-all duration-500 ease-in-out"
-      onClick={() => setIsOpen(!isOpen)}>
-      {isOpen ? <X size={24} /> : <Menu size={24} />}
-    </button>
+ 
   </div>
   );
 };
