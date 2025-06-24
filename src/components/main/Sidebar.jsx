@@ -581,17 +581,18 @@ const calculateDropdownPosition = (convId) => {
   return (
     <div className="flex  min-h-screen">
     {/* Sidebar starts */}
-    <div
-        className={`fixed md:relative z-50 h-full md:h-screen
-    ${isOpen ? "translate-x-0 w-64" : "-translate-x-full"} md:translate-x-0
+   <div
+  className={`fixed md:relative z-50 h-full md:h-screen
+    ${isOpen ? "translate-x-0 w-64" : "-translate-x-full w-64"} md:translate-x-0
     ${isCollapsed ? "md:w-16" : "md:w-64"}
     bg-slate-200 dark:bg-[#282828] p-2 flex flex-col
     transition-all duration-500 ease-in-out overflow-hidden`}>
-      {/* Mobile Close Button - Only visible when sidebar is open on mobile */}
+
+       {/* Mobile Close Button - Only closes sidebar, doesn't affect collapse state */}
     {isOpen && (
       <button
         className="md:hidden absolute top-4 right-4 z-10 p-1 rounded-md bg-gray-600 text-white hover:bg-gray-500 transition-all duration-300"
-        onClick={() => setIsOpen(false)}>
+        onClick={() => setIsOpen(false)}> {/* ✅ Only setIsOpen(false) */}
         <X size={20} />
       </button>
     )}
@@ -615,7 +616,7 @@ const calculateDropdownPosition = (convId) => {
                 isCollapsed ? "right-4" : ""
               } z-30 rounded-md relative text-black dark:text-white hover:dark:bg-slate-600 hover:bg-slate-400 transition-all duration-500 ease-in-out`}
               onClick={() => {
-                setIsOpen(!isOpen);
+              
                 setIsCollapsed(!isCollapsed);
               }}
               onMouseEnter={() => setShowTooltip(true)}
