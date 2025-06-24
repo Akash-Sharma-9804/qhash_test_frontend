@@ -2126,7 +2126,7 @@ useEffect(() => {
       )}
       {/* chat area ends*/}
       {/* Input Section div starts */}
-      <div className="flex flex-col  mx-auto    mb-3 mt-2 w-[95%] sm:w-[70%] shadow-2xl rounded-3xl bg-white dark:bg-[#282828]  p-2 transition-colors duration-300">
+      <div className="flex flex-col  mx-auto     mb-3 mt-2 w-[95%] sm:w-[70%] shadow-2xl rounded-3xl bg-white dark:bg-[#282828]  px-2 py-4 md:px-2 md:py-2 transition-colors duration-300">
         {/* File Previews Section — ✅ UPDATED LIKE CHATGPT */}
 
         {/* test  */}
@@ -2180,7 +2180,7 @@ useEffect(() => {
        <div className="relative w-full">
   <textarea
     ref={textareaRef}
-    className="w-full h-auto text-xs md:text-base max-h-36 min-h-[35px] md:min-h-[44px] p-2 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
+    className="w-full h-auto text-xs md:text-base max-h-36 min-h-[38px] md:min-h-[44px] p-2 pt-3 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
     value={inputMessage} // 👈 CLEAN: Only inputMessage, no live transcript
     onChange={handleInputChange}
     onKeyDown={(e) => {
@@ -2248,7 +2248,7 @@ useEffect(() => {
 </div>
 
         {/* Buttons Section */}
-        <div className="buttons flex justify-between  ">
+        <div className="buttons flex mt-2 md:mt-0 justify-between  ">
           <div className="flex w-2/4 gap-2 md:gap-3 md:p-2 ">
             {/* Upload Button */}
             <div className="relative">
