@@ -587,7 +587,14 @@ const calculateDropdownPosition = (convId) => {
     ${isCollapsed ? "md:w-16" : "md:w-64"}
     bg-slate-200 dark:bg-[#282828] p-2 flex flex-col
     transition-all duration-500 ease-in-out overflow-hidden`}>
-      
+      {/* Mobile Close Button - Only visible when sidebar is open on mobile */}
+    {isOpen && (
+      <button
+        className="md:hidden absolute top-4 right-4 z-10 p-1 rounded-md bg-gray-600 text-white hover:bg-gray-500 transition-all duration-300"
+        onClick={() => setIsOpen(false)}>
+        <X size={20} />
+      </button>
+    )}
       {/* Logo with Menu Button */}
       <div className="flex gap-2 items-center mb-4 flex-shrink-0">
         <div className={`flex items-center gap-2 justify-center ${isCollapsed ? "" : ""}`}>
@@ -879,7 +886,7 @@ const calculateDropdownPosition = (convId) => {
         </Link>
       </div>
     </div>
-
+  
  
   </div>
   );

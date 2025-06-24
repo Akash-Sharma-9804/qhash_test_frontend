@@ -1855,15 +1855,17 @@ useEffect(() => {
    <div className="flex flex-col w-full mobile-viewport md:h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300 fixed md:relative inset-0 md:inset-auto z-40 md:z-auto mobile-full-height">
 
  {/* ✅ ADD: Mobile Menu Button - Now in ChatArea with conditional z-index */}
-      {!isGuest && (
-        <button
-          className={`md:hidden fixed top-4 left-4 p-1 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-all duration-500 ease-in-out ${
-            showVoiceOverlay || showLiveTranscript ? 'z-10' : 'z-50'
-          }`}
-          onClick={() => setSidebarOpen(!sidebarOpen)}>
-          {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      )}
+  {!isGuest && (
+  <button
+    className={`md:hidden fixed top-4 left-4 p-1 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-all duration-500 ease-in-out ${
+      showVoiceOverlay || showLiveTranscript 
+        ? 'z-10'    // Hidden behind voice overlays only
+        : 'z-[100]' // Always on top of everything else
+    }`}
+    onClick={() => setSidebarOpen(!sidebarOpen)}>
+    {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+  </button>
+)}
       <Navbar isGuest={isGuest} />
       {/* Chat Area starts */}
       <div
