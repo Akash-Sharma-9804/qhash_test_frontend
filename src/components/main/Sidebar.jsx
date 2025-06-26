@@ -11,7 +11,7 @@ import {
   Pen,
   EllipsisVertical,
   CircleEllipsis ,
-  ChevronDown,
+  CheckCircle ,
   Save,
   PanelRightOpen,
   BadgeHelp,
@@ -582,243 +582,230 @@ const calculateDropdownPosition = (convId) => {
   setDropdownId(wasOpen ? null : convId);
 };
 
-  return (
-    <div className="flex  min-h-screen">
+ return (
+  <div className="flex min-h-screen">
     {/* Sidebar starts */}
-   <div
-  data-sidebar // ✅ Add this attribute for outside click detection
-  className={`fixed md:relative z-50 h-full md:h-screen
-    ${isOpen ? "translate-x-0 w-64" : "-translate-x-full w-64"} md:translate-x-0
-    ${isCollapsed ? "md:w-16" : "md:w-64"}
-    bg-slate-200 dark:bg-[#282828] p-2 flex flex-col
-    transition-all duration-500 ease-in-out overflow-hidden`}>
+    <div
+      data-sidebar
+      className={`fixed md:relative z-50 h-full md:h-screen
+        ${isOpen ? "translate-x-0 w-72" : "-translate-x-full w-72"} md:translate-x-0
+        ${isCollapsed ? "md:w-20" : "md:w-72"}
+        bg-white dark:bg-[#1a1a1a] 
+        border-r border-slate-200 dark:border-slate-700
+        flex flex-col transition-all duration-300 ease-out overflow-hidden
+        shadow-xl md:shadow-lg`}>
 
-       {/* Mobile Close Button - Only closes sidebar, doesn't affect collapse state */}
-    {isOpen && (
-      <button
-        className="md:hidden absolute top-4 right-4 z-10 p-1 rounded-md bg-gray-600 text-white hover:bg-gray-500 transition-all duration-300"
-        onClick={() => setIsOpen(false)}> {/* ✅ Only setIsOpen(false) */}
-        <X size={20} />
-      </button>
-    )}
-      {/* Logo with Menu Button */}
-      <div className="flex gap-2 items-center mb-4 flex-shrink-0">
-        <div className={`flex items-center gap-2 justify-center ${isCollapsed ? "" : ""}`}>
-          <div
-            className={`transition-all duration-500 ease-in-out transform ${
-              isCollapsed 
-                ? "opacity-0 scale-x-0 w-0 ml-0" 
-                : "opacity-100 scale-x-100 w-32 ml-14 md:ml-5"
-            }  ml-14 md:ml-5 mt-4 md:mt-0  whitespace-nowrap overflow-hidden`}>
-            <span className="text-2xl mt-2 items-center cursor-pointer sm:text-center font-bold text-black dark:text-white">
-              <img src="./logoName.png" className="w-32 block dark:hidden" alt="Logo" />
-              <img src="./dark_logo.png" className="w-32 hidden dark:block" alt="Logo" />
-            </span>
-          </div>
-          <div className="relative z-30">
-            <button
-              className={`absolute hidden md:block p-1 ${
-                isCollapsed ? "right-4" : ""
-              } z-30 rounded-md relative text-black dark:text-white hover:dark:bg-slate-600 hover:bg-slate-400 transition-all duration-500 ease-in-out`}
-              onClick={() => {
-              
-                setIsCollapsed(!isCollapsed);
-              }}
-              onMouseEnter={() => setShowTooltip(true)}
-              onMouseLeave={() => setShowTooltip(false)}
-              ref={buttonRef}>
-              <PanelRightOpen 
-                size={24} 
-                className={`transition-transform duration-500 ease-in-out ${
-                  isCollapsed ? "rotate-180" : "rotate-0"
-                }`} 
-              />
-            </button>
-            {showTooltip && (
+      {/* Mobile Close Button */}
+      {isOpen && (
+        <button
+          className="md:hidden absolute top-4 right-4 z-10 p-2 rounded-full bg-slate-800 text-white hover:bg-slate-700 transition-all duration-200 shadow-lg"
+          onClick={() => setIsOpen(false)}>
+          <X size={18} />
+        </button>
+      )}
+
+     {/* Header Section */}
+<div className={`flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700 ${
+  isCollapsed ? "justify-center" : ""
+}`}>
+  <div className={`flex items-center gap-3 transition-all duration-300 ${
+    isCollapsed ? "opacity-0 scale-0 w-0" : "opacity-100 scale-100"
+  }`}>
+    <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+      <img src="./logo.png" className="w-5 h-5 block dark:hidden" alt="Logo" />
+      <img src="./q.png" className="w-5 h-5 hidden dark:block" alt="Logo" />
+    </div>
+    <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
+      Quantumhash
+    </span>
+  </div>
+
+  {/* Collapse Button - Always visible and centered when collapsed */}
+  <button
+    className={`hidden md:flex p-2 rounded-lg border border-gray-500 text-black dark:text-white hover:dark:bg-slate-600 hover:bg-slate-400    transition-all duration-200 shadow-sm relative ${
+      isCollapsed ? "mx-auto" : ""
+    }`}
+    onClick={() => setIsCollapsed(!isCollapsed)}
+    onMouseEnter={() => setShowTooltip(true)}
+    onMouseLeave={() => setShowTooltip(false)}
+    ref={buttonRef}>
+    <PanelRightOpen 
+      size={20} 
+      className={`transition-transform duration-300 ${
+        isCollapsed ? "rotate-180" : "rotate-0"
+      }`} 
+    />
+    {showTooltip && (
               <div
-                className={`absolute ${
+                className={`absolute z-40 ${
                   isCollapsed
-                    ? "top-8 left-1/2 transform -translate-x-3/4"
-                    : "top-8 left-1/2 transform -translate-x-2/3"
+                    ? "top-9 left-9 transform -translate-x-3/4"
+                    : "top-9 left-1/2 transform -translate-x-2/3"
                 } mt-1 px-2 py-1 text-xs text-white bg-zinc-900 rounded transition-all duration-300 ease-in-out`}>
                 {isCollapsed ? "Open Sidebar" : "Close Sidebar"}
               </div>
             )}
-          </div>
-        </div>
-      </div>
+  </button>
+</div>
 
-      {/* New Chat Button */}
-      <div className="mb-4 flex-shrink-0">
-        <div className="w-full sm:w-auto"> 
-        <button onClick={handleNewChat}
-          className={`border border-black dark:border-white p-2 bg-gradient-to-r from-[#0000B5] to-[#0076FF]
-            hover:from-[#0076FF] hover:to-[#0000B5] text-white rounded-lg flex items-center 
-            transition-all duration-500 ease-in-out overflow-hidden ${
-              isCollapsed ? "w-12 h-12 justify-center" : "w-full"
-            }`}>
-          <Plus size={18} className="text-white flex-shrink-0" />
-          <span
-            className={`whitespace-nowrap text-sm transition-all duration-500 ease-in-out transform ${
-              isCollapsed 
-                ? "opacity-0 scale-x-0 w-0 ml-0" 
-                : "opacity-100 scale-x-100 w-auto ml-2"
-            }`}>
-            New Chat
-          </span>
-        </button>
-        </div>
-      </div>
+{/* New Chat Button */}
+<div className="p-4">
+  <button 
+    onClick={handleNewChat}
+    className={`w-full h-12 flex items-center p-3 rounded-xl
+      bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md hover:shadow-lg
+      transition-all duration-300 transform hover:scale-[1.02]
+      ${isCollapsed ? "justify-center" : "justify-start gap-3"}`}>
+    <Plus size={18} className="flex-shrink-0" />
+    <span className={`transition-all duration-300 ${
+      isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto ml-3"
+    }`}>
+      New Chat
+    </span>
+  </button>
+</div>
 
-      {/* Chat History - Scrollable Container with proper bottom spacing */}
-      <div className={`flex-1 flex flex-col min-h-0 pb-32 transition-all duration-500 ease-in-out ${
-        isCollapsed ? "opacity-0 scale-x-0 w-0 overflow-hidden" : "opacity-100 scale-x-100 w-auto"
+
+      {/* Chat History */}
+      <div className={`flex-1 flex flex-col min-h-0 px-4 pb-24 transition-all duration-300 ${
+        isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}>
-        <h2 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-2 flex-shrink-0 whitespace-nowrap">
-          Chat History
-        </h2>
+        <div className="flex items-center gap-2 mb-4">
+          <History size={16} className="text-slate-500 dark:text-slate-400" />
+          <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+            Recent Chats
+          </h2>
+        </div>
         
-        {/* Scrollable conversation list with visible scrollbar */}
-        <div className="conversation-scroll-container flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-200 dark:scrollbar-track-gray-700 hover:scrollbar-thumb-gray-600">
+        {/* Scrollable conversation list */}
+        <div className="conversation-scroll-container flex-1 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
           {Object.entries(groupedConversations).map(
             ([section, convs]) =>
               convs.length > 0 && (
-                <div key={section} className="mb-4">
-                  <h3 className="text-sm font-semibold text-gray-400 uppercase mb-2 whitespace-nowrap">
-                    {section === "today"
-                      ? "Today"
-                      : section === "yesterday"
-                      ? "Yesterday"
-                      : "Previous"}
+                <div key={section} className="mb-6">
+                  <h3 className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-2 px-2">
+                    {section === "today" ? "Today" : section === "yesterday" ? "Yesterday" : "Previous"}
                   </h3>
+                  
                   {convs.map((conv) => (
                     <div
                       key={conv.id}
                       data-conversation-id={conv.id}
-                      className={`p-2 text-[13px] font-mono text-black dark:text-white rounded-md cursor-pointer transition-all duration-300 flex justify-between items-center relative ${
-                        activeConversation === conv.id
-                          ? "bg-gradient-to-r from-[#0000B5] to-[#0076FF] hover:bg-gradient-to-r hover:from-[#0076FF] hover:to-[#0000B5] text-white"
-                          : "bg-slate-300 dark:bg-[#3f3f3f] border hover:bg-gray-500"
-                      } my-1 mr-2`}>
+                      className={`group relative p-3 rounded-xl cursor-pointer transition-all duration-200 flex items-center justify-between
+                        ${activeConversation === conv.id
+                          ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 shadow-sm"
+                          : "hover:bg-slate-100 dark:hover:bg-slate-700/50"
+                        }`}>
                       
-<div
-  onClick={() => handleSelectConversation(conv.id)}
-  className="flex-grow min-w-0">
-  
-  {/* Show typing animation when renaming */}
-  {renamingId === conv.id ? (
-    <div className="typing-animation">
-      <span className="typing-text">
-        {tempRenameText}
-      </span>
-      <div className="typing-dots">
-        <span className="typing-dot"></span>
-        <span className="typing-dot"></span>
-        <span className="typing-dot"></span>
-      </div>
-    </div>
-  ) : fetchingConversationId === conv.id ? (
-    // Show typing animation when fetching from localStorage
-    <div className="typing-animation">
-      <span className="typing-text ">
-        {conv.name || "New Chat"}
-      </span>
-      <div className="typing-dots">
-        <span className="typing-dot"></span>
-        <span className="typing-dot"></span>
-        <span className="typing-dot"></span>
-      </div>
-    </div>
-  ) : editingId === conv.id ? (
-    <div className="flex items-center gap-2">
-      <input
-        type="text"
-        value={editText}
-        autoFocus
-        onChange={(e) => setEditText(e.target.value)}
-        onClick={(e) => e.stopPropagation()}
-        onBlur={() => handleRename(conv.id)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter")
-            handleRename(conv.id);
-          if (e.key === "Escape") {
-            setEditText("");
-            setEditingId(null);
-          }
-        }}
-        className="bg-transparent border-b border-gray-400 outline-none w-full "
-      />
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleRename(conv.id);
-        }}
-        title="Save"
-        className="text-green-500 hover:text-green-700 flex-shrink-0">
-        <Save
-          size={20}
-          color="#4dff00"
-          strokeWidth={2}
-        />
-      </button>
-    </div>
-  ) : (
-    <span 
-      title={conv.name || "New Chat"}
-      className="block truncate pr-2 ">
-      {conv.name || "New Chat"}
-    </span>
-  )}
-</div>
+                      <div
+                        onClick={() => handleSelectConversation(conv.id)}
+                        className="flex-1 min-w-0 flex items-center gap-3">
+                        
+                        {/* Chat Icon */}
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          activeConversation === conv.id 
+                            ? "bg-blue-500" 
+                            : "bg-slate-300 dark:bg-slate-600"
+                        }`} />
 
+                        {/* Chat Content */}
+                        <div className="flex-1 min-w-0">
+                          {renamingId === conv.id ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-slate-600 dark:text-slate-300 animate-pulse">
+                                {tempRenameText}
+                              </span>
+                              <div className="flex gap-1">
+                                <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" />
+                                <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}} />
+                                <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
+                              </div>
+                            </div>
+                          ) : fetchingConversationId === conv.id ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-slate-600 dark:text-slate-300 animate-pulse">
+                                {conv.name || "New Chat"}
+                              </span>
+                              <div className="flex gap-1">
+                                <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" />
+                                <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}} />
+                                <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
+                              </div>
+                            </div>
+                          ) : editingId === conv.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editText}
+                                autoFocus
+                                onChange={(e) => setEditText(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                onBlur={() => handleRename(conv.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleRename(conv.id);
+                                  if (e.key === "Escape") {
+                                    setEditText("");
+                                    setEditingId(null);
+                                  }
+                                }}
+                                className="bg-transparent border-b border-blue-300 dark:border-blue-600 outline-none text-sm text-slate-700 dark:text-slate-200 w-full"
+                              />
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRename(conv.id);
+                                }}
+                                className="text-green-500 hover:text-green-600 transition-colors">
+                                <CheckCircle size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate block">
+                              {conv.name || "New Chat"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                      {/* Dropdown trigger */}
-                    {/* Dropdown trigger - hide when renaming */}
-                   {renamingId !== conv.id && fetchingConversationId !== conv.id && (
-  <div className="relative flex-shrink-0" data-dropdown-id={conv.id}>
-                          <span
-                            className="ml-2 flex justify-center items-center cursor-pointer p-1 hover:bg-black/10 rounded"
+                      {/* Dropdown Menu */}
+                      {renamingId !== conv.id && fetchingConversationId !== conv.id && (
+                        <div className="relative" data-dropdown-id={conv.id}>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 transition-all duration-200"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDropdownOpen(conv.id);
                             }}>
-                            <ChevronDown size={16} />
-                          </span>
+                            <MoreVertical size={14} className="text-slate-500 dark:text-slate-400" />
+                          </button>
 
-                          {/* Dropdown menu */}
-                   {dropdownId === conv.id && (
-  <div 
-    className={`absolute right-0 bg-white dark:bg-gray-800 border border-gray-300 rounded shadow-md z-50 min-w-[120px] ${
-      dropdownPosition[conv.id]?.class || 'top-full mt-1' // Changed default from 'top-8 mt-2' to 'top-full mt-1'
-    }`}
-  >
-    <button
-      className="block px-4 py-2 font-bold text-sm text-gray-700 hover:bg-gray-100 dark:bg-gray-600 w-full text-left dark:text-white"
-      onClick={(e) => {
-        e.stopPropagation();
-        setEditingId(conv.id);
-        setEditText(conv.name || "New Chat");
-        setDropdownId(null);
-      }}>
-      <span className="flex gap-2 items-center">
-        <Pen size={14} />
-        Rename
-      </span>
-    </button>
-    <button
-      className="block px-4 py-2 text-sm text-red-600 hover:bg-red-100 hover:dark:bg-red-800 font-bold hover:dark:text-black w-full text-left"
-      onClick={(e) => {
-        e.stopPropagation();
-        handleDeleteConversation(conv.id, token, dispatch);
-        setDropdownId(null);
-      }}>
-      <span className="flex gap-2 items-center">
-        <Trash size={14} />
-        Delete
-      </span>
-    </button>
-  </div>
-)}
+                          {dropdownId === conv.id && (
+                            <div className={`absolute right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-xl z-50 min-w-[140px] ${
+                              dropdownPosition[conv.id]?.class || 'top-full mt-1'
+                            }`}>
+                              <button
+                                className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 rounded-t-lg transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingId(conv.id);
+                                  setEditText(conv.name || "New Chat");
+                                  setDropdownId(null);
+                                }}>
+                                <Pen size={14} />
+                                Rename
+                              </button>
+                              <button
+                                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 rounded-b-lg transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteConversation(conv.id);
+                                  setDropdownId(null);
+                                }}>
+                                <Trash size={14} />
+                                Delete
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -828,11 +815,11 @@ const calculateDropdownPosition = (convId) => {
           )}
 
           {conversations.length === 0 && (
-            <div className="space-y-4 animate-pulse">
-              {[...Array(6)].map((_, idx) => (
-                <div key={idx} className="flex items-center space-x-4">
-                  <div className="w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600"></div>
-                  <div className="flex-1 h-4 bg-gray-400 dark:bg-gray-600 rounded"></div>
+            <div className="space-y-3 animate-pulse">
+              {[...Array(4)].map((_, idx) => (
+                <div key={idx} className="flex items-center gap-3 p-3">
+                  <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></div>
+                  <div className="flex-1 h-4 bg-slate-300 dark:bg-slate-600 rounded-md"></div>
                 </div>
               ))}
             </div>
@@ -840,62 +827,53 @@ const calculateDropdownPosition = (convId) => {
         </div>
       </div>
 
-      {/* Footer Buttons - Always at bottom with absolute positioning */}
-      <div className={`absolute bottom-2 left-2 right-2 flex flex-col gap-3 w-[calc(100%-16px)]`}>
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className={`relative overflow-hidden p-2 flex items-center gap-3 
-                    bg-[#282828] dark:bg-slate-200 text-white dark:text-black 
-                    hover:bg-slate-200 hover:text-black border border-black dark:border-white 
-                    rounded-lg cursor-pointer transition-all duration-500 ease-in-out ${
-                      isCollapsed ? "w-12 h-12 justify-center" : "w-full"
-                    }`}>
-          
-          {/* Animated Icon Swap */}
-          <div className="relative w-5 h-5 flex-shrink-0">
-            <div
-              className={`absolute inset-0 transition-transform duration-500 ease-in-out ${
-                darkMode ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0"
-              }`}>
-              <Sun size={18} />
-            </div>
-            <div
-              className={`absolute inset-0 transition-transform duration-500 ease-in-out ${
-                darkMode ? "translate-x-full opacity-0" : "translate-x-0 opacity-100"
-              }`}>
-              <Moon size={18} />
-            </div>
-          </div>
-
-          {/* Animated Text Label */}
-          <span
-            className={`transition-all duration-500 ease-in-out transform
-            ${isCollapsed ? "opacity-0 scale-x-0 w-0" : "opacity-100 scale-x-100 w-auto"}
-            whitespace-nowrap`}>
-            {darkMode ? "Light Mode" : "Dark Mode"}
-          </span>
-        </button>
-
-        {/* Help */}
-        <Link to="/about"
-          className={`bg-gradient-to-r from-[#0000B5] to-[#0076FF] hover:bg-gradient-to-r hover:from-[#0076FF] hover:to-[#0000B5] p-2 flex items-center gap-3 text-white border border-black dark:border-white rounded-lg cursor-pointer transition-all duration-500 ease-in-out ${
-            isCollapsed ? "w-12 h-12 justify-center" : "w-full"
-          }`}>
-          <BadgeHelp size={18} className="flex-shrink-0" />
-          <span
-            className={`transition-all duration-500 ease-in-out transform
-            ${isCollapsed ? "opacity-0 scale-x-0 w-0" : "opacity-100 scale-x-100 w-auto"}
-            whitespace-nowrap`}>
-            About us
-          </span>
-        </Link>
-      </div>
+   {/* Footer Buttons */}
+<div className={`absolute bottom-0 left-0 right-0 p-4 bg-white dark:bg-[#1a1a1a] border-t border-slate-200 dark:border-slate-700 space-y-3 transition-all duration-300`}>
+  {/* Theme Toggle */}
+  <button
+    onClick={toggleTheme}
+    className={`w-full h-12 flex items-center p-3 rounded-xl
+      bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800
+      hover:bg-slate-700 dark:hover:bg-slate-300
+      transition-all duration-300 shadow-md hover:shadow-lg
+      ${isCollapsed ? "justify-center" : "justify-start gap-3"}`}>
+    
+    <div className="relative w-5 h-5 flex-shrink-0">
+      <Sun size={18} className={`absolute transition-all duration-300 ${
+        darkMode ? "opacity-0 rotate-180" : "opacity-100 rotate-0"
+      }`} />
+      <Moon size={18} className={`absolute transition-all duration-300 ${
+        darkMode ? "opacity-100 rotate-0" : "opacity-0 -rotate-180"
+      }`} />
     </div>
-  
- 
+
+    <span className={`font-medium transition-all duration-300 ${
+      isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto ml-3"
+    }`}>
+      {darkMode ? "Light Mode" : "Dark Mode"}
+    </span>
+  </button>
+
+  {/* About Us */}
+  <Link to="/about"
+    className={`w-full h-12 flex items-center p-3 rounded-xl
+      bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg
+      transition-all duration-300 transform hover:scale-[1.02]
+      ${isCollapsed ? "justify-center" : "justify-start gap-3"}`}>
+    <BadgeHelp size={18} className="flex-shrink-0" />
+    <span className={`font-medium transition-all duration-300 ${
+      isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto ml-3"
+    }`}>
+      About Us
+    </span>
+  </Link>
+</div>
+
+    </div>
   </div>
-  );
+);
+
+
 };
 
 export default Sidebar;
