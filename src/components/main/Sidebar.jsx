@@ -592,7 +592,7 @@ const calculateDropdownPosition = (convId) => {
         ${isCollapsed ? "md:w-20" : "md:w-72"}
         bg-white dark:bg-[#1a1a1a] 
         border-r border-slate-200 dark:border-slate-700
-        flex flex-col transition-all duration-300 ease-out overflow-hidden
+        flex flex-col transition-all  duration-500 ease-out overflow-hidden
         shadow-xl md:shadow-lg`}>
 
       {/* Mobile Close Button */}
@@ -608,7 +608,7 @@ const calculateDropdownPosition = (convId) => {
 <div className={`flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700 ${
   isCollapsed ? "justify-center" : ""
 }`}>
-  <div className={`flex items-center gap-3 transition-all duration-300 ${
+  <div className={`flex items-center gap-3 transition-all  duration-500 ${
     isCollapsed ? "opacity-0 scale-0 w-0" : "opacity-100 scale-100"
   }`}>
     <div className="w-8 h-8 rounded-lg flex items-center justify-center">
@@ -631,7 +631,7 @@ const calculateDropdownPosition = (convId) => {
     ref={buttonRef}>
     <PanelRightOpen 
       size={20} 
-      className={`transition-transform duration-300 ${
+      className={`transition-transform  duration-500 ${
         isCollapsed ? "rotate-180" : "rotate-0"
       }`} 
     />
@@ -641,7 +641,7 @@ const calculateDropdownPosition = (convId) => {
                   isCollapsed
                     ? "top-9 left-9 transform -translate-x-3/4"
                     : "top-9 left-1/2 transform -translate-x-2/3"
-                } mt-1 px-2 py-1 text-xs text-white bg-zinc-900 rounded transition-all duration-300 ease-in-out`}>
+                } mt-1 px-2 py-1 text-xs text-white bg-zinc-900 rounded transition-all  duration-500 ease-in-out`}>
                 {isCollapsed ? "Open Sidebar" : "Close Sidebar"}
               </div>
             )}
@@ -655,10 +655,10 @@ const calculateDropdownPosition = (convId) => {
     className={`w-full h-12 flex items-center p-3 rounded-xl
      bg-gradient-to-r from-[#0000B5] to-[#0076FF]
             hover:from-[#0076FF] hover:to-[#0000B5] text-white font-medium shadow-md hover:shadow-lg
-      transition-all duration-300 transform hover:scale-[1.02]
+      transition-all  duration-500 transform hover:scale-[1.02]
       ${isCollapsed ? "justify-center" : "justify-start gap-3"}`}>
     <Plus size={18} className="flex-shrink-0" />
-    <span className={`transition-all duration-300 ${
+    <span className={`transition-all  duration-500 ${
       isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto ml-3"
     }`}>
       New Chat
@@ -668,7 +668,7 @@ const calculateDropdownPosition = (convId) => {
 
 
       {/* Chat History */}
-      <div className={`flex-1 flex flex-col min-h-0 px-4 pb-24 transition-all duration-300 ${
+      <div className={`flex-1 flex flex-col min-h-0 px-4 pb-24 transition-all  duration-500 ${
         isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}>
         <div className="flex items-center gap-2 mb-4">
@@ -829,26 +829,26 @@ const calculateDropdownPosition = (convId) => {
       </div>
 
    {/* Footer Buttons */}
-<div className={`absolute bottom-0 left-0 right-0 p-4 bg-white dark:bg-[#1a1a1a] border-t border-slate-200 dark:border-slate-700 space-y-3 transition-all duration-300`}>
+<div className={`absolute bottom-0 left-0 right-0 p-4 bg-white dark:bg-[#1a1a1a] border-t border-slate-200 dark:border-slate-700 space-y-3 transition-all  duration-500`}>
   {/* Theme Toggle */}
   <button
     onClick={toggleTheme}
     className={`w-full h-12 flex items-center p-3 rounded-xl
       bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800
       hover:bg-slate-700 dark:hover:bg-slate-300
-      transition-all duration-300 shadow-md hover:shadow-lg
+      transition-all  duration-500 shadow-md hover:shadow-lg
       ${isCollapsed ? "justify-center" : "justify-start gap-3"}`}>
     
     <div className="relative w-5 h-5 flex-shrink-0">
-      <Sun size={18} className={`absolute transition-all duration-300 ${
+      <Sun size={18} className={`absolute transition-all  duration-500 ${
         darkMode ? "opacity-0 rotate-180" : "opacity-100 rotate-0"
       }`} />
-      <Moon size={18} className={`absolute transition-all duration-300 ${
+      <Moon size={18} className={`absolute transition-all  duration-500 ${
         darkMode ? "opacity-100 rotate-0" : "opacity-0 -rotate-180"
       }`} />
     </div>
 
-    <span className={`font-medium transition-all duration-300 ${
+    <span className={`font-medium transition-all  duration-500 ${
       isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto ml-3"
     }`}>
       {darkMode ? "Light Mode" : "Dark Mode"}
@@ -860,10 +860,10 @@ const calculateDropdownPosition = (convId) => {
     className={`w-full h-12 flex items-center p-3 rounded-xl
       bg-gradient-to-r from-[#0000B5] to-[#0076FF]
             hover:from-[#0076FF] hover:to-[#0000B5] text-white shadow-md hover:shadow-lg
-      transition-all duration-300 transform hover:scale-[1.02]
+      transition-all  duration-500 transform hover:scale-[1.02]
       ${isCollapsed ? "justify-center" : "justify-start gap-3"}`}>
     <BadgeHelp size={18} className="flex-shrink-0" />
-    <span className={`font-medium transition-all duration-300 ${
+    <span className={`font-medium transition-all  duration-500 ${
       isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto ml-3"
     }`}>
       About Us
