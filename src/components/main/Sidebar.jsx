@@ -484,6 +484,10 @@ const handleDeleteConversation = async (id) => {
     if (selectedConversation) {
       localStorage.setItem("conversation_name", selectedConversation.name);
     }
+    // ✅ Close sidebar on mobile when conversation is selected
+  if (window.innerWidth <= 768) {
+    setIsOpen(false);
+  }
   };
 
   const groupedConversations = groupConversationsByDate(conversations);
@@ -582,6 +586,7 @@ const calculateDropdownPosition = (convId) => {
     <div className="flex  min-h-screen">
     {/* Sidebar starts */}
    <div
+  data-sidebar // ✅ Add this attribute for outside click detection
   className={`fixed md:relative z-50 h-full md:h-screen
     ${isOpen ? "translate-x-0 w-64" : "-translate-x-full w-64"} md:translate-x-0
     ${isCollapsed ? "md:w-16" : "md:w-64"}
