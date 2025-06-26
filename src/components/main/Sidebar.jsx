@@ -653,7 +653,8 @@ const calculateDropdownPosition = (convId) => {
   <button 
     onClick={handleNewChat}
     className={`w-full h-12 flex items-center p-3 rounded-xl
-      bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md hover:shadow-lg
+     bg-gradient-to-r from-[#0000B5] to-[#0076FF]
+            hover:from-[#0076FF] hover:to-[#0000B5] text-white font-medium shadow-md hover:shadow-lg
       transition-all duration-300 transform hover:scale-[1.02]
       ${isCollapsed ? "justify-center" : "justify-start gap-3"}`}>
     <Plus size={18} className="flex-shrink-0" />
@@ -857,7 +858,8 @@ const calculateDropdownPosition = (convId) => {
   {/* About Us */}
   <Link to="/about"
     className={`w-full h-12 flex items-center p-3 rounded-xl
-      bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg
+      bg-gradient-to-r from-[#0000B5] to-[#0076FF]
+            hover:from-[#0076FF] hover:to-[#0000B5] text-white shadow-md hover:shadow-lg
       transition-all duration-300 transform hover:scale-[1.02]
       ${isCollapsed ? "justify-center" : "justify-start gap-3"}`}>
     <BadgeHelp size={18} className="flex-shrink-0" />
