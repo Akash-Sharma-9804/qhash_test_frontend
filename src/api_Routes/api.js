@@ -137,174 +137,25 @@ export const fetchConversations = async (token) => {
 };
 
 // Fetch conversation history
+// export const fetchConversationHistory = async (conversationId, token) => {
+//   const response = await axios.get(`${API_BASE_URL}/chat/conversations/${conversationId}`, {
+//     headers: { Authorization: `Bearer ${token}` },
+//   });
+//   return response.data;
+// };
+// ✅ FIND YOUR EXISTING fetchConversationHistory FUNCTION AND REPLACE IT:
 export const fetchConversationHistory = async (conversationId, token) => {
   const response = await axios.get(`${API_BASE_URL}/chat/conversations/${conversationId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  
+  
+  
   return response.data;
 };
 
 
-// export const fetchConversationHistory = async (conversationId, token) => {
-//   try {
-//     const response = await axios.get(`${API_BASE_URL}/chat/conversations/${conversationId}`, {
-//       headers: { Authorization: `Bearer ${token}` },
-//     });
 
-//     // Check if response.data is an array
-//     if (Array.isArray(response.data)) {
-//       // If it's an array, proceed with mapping over it
-//       const messages = response.data.map((msg) => ({
-//         ...msg,
-//         file_names: msg.file_names ? JSON.parse(msg.file_names) : [], // Parse file_names if available
-//       }));
-
-//       return messages;
-//     } else {
-//       // If it's not an array, log and return an empty array or some fallback
-//       console.error("Expected an array but received:", response.data);
-//       return [];
-//     }
-//   } catch (error) {
-//     console.error("❌ Error fetching chat history:", error);
-//     return []; // Return an empty array on error
-//   }
-// };
-
-
-
-
-// Send a message
- 
-
-// export const sendMessage = async (
-//   conversationId,
-//   message,
-//   userId,
-//   token,
-//   extracted_summary_raw = "",
-//   uploaded_file_metadata = [] // ⬅️ New param!
-// ) => {
-//   const response = await axios.post(
-//     `${API_BASE_URL}/chat`,
-//     {
-//       userMessage: message,
-//       conversation_id: conversationId,
-//       user_id: userId,
-//       extracted_summary: extracted_summary_raw,
-//       uploaded_file_metadata // ✅ Pass this to backend
-//     },
-//     {
-//       headers: { Authorization: `Bearer ${token}` },
-//     }
-//   );
-//   return response.data;
-// };
-  
-// export const sendMessage = async (
-//   conversationId,
-//   message,
-//   userId,
-//   token,
-//   extracted_summary_raw = "",
-//   uploaded_file_metadata = [],
-//   file_upload_ids = [],
-//   onStreamChunk = null // Callback for streaming chunks
-// ) => {
-//   const response = await fetch(`${API_BASE_URL}/chat`, {
-//     method: 'POST',
-//     headers: {
-//       'Authorization': `Bearer ${token}`,
-//       'Content-Type': 'application/json',
-//     },
-//     body: JSON.stringify({
-//       userMessage: message,
-//       conversation_id: conversationId,
-//       user_id: userId,
-//       extracted_summary: extracted_summary_raw,
-//       uploaded_file_metadata,
-//       _file_upload_ids: file_upload_ids // ✅ ADD THIS LINE
-//     })
-//   });
-
-//   if (!response.ok) {
-//     throw new Error(`HTTP error! status: ${response.status}`);
-//   }
-
-//   const reader = response.body.getReader();
-//   const decoder = new TextDecoder();
-  
-//   let buffer = '';
-//   let fullResponse = '';
-//   let metadata = null;
-//   let suggestions = [];
-
-//   try {
-//     while (true) {
-//       const { done, value } = await reader.read();
-      
-//       if (done) break;
-      
-//       buffer += decoder.decode(value, { stream: true });
-//       const lines = buffer.split('\n');
-//       buffer = lines.pop() || ''; // Keep incomplete line in buffer
-      
-//       for (const line of lines) {
-//         if (line.trim()) {
-//           try {
-//             const data = JSON.parse(line);
-            
-//             switch (data.type) {
-//               case 'start':
-//                 metadata = data;
-//                 if (onStreamChunk) {
-//                   onStreamChunk({ type: 'start', data: metadata });
-//                 }
-//                 break;
-                
-//               case 'content':
-//                 fullResponse += data.content;
-//                 if (onStreamChunk) {
-//                   onStreamChunk({ 
-//                     type: 'content', 
-//                     content: data.content,
-//                     fullResponse: fullResponse 
-//                   });
-//                 }
-//                 break;
-                
-//               case 'end':
-//                 suggestions = data.suggestions || [];
-//                 if (onStreamChunk) {
-//                   onStreamChunk({ 
-//                     type: 'end', 
-//                     suggestions: suggestions,
-//                     fullResponse: fullResponse 
-//                   });
-//                 }
-//                 break;
-                
-//               case 'error':
-//                 throw new Error(data.error);
-//             }
-//           } catch (parseError) {
-//             console.error('Error parsing streaming data:', parseError);
-//           }
-//         }
-//       }
-//     }
-//   } finally {
-//     reader.releaseLock();
-//   }
-
-//   return {
-//     response: fullResponse,
-//     suggestions: suggestions,
-//     files: metadata?.uploaded_files || [],
-//     conversation_id: metadata?.conversation_id || conversationId,
-//     ...metadata
-//   };
-// };
 
 export const sendMessage = async (
   conversationId,
@@ -377,7 +228,52 @@ export const sendMessage = async (
                   });
                 }
                 break;
-                
+                 // 📄 ADD THESE MISSING CASES:
+  case 'file_generation':
+  if (onStreamChunk) {
+    onStreamChunk({
+      type: 'file_generation',
+      status: data.status,
+      file_type: data.file_type,
+      message: data.message
+    });
+  }
+  break;
+
+case 'file_created':  // ✅ ADD: This was missing!
+  if (onStreamChunk) {
+    onStreamChunk({
+      type: 'file_created',
+      status: data.status,
+      files_count: data.files_count
+    });
+  }
+  break;
+
+case 'file_error':  // ✅ ADD: This was also missing!
+  if (onStreamChunk) {
+    onStreamChunk({
+      type: 'file_error',
+      error: data.error,
+      message: data.message
+    });
+  }
+  break;
+
+case 'file_generated':
+  if (onStreamChunk) {
+    onStreamChunk({
+      type: 'file_generated',
+      file_type: data.file_type,
+      filename: data.filename,
+      mime_type: data.mime_type,
+      file_data: data.file_data,
+      download_ready: data.download_ready,
+      success: data.success
+    });
+  }
+  break;
+
               case 'end':
                 suggestions = data.suggestions || [];
                 if (onStreamChunk) {

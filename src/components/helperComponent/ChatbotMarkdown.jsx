@@ -658,9 +658,26 @@ const ChatbotMarkdown = forwardRef(
       setTimeout(() => setCopied(false), 1000);
     };
 
-    const handleCopyCodeBlock = (codeContent) => {
-      navigator.clipboard.writeText(codeContent);
-    };
+    const handleCopyCodeBlock = async (codeContent) => {
+  try {
+    await navigator.clipboard.writeText(codeContent);
+    console.log('✅ Code copied successfully');
+  } catch (err) {
+    console.error('❌ Failed to copy code:', err);
+    
+    // Fallback for older browsers
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = codeContent;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    } catch (fallbackErr) {
+      console.error('❌ Fallback copy also failed:', fallbackErr);
+    }
+  }
+};
 
     const setPendingUrl = (url) => {
       if (onLinkClick) {
@@ -681,85 +698,242 @@ const ChatbotMarkdown = forwardRef(
     }));
 
     // Highlight code blocks after render
-    useEffect(() => {
-      if (!containerRef.current) return;
+    // useEffect(() => {
+    //   if (!containerRef.current) return;
 
-      const codeBlocks = containerRef.current.querySelectorAll('pre code');
-      codeBlocks.forEach((block) => {
-        // Skip if already highlighted
-        if (block.classList.contains('hljs')) return;
+    //   const codeBlocks = containerRef.current.querySelectorAll('pre code');
+    //   codeBlocks.forEach((block) => {
+    //     // Skip if already highlighted
+    //     if (block.classList.contains('hljs')) return;
         
-        hljs.highlightElement(block);
-      });
+    //     hljs.highlightElement(block);
+    //   });
 
-      // Add copy buttons to code blocks
-      const preBlocks = containerRef.current.querySelectorAll('pre');
-      preBlocks.forEach((pre, index) => {
-        // Skip if already has copy button
-        if (pre.querySelector('.code-copy-btn')) return;
+    //   // Add copy buttons to code blocks
+    //   const preBlocks = containerRef.current.querySelectorAll('pre');
+    //   preBlocks.forEach((pre, index) => {
+    //     // Skip if already has copy button
+    //     if (pre.querySelector('.code-copy-btn')) return;
 
-        const code = pre.querySelector('code');
-        if (!code) return;
+    //     const code = pre.querySelector('code');
+    //     if (!code) return;
 
-        const codeContent = code.textContent || '';
-        const className = code.className || '';
-        const match = /language-(\w+)/.exec(className);
-        const lang = match?.[1] || hljs.highlightAuto(codeContent).language || 'code';
-
-        // Create header
-        const header = document.createElement('div');
-        header.className = 'code-header';
+    //     // ✅ FIXED: Store original content BEFORE highlighting
+    //     const originalContent = code.textContent || code.innerText || '';
         
-        // Create language span
-        const langSpan = document.createElement('span');
-        langSpan.className = 'code-lang';
-        langSpan.textContent = lang.toUpperCase();
-        
-        // Create button
-        const button = document.createElement('button');
-        button.className = 'code-copy-btn';
-        
-        // Function to update button content
-        const updateButtonContent = (isCopied) => {
-          button.innerHTML = `
-            <div class="flex items-center gap-1.5">
-              ${isCopied 
-                ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4cd327" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>`
-                : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`
-              }
-              <span style="color: ${isCopied ? '#4cd327' : 'inherit'}">${isCopied ? 'Copied!' : 'Copy code'}</span>
-            </div>
-          `;
-        };
+    //     // Store original content as data attribute
+    //     code.setAttribute('data-original-content', originalContent);
 
-        // Initial button content
-        updateButtonContent(false);
+    //     const className = code.className || '';
+    //     const match = /language-(\w+)/.exec(className);
+    //     const lang = match?.[1] || hljs.highlightAuto(originalContent).language || 'code';
         
-        // Add click handler
-        button.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
+    //     // ✅ FIXED: Create unique ID for each code block
+    //     const blockId = `code-block-${index}-${Date.now()}`;
+
+    //     // Create header
+    //     const header = document.createElement('div');
+    //     header.className = 'code-header';
+        
+    //     // Create language span
+    //     const langSpan = document.createElement('span');
+    //     langSpan.className = 'code-lang';
+    //     langSpan.textContent = lang.toUpperCase();
+        
+    //     // Create button with unique ID
+    //     const button = document.createElement('button');
+    //     button.className = 'code-copy-btn';
+    //     button.setAttribute('data-block-id', blockId);
+        
+    //     // ✅ FIXED: Better button state management
+    //     const updateButtonContent = (isCopied) => {
+    //       button.innerHTML = `
+    //         <div class="flex items-center gap-1.5">
+    //           ${isCopied 
+    //             ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4cd327" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>`
+    //             : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`
+    //           }
+    //           <span style="color: ${isCopied ? '#4cd327' : 'inherit'}">${isCopied ? 'Copied!' : 'Copy code'}</span>
+    //         </div>
+    //       `;
+    //     };
+
+    //     // Initial button content
+    //     updateButtonContent(false);
+        
+    //     // ✅ FIXED: Improved click handler with proper content retrieval
+    //     button.addEventListener('click', async (e) => {
+    //       e.preventDefault();
+    //       e.stopPropagation();
           
-          // Immediately update button to show copied state
-          updateButtonContent(true);
+    //       try {
+    //         // Get the original content from data attribute
+    //         const codeContent = code.getAttribute('data-original-content') || originalContent;
+            
+    //         // Copy to clipboard
+    //         await navigator.clipboard.writeText(codeContent);
+            
+    //         // Update button to show copied state
+    //         updateButtonContent(true);
+            
+    //         // Reset button after 2 seconds
+    //         setTimeout(() => {
+    //           updateButtonContent(false);
+    //         }, 2000);
+            
+    //         console.log(`✅ Copied code block ${blockId}:`, codeContent.substring(0, 50) + '...');
+            
+    //       } catch (err) {
+    //         console.error('❌ Failed to copy code:', err);
+            
+    //         // Fallback for older browsers
+    //         try {
+    //           const textArea = document.createElement('textarea');
+    //           textArea.value = code.getAttribute('data-original-content') || originalContent;
+    //           document.body.appendChild(textArea);
+    //           textArea.select();
+    //           document.execCommand('copy');
+    //           document.body.removeChild(textArea);
+              
+    //           updateButtonContent(true);
+    //           setTimeout(() => updateButtonContent(false), 2000);
+    //         } catch (fallbackErr) {
+    //           console.error('❌ Fallback copy also failed:', fallbackErr);
+    //         }
+    //       }
+    //     });
+        
+    //     // Assemble header
+    //     header.appendChild(langSpan);
+    //     header.appendChild(button);
+        
+    //     // Insert header
+    //     pre.insertBefore(header, pre.firstChild);
+    //   });
+    // }, [content]);
+// Replace the useEffect section (around line 100-200) with this:
+useEffect(() => {
+  if (!containerRef.current) return;
+
+  // Add a small delay to ensure DOM is fully updated during streaming
+  const timer = setTimeout(() => {
+    const codeBlocks = containerRef.current.querySelectorAll('pre code');
+    codeBlocks.forEach((block) => {
+      // Skip if already highlighted
+      if (block.classList.contains('hljs')) return;
+      
+      // ✅ FIXED: Store original content BEFORE highlighting
+      if (!block.hasAttribute('data-original-content')) {
+        const originalContent = block.textContent || block.innerText || '';
+        block.setAttribute('data-original-content', originalContent);
+      }
+      
+      hljs.highlightElement(block);
+    });
+
+    // Add copy buttons to code blocks
+    const preBlocks = containerRef.current.querySelectorAll('pre');
+    preBlocks.forEach((pre, index) => {
+      // Skip if already has copy button
+      if (pre.querySelector('.code-copy-btn')) return;
+
+      const code = pre.querySelector('code');
+      if (!code) return;
+
+      // ✅ FIXED: Get original content from stored attribute
+      const originalContent = code.getAttribute('data-original-content') || 
+                             code.textContent || code.innerText || '';
+
+      const className = code.className || '';
+      const match = /language-(\w+)/.exec(className);
+      const lang = match?.[1] || hljs.highlightAuto(originalContent).language || 'code';
+      
+      // Create unique ID for each code block
+      const blockId = `code-block-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+
+      // Create header
+      const header = document.createElement('div');
+      header.className = 'code-header';
+      
+      // Create language span
+      const langSpan = document.createElement('span');
+      langSpan.className = 'code-lang';
+      langSpan.textContent = lang.toUpperCase();
+      
+      // Create button
+      const button = document.createElement('button');
+      button.className = 'code-copy-btn';
+      button.setAttribute('data-block-id', blockId);
+      
+      // Function to update button content
+      const updateButtonContent = (isCopied) => {
+        button.innerHTML = `
+          <div class="flex items-center gap-1.5">
+            ${isCopied 
+              ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4cd327" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>`
+              : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`
+            }
+            <span style="color: ${isCopied ? '#4cd327' : 'inherit'}">${isCopied ? 'Copied!' : 'Copy code'}</span>
+          </div>
+        `;
+      };
+
+      // Initial button content
+      updateButtonContent(false);
+      
+      // ✅ FIXED: Click handler that uses stored original content
+      button.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        try {
+          // Use the stored original content
+          const codeContent = originalContent;
           
           // Copy to clipboard
-          handleCopyCodeBlock(codeContent);
+          await navigator.clipboard.writeText(codeContent);
           
-          // Reset button after 1 second
+          // Update button to show copied state
+          updateButtonContent(true);
+          
+          // Reset button after 2 seconds
           setTimeout(() => {
             updateButtonContent(false);
-          }, 1000);
-        });
-        
-        // Assemble header
-        header.appendChild(langSpan);
-        header.appendChild(button);
-        
-        // Insert header
-        pre.insertBefore(header, pre.firstChild);
+          }, 2000);
+          
+          console.log(`✅ Copied code block ${blockId}:`, codeContent.substring(0, 50) + '...');
+          
+        } catch (err) {
+          console.error('❌ Failed to copy code:', err);
+          
+          // Fallback for older browsers
+          try {
+            const textArea = document.createElement('textarea');
+            textArea.value = originalContent;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            updateButtonContent(true);
+            setTimeout(() => updateButtonContent(false), 2000);
+          } catch (fallbackErr) {
+            console.error('❌ Fallback copy also failed:', fallbackErr);
+          }
+        }
       });
-    }, [content]);
+      
+      // Assemble header
+      header.appendChild(langSpan);
+      header.appendChild(button);
+      
+      // Insert header
+      pre.insertBefore(header, pre.firstChild);
+    });
+  }, 50); // Small delay to ensure DOM is ready
+
+  return () => clearTimeout(timer);
+}, [content]);
 
     return (
       <div ref={containerRef}>
@@ -773,6 +947,7 @@ const ChatbotMarkdown = forwardRef(
               line-height: 1.6;
               color: #374151;
               width: 100%;
+              // white-space: pre-wrap; 
             }
 
             .dark .chatgpt-markdown {
@@ -785,6 +960,12 @@ const ChatbotMarkdown = forwardRef(
               -moz-user-select: text !important;
               -ms-user-select: text !important;
             }
+ /* ✅ ENHANCED: Force newline handling for all text content */
+    .chatgpt-markdown p,
+    .chatgpt-markdown div,
+    .chatgpt-markdown span {
+      white-space: pre-wrap !important; /* Preserve newlines and wrap text */
+    }
 
             /* Headings */
             .chatgpt-markdown h1 {
@@ -792,36 +973,42 @@ const ChatbotMarkdown = forwardRef(
               font-weight: 600;
               margin: 1.5rem 0 0.75rem 0;
               color: #111827;
+               white-space: pre-wrap; 
             }
             .chatgpt-markdown h2 {
               font-size: 1.5rem;
               font-weight: 600;
               margin: 1.25rem 0 0.75rem 0;
               color: #111827;
+              white-space: pre-wrap; 
             }
             .chatgpt-markdown h3 {
               font-size: 1.25rem;
               font-weight: 600;
               margin: 1rem 0 0.5rem 0;
-              color: #111827;
+              color: #111827; 
+              white-space: pre-wrap; 
             }
             .chatgpt-markdown h4 {
               font-size: 1.125rem;
               font-weight: 600;
               margin: 1rem 0 0.5rem 0;
-              color: #111827;
+              color: #111827; 
+              white-space: pre-wrap; 
             }
             .chatgpt-markdown h5 {
               font-size: 1rem;
               font-weight: 600;
               margin: 0.75rem 0 0.5rem 0;
-              color: #111827;
+              color: #111827; 
+              white-space: pre-wrap; 
             }
             .chatgpt-markdown h6 {
               font-size: 0.875rem;
               font-weight: 600;
               margin: 0.75rem 0 0.5rem 0;
-              color: #111827;
+              color: #111827; 
+              white-space: pre-wrap; 
             }
 
             .dark .chatgpt-markdown h1,
@@ -847,6 +1034,7 @@ const ChatbotMarkdown = forwardRef(
             .chatgpt-markdown p {
               margin: 0 0 1rem 0;
               line-height: 1.6;
+                white-space: pre-wrap !important;
             }
 
             /* Lists */
@@ -854,6 +1042,7 @@ const ChatbotMarkdown = forwardRef(
             .chatgpt-markdown ol {
               margin: 0 0 1rem 0;
               padding-left: 1.5rem;
+              
             }
             .chatgpt-markdown li {
               margin: 0.25rem 0;
@@ -870,13 +1059,29 @@ const ChatbotMarkdown = forwardRef(
               background: #f9fafb;
               padding: 0.75rem 1rem;
               border-radius: 0 0.375rem 0.375rem 0;
+              
             }
             .dark .chatgpt-markdown blockquote {
               border-left-color: #4b5563;
               color: #9ca3af;
               background: #1f2937;
             }
+   /* ✅ ENHANCED: Special handling for CREATE_FILE content */
+    .chatgpt-markdown .create-file-content {
+      white-space: pre-wrap !important;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      background: #f8f9fa;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid #e9ecef;
+      margin: 1rem 0;
+    }
 
+    .dark .chatgpt-markdown .create-file-content {
+      background: #1f2937;
+      border-color: #374151;
+      color: #e5e7eb;
+    }
             /* Links */
             .chatgpt-markdown a {
               color: #2563eb;
@@ -1015,6 +1220,12 @@ const ChatbotMarkdown = forwardRef(
     line-height: 1.4; /* Better line spacing for mobile */
   }
 }
+ /* ✅ ENHANCED: Better text content handling */
+    .chatgpt-markdown .text-content {
+      white-space: pre-wrap !important;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
 
 /* Extra small screens */
 @media (max-width: 480px) {

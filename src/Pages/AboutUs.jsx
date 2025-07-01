@@ -21,7 +21,7 @@ const AboutUs = () => {
             <p className="text-center">
 
             It is the AI innovation division of
-            <span className="font-semibold"> QuantumHash</span>, dedicated to
+            <span className="font-semibold"> QuantumHash Corporation</span>, dedicated to
             developing cutting-edge artificial intelligence models and
             solutions. Our team of <span className="font-semibold"> researchers,scientists and engineers</span> collaborates on a
             wide range of AI technologies, from machine learning and natural

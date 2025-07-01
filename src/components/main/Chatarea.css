@@ -647,3 +647,62 @@
   height: -webkit-fill-available; /* iOS Safari */
 }
 
+/* ✅ ADD THESE ANIMATIONS TO YOUR EXISTING CSS */
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+/* ✅ File Generation Status Animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.6);
+  }
+}
+
+/* ✅ REPLACE ALL THE COMPLEX ANIMATIONS WITH THESE SIMPLE ONES */
+
+/* Simple hover effect for file cards */
+.file-card-minimal {
+  transition: all 0.2s ease;
+}
+
+.file-card-minimal:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.dark .file-card-minimal:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Simple button hover */
+.download-btn-minimal {
+  transition: all 0.2s ease;
+}
+
+.download-btn-minimal:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Simple spinner */
+.spinner-minimal {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+

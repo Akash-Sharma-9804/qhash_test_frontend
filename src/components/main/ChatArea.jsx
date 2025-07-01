@@ -37,8 +37,12 @@ import {
   uploadFiles,
   fetchConversations,
   uploadFinalAudio,
+ 
   sendGuestMessage,
 } from "../../api_Routes/api";
+// ✅ ADD THESE IMPORTS TO YOUR EXISTING IMPORTS
+ 
+ 
 import {
   setMessages,
   addMessage,
@@ -59,6 +63,38 @@ import RadialVisualizer from "../helperComponent/RadialVisualizer";
 import { FaMicrophone, FaStop, FaPause, FaPlay } from "react-icons/fa";
 import RedirectModal from "../helperComponent/RedirectModal";
 import BotThinking from "../helperComponent/BotThinking";
+ 
+
+// ✅ REPLACE YOUR EXISTING FileGenerationDisplay WITH THIS MINIMAL VERSION:
+
+const FileCreationLoader = ({ isVisible }) => {
+  if (!isVisible) return null;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="relative z-30 p-3 rounded-lg dark:bg-[#282828] bg-white/10 border border-white/20 backdrop-blur-2xl shadow-md max-w-full self-start mr-auto"
+    >
+      <div className="flex items-center gap-3">
+        <div className="p-1 rounded-full">
+          <img
+            src="./logo.png"
+            className="h-5 w-5"
+            alt="Bot Logo"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm text-blue-600 dark:text-blue-400">Creating your file...</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+
 
 const isMobileDevice = () => {
   return (
@@ -98,7 +134,7 @@ const ChatArea = ({ isGuest, sidebarOpen, setSidebarOpen  }) => {
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const conversations = useSelector((state) => state.chat.conversations);
   const [isResponding, setIsResponding] = useState(false);
-
+ const [isCreatingFile, setIsCreatingFile] = useState(false);
   // guest mode
 
   const guestConversationId = useSelector(
@@ -208,31 +244,104 @@ const ChatArea = ({ isGuest, sidebarOpen, setSidebarOpen  }) => {
   }, [dispatch]);
 
   // 2nd useeffect
-  useEffect(() => {
-    if (!activeConversation || !token) return;
+  
+// useEffect(() => {
+//   if (!activeConversation || !token) return;
 
-    fetchConversationHistory(activeConversation, token)
-      .then((data) => {
-        // console.log("Fetched history:", data.history);
-        const history = Array.isArray(data.history)
-          ? data.history
-          : [data.history];
+//   fetchConversationHistory(activeConversation, token)
+//     .then((data) => {
+//       console.log("Fetched history:", data.history);
+//       const history = Array.isArray(data.history)
+//         ? data.history
+//         : [data.history];
 
-        dispatch(
-          setMessages({ conversationId: activeConversation, messages: history })
-        );
+//       // ✅ ADD: Process history to ensure generated files are preserved
+//       const processedHistory = history.map(msg => ({
+//         ...msg,
+//         // ✅ Ensure generated file data is preserved after refresh
+//         generatedFile: msg.generatedFile || msg.generated_file || null,
+//         fileGenerationStatus: msg.fileGenerationStatus || null,
+//         files: msg.files || [],
+//         suggestions: msg.suggestions || []
+//       }));
 
-        // ✅ Auto-scroll to bottom after fetching messages
-        setTimeout(() => {
-          const chatContainer = document.getElementById("chat-container");
-          if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-          }
-        }, 100);
-      })
-      .catch((err) => console.error("❌ Error fetching chat history:", err));
-  }, [activeConversation, token, dispatch]);
+//       dispatch(
+//         setMessages({ 
+//           conversationId: activeConversation, 
+//           messages: processedHistory // ✅ Use processed history
+//         })
+//       );
 
+//       // ✅ Auto-scroll to bottom after fetching messages
+//       setTimeout(() => {
+//         const chatContainer = document.getElementById("chat-container");
+//         if (chatContainer) {
+//           chatContainer.scrollTop = chatContainer.scrollHeight;
+//         }
+//       }, 100);
+//     })
+//     .catch((err) => console.error("❌ Error fetching chat history:", err));
+// }, [activeConversation, token, dispatch]);
+useEffect(() => {
+  if (!activeConversation || !token) return;
+setIsCreatingFile(false);
+  fetchConversationHistory(activeConversation, token)
+    .then((data) => {
+      console.log("Fetched history:", data.history);
+      const history = Array.isArray(data.history)
+        ? data.history
+        : [data.history];
+
+      dispatch(
+        setMessages({ 
+          conversationId: activeConversation, 
+          messages: history // ✅ Use original history without processing
+        })
+      );
+
+      // ✅ Auto-scroll to bottom after fetching messages
+      setTimeout(() => {
+        const chatContainer = document.getElementById("chat-container");
+        if (chatContainer) {
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+      }, 100);
+    })
+    .catch((err) => console.error("❌ Error fetching chat history:", err));
+}, [activeConversation, token, dispatch]);
+
+
+
+
+// ✅ ADD THIS useEffect TO RESTORE GENERATED FILES FROM localStorage:
+// useEffect(() => {
+//   // ✅ Restore generated files from localStorage on component mount
+//   if (activeConversation) {
+//     const savedFiles = localStorage.getItem(`generated_files_${activeConversation}`);
+//     if (savedFiles) {
+//       try {
+//         const parsedFiles = JSON.parse(savedFiles);
+//         console.log(`📁 Restored generated files from localStorage:`, Object.keys(parsedFiles).length);
+        
+//         // Update messages with restored generated files
+//         const currentMessages = messages[activeConversation] || [];
+//         const updatedMessages = currentMessages.map(msg => ({
+//           ...msg,
+//           generatedFile: parsedFiles[msg.id] || msg.generatedFile
+//         }));
+        
+//         if (JSON.stringify(currentMessages) !== JSON.stringify(updatedMessages)) {
+//           dispatch(setMessages({ 
+//             conversationId: activeConversation, 
+//             messages: updatedMessages 
+//           }));
+//         }
+//       } catch (error) {
+//         console.error("❌ Error restoring generated files:", error);
+//       }
+//     }
+//   }
+// }, [activeConversation, dispatch]);
   // 3rd useeffect
 
   useEffect(() => {
@@ -289,7 +398,20 @@ const ChatArea = ({ isGuest, sidebarOpen, setSidebarOpen  }) => {
   };
 
   // greeting text function ends
-
+// useEffect(() => {
+//   // ✅ Persist generated files to localStorage when messages change
+//   if (activeConversation && conversationMessages.length > 0) {
+//     const messagesWithFiles = conversationMessages.filter(msg => msg.generatedFile);
+//     if (messagesWithFiles.length > 0) {
+//       const generatedFilesData = {};
+//       messagesWithFiles.forEach(msg => {
+//         generatedFilesData[msg.id] = msg.generatedFile;
+//       });
+//       localStorage.setItem(`generated_files_${activeConversation}`, JSON.stringify(generatedFilesData));
+//       console.log(`💾 Saved ${messagesWithFiles.length} generated files to localStorage`);
+//     }
+//   }
+// }, [activeConversation, conversationMessages]);
   // 4th useeffect
   useEffect(() => {
     const currentMessages = messages[activeConversation];
@@ -448,12 +570,17 @@ useEffect(() => {
   }, [userHasScrolledUp, isAutoScrolling]);
 
   // working handlesend message function starts
+// ✅ RESET: Clear file creation state when conversation changes
+useEffect(() => {
+  setIsCreatingFile(false);
+}, [activeConversation]);
 
   
   const handleSendMessage = async (customText) => {
     //  console.log("💥 handleSendMessage fired", { customText });
     // Reset scroll state for new message
     setUserHasScrolledUp(false);
+     setIsCreatingFile(false);
     const messageText =
       typeof customText === "string"
         ? customText.trim()
@@ -823,8 +950,25 @@ if (uploadResponse?.summary?.failed > 0) {
                     scrollToBottomSmooth();
                   }, 10);
                   break;
+// 📄 ADD: Handle file generation detection
+case "file_generation":
+  console.log("📤 Frontend received file_generation event");
+  setIsCreatingFile(true);
+  break;
 
-                case "end":
+case "file_created":
+  console.log("📤 Frontend received file_created event");
+  setIsCreatingFile(false);
+  break;
+
+case "file_error":
+  console.log("📤 Frontend received file_error event");
+  setIsCreatingFile(false);
+  toast.error("❌ File creation failed");
+  break;
+
+ 
+      case "end":
                   // Final update with suggestions and complete response
                   dispatch(
                     updateMessage({
@@ -941,14 +1085,8 @@ if (uploadResponse?.summary?.failed > 0) {
     }
   };
 
-  // working handlesend message ends
-const clearFileSelection = () => {
-  setFiles([]);
-  setUploadProgress({});
-  if (fileInputRef.current) {
-    fileInputRef.current.value = '';
-  }
-};
+
+ 
   // ✅ Remove selected file
   const removeFile = (index) => {
   const updatedFiles = [...files];
@@ -2003,11 +2141,13 @@ useEffect(() => {
                               }}
                               onCopyClick={handleCopyCode}
                             />
+    {/* Show file creation loader */}
+{isCreatingFile && <FileCreationLoader isVisible={true} />}
                           </div>
                         </div>
                       </motion.div>
                     )}
-
+  
                     {msg.suggestions && msg.suggestions.length > 0 && (
                       <div className="mt-2 p-4 font-poppins">
                         <motion.p
@@ -2381,285 +2521,159 @@ ${
             </div>
           
 
- {/* voice mode  */}
-            <div className="voice-mode-section">
-              <div className="relative voice-controls text-gray-800 dark:text-white">
-                <button
-                  onMouseEnter={() => setvoiceTooltip(true)}
-                  onMouseLeave={() => setvoiceTooltip(false)}
-                  onClick={() => {
-                    // ✅ Add guest check here - same as mic button
-                    if (isGuest) {
-                      handleLoginPrompt();
-                      return;
-                    }
-                     if (!isGuest) {
-          return; // Do nothing for logged-in users
+  {/* voice mode  */}
+           <div className="voice-mode-section">
+  <div className="relative voice-controls text-gray-800 dark:text-white">
+    <button
+      onMouseEnter={() => setvoiceTooltip(true)}
+      onMouseLeave={() => setvoiceTooltip(false)}
+      onClick={() => {
+        if (isGuest) {
+          handleLoginPrompt();
+          return;
         }
-                    startVoiceMode();
-                  }}
-                  disabled={isVoiceMode || isProcessing }
-                  className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
-                    isVoiceMode
-                      ? "bg-red-600 text-white cursor-not-allowed"
-                      
-                      : "bg-green-600 hover:bg-green-700 text-white"
-                  } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
-                  <span className="md:block hidden text-xs md:text-base items-center gap-2">
-                    <AudioLines size={20} />
-                  </span>
-                  <span className="block md:hidden text-xs md:text-base items-center gap-2">
-                    <AudioLines size={12} />
-                  </span>
-                  {voiceTooltip && (
-                    <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
-                      { isGuest
-  ? "Login for Voice Mode" 
-                        : isVoiceMode
-                        ? "Voice Active"
-                        : "Coming soon"}
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900" />
-                    </div>
-                  )}
-                </button>
-              </div>
+        startVoiceMode();
+      }}
+      disabled={isVoiceMode || isProcessing}
+      className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
+        isVoiceMode
+          ? "bg-red-600 text-white cursor-not-allowed"
+          : "bg-green-600 hover:bg-green-700 text-white"
+      } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
+      <span className="md:block hidden text-xs md:text-base items-center gap-2">
+        <AudioLines size={20} />
+      </span>
+      <span className="block md:hidden text-xs md:text-base items-center gap-2">
+        <AudioLines size={12} />
+      </span>
+      {voiceTooltip && (
+        <div className="absolute z-20 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-zinc-900 rounded-lg shadow-md whitespace-nowrap">
+          {isGuest
+            ? "Login for Voice Mode"
+            : isVoiceMode
+            ? "Voice Active"
+            : "Voice Mode"}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900" />
+        </div>
+      )}
+    </button>
+  </div>
 
-              {/* Professional Voice Overlay - Custom Layout */}
-              {showVoiceOverlay && !isGuest && (
-                <motion.div
-                  initial={{ opacity: 0, y: 100 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 100 }}
-                  className="fixed bottom-0 left-0 right-0 w-screen h-screen md:h-full  md:transform md:-translate-x-1/2 md:w-screen bg-gradient-to-t from-gray-900 via-gray-700 to-transparent backdrop-blur-lg rounded-t-2xl md:rounded-2xl text-white z-50 flex flex-col md:flex-row items-center justify-center shadow-2xl px-4 md:px-6 py-4">
-                  {/* MOBILE LAYOUT: Vertical Stack */}
-                  <div className="flex flex-col md:hidden  items-center justify-center gap-4 w-full">
-                    {/* 1. Rotating Green Animation */}
-                    <div className="flex items-center justify-center">
-                      <div className="w-16 h-16 relative">
-                        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 rotating-border"></div>
-                        <div className="absolute inset-2 rounded-full border-2 border-transparent border-b-green-300 border-l-green-300 rotating-border-reverse"></div>
-                        <div className="absolute inset-4 rounded-full bg-green-400/20 pulsing-glow"></div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div
-                            className={`transition-all duration-300 ${
-                              isAISpeaking ? "animate-bounce" : "animate-pulse"
-                            }`}>
-                            <img
-                              src="./logo.png"
-                              className="w-6 h-6 block dark:hidden"
-                              alt="Logo"
-                            />
-                            <img
-                              src="./q.png"
-                              className="w-6 h-6 hidden dark:block"
-                              alt="Logo"
-                            />
-                          </div>
-                        </div>
-                        {/* Bigger and darker ripples */}
-                        <div className="absolute -inset-4 rounded-full border-2 border-green-500/60 animate-ping"></div>
-                        <div className="absolute -inset-8 rounded-full border-2 border-green-600/50 animate-ping animation-delay-300"></div>
-                        <div className="absolute -inset-12 rounded-full border border-green-700/40 animate-ping animation-delay-600"></div>
-                      </div>
-                    </div>
+  {/* SINGLE VOICE OVERLAY - PROPERLY RESPONSIVE */}
+ {showVoiceOverlay && !isGuest && (
+  <div className="fixed inset-0 z-[90] bg-gradient-to-t from-gray-900 via-gray-700 to-transparent backdrop-blur-lg text-white flex items-center justify-center shadow-2xl px-4 py-4">
+    
+    {/* MOBILE ONLY */}
+    <div className="block md:hidden w-full max-w-sm">
+      <div className="flex flex-col items-center justify-center gap-6">
+        {/* Mobile Animation - Ripple Effect */}
+        <div className="w-20 h-20 relative flex items-center justify-center">
+          {/* Multiple ripple circles */}
+          <div className="absolute w-20 h-20 rounded-full border-2 border-green-400 animate-ping opacity-75"></div>
+          <div className="absolute w-16 h-16 rounded-full border-2 border-green-300 animate-ping opacity-50" style={{animationDelay: '0.5s'}}></div>
+          <div className="absolute w-12 h-12 rounded-full border-2 border-green-200 animate-ping opacity-25" style={{animationDelay: '1s'}}></div>
+          
+          {/* Center logo */}
+          <div className="relative z-10 w-12 h-12 flex items-center justify-center  rounded-full">
+            <img
+              src="./logo.png"
+              className="w-8 h-8 block dark:hidden"
+              alt="Logo"
+            />
+            <img
+              src="./q.png"
+              className="w-8 h-8 hidden dark:block"
+              alt="Logo"
+            />
+          </div>
+        </div>
 
-                    {/* 2. Status Display */}
-                    <div className="text-sm font-semibold text-center">
-                      {isProcessing && (
-                        <p className="text-yellow-400 animate-pulse flex items-center gap-2 justify-center">
-                          <span className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce status-dot"></span>
-                          Initializing voice mode...
-                        </p>
-                      )}
-                      {isAISpeaking && (
-                        <p className="text-blue-400 animate-pulse flex items-center gap-2 justify-center">
-                          <span className="w-3 h-3 bg-blue-400 rounded-full animate-bounce status-dot"></span>
-                          AI is responding...
-                        </p>
-                      )}
-                      {!isProcessing &&
-                        !isAISpeaking &&
-                        connectionStatus === "connected" && (
-                          <p className="text-green-400 flex items-center gap-2 justify-center">
-                            <span className="w-3 h-3 bg-green-400 rounded-full animate-pulse status-dot"></span>
-                            Listening for speech...
-                          </p>
-                        )}
-                      <div className="text-xs mt-1 flex items-center gap-1 justify-center">
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            connectionStatus === "connected"
-                              ? "bg-green-400 connection-pulse"
-                              : "bg-red-400"
-                          }`}></span>
-                        <span className="text-gray-400">
-                          {connectionStatus === "connected"
-                            ? "Connected"
-                            : "Disconnected"}
-                        </span>
-                      </div>
-                    </div>
+        {/* Mobile Status */}
+        <div className="text-sm font-semibold text-center">
+          {isProcessing && (
+            <p className="text-yellow-400 animate-pulse">Initializing...</p>
+          )}
+          {isAISpeaking && (
+            <p className="text-blue-400 animate-pulse">AI is responding...</p>
+          )}
+          {!isProcessing && !isAISpeaking && connectionStatus === "connected" && (
+            <p className="text-green-400">Listening for speech...</p>
+          )}
+        </div>
 
-                    {/* 3. Live Transcript */}
-                    <div className="w-full max-w-sm">
-                      <div className="p-3  flex flex-col items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm border border-green-400/30 transcript-glow">
-                        <div className="text-xs text-green-300 mb-1 flex items-center gap-1">
-                          <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
-                          Live Transcript:
-                        </div>
-                        <p className="text-sm text-white min-h-[40px] break-words">
-                          {voiceTranscript || "Listening for speech..."}
-                        </p>
-                      </div>
-                    </div>
+        {/* Mobile Transcript */}
+        <div className="w-full p-3 bg-black/40 rounded-lg backdrop-blur-sm border border-green-400/30">
+          <p className="text-sm text-white min-h-[40px] break-words text-center">
+            {voiceTranscript || "Listening for speech..."}
+          </p>
+        </div>
 
-                    {/* 4. Stop Button */}
-                    <button
-                      disabled={!socketOpen}
-                      onClick={() => {
-                        console.log("🖱️ Stop button clicked");
-                        stopVoiceMode();
-                      }}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full shadow-lg transition-all duration-300 flex items-center gap-2 min-w-[120px] justify-center relative overflow-hidden text-sm">
-                      <span className="absolute inset-0 bg-white/10 rounded-full animate-pulse"></span>
-                      <span className="relative z-10 flex items-center gap-2">
-                        <span>🛑</span>
-                        Stop Voice
-                      </span>
-                    </button>
-                  </div>
+        {/* Mobile Stop Button */}
+        <button
+          onClick={stopVoiceMode}
+          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full">
+          🛑 Stop Voice
+        </button>
+      </div>
+    </div>
 
-                  {/* DESKTOP LAYOUT: Horizontal */}
-                  <div className="hidden md:flex md:flex-col items-center justify-center gap-5 w-full max-w-4xl">
-                    {/* 1. Rotating Green Animation and Status Display (Top) */}
-                    <div className="flex flex-col gap-10  mt-32">
-                      <div className="flex items-center justify-center">
-                        <div className="w-40 h-40 relative">
-                          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 rotating-border"></div>
-                          <div className="absolute inset-2 rounded-full border-2 border-transparent border-b-green-300 border-l-green-300 rotating-border-reverse"></div>
-                          <div className="absolute inset-4 rounded-full bg-green-400/20 pulsing-glow"></div>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div
-                              className={`transition-all duration-300 ${
-                                isAISpeaking
-                                  ? "animate-bounce"
-                                  : "animate-pulse"
-                              }`}>
-                              <img
-                                src="./logo.png"
-                                className="w-16 h-16 block dark:hidden"
-                                alt="Logo"
-                              />
-                              <img
-                                src="./q.png"
-                                className="w-16 h-16 hidden dark:block"
-                                alt="Logo"
-                              />
-                            </div>
-                          </div>
-                          <div className="absolute -inset-2 rounded-full border border-green-400/30 animate-ping"></div>
-                          <div className="absolute -inset-4 rounded-full border border-green-400/20 animate-ping animation-delay-300"></div>
-                        </div>
-                      </div>
-                      {/* Status Display (Top) */}
-                      <div className="text-sm font-semibold text-center">
-                        {isProcessing && (
-                          <p className="text-yellow-400 animate-pulse flex items-center gap-2 justify-center">
-                            <span className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce status-dot"></span>
-                            Initializing voice mode...
-                          </p>
-                        )}
-                        {isAISpeaking && (
-                          <p className="text-blue-400 animate-pulse flex items-center gap-2 justify-center">
-                            <span className="w-3 h-3 bg-blue-400 rounded-full animate-bounce status-dot"></span>
-                            AI is responding...
-                          </p>
-                        )}
-                        {!isProcessing &&
-                          !isAISpeaking &&
-                          connectionStatus === "connected" && (
-                            <p className="text-green-400 flex items-center gap-2 justify-center">
-                              <span className="w-3 h-3 bg-green-400 rounded-full animate-pulse status-dot"></span>
-                              Listening for speech...
-                            </p>
-                          )}
-                        <div className="text-xs mt-1 flex items-center gap-1 justify-center">
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              connectionStatus === "connected"
-                                ? "bg-green-400 connection-pulse"
-                                : "bg-red-400"
-                            }`}></span>
-                          <span className="text-gray-400">
-                            {connectionStatus === "connected"
-                              ? "Connected"
-                              : "Disconnected"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    {/* 2. Status + Live Transcript Div */}
-                    <div className="flex flex-col items-center justify-center p-10  gap-5 w-full  ">
-                      {/* Live Transcript (Bottom) */}
-                      <div className="w-full">
-                        <div className="p-3 flex flex-col items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm border border-green-400/30 transcript-glow">
-                          <div className="text-xs text-green-300 mb-1 flex items-center  gap-1">
-                            <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
-                            Live Speech
-                          </div>
-                          <p className="text-sm text-white min-h-[40px] break-words">
-                            {voiceTranscript || "Listening for speech..."}
-                          </p>
-                        </div>
-                      </div>
-                      {/* 3. Stop Button + WebSocket Status Div */}
-                      <div className="flex flex-col gap-4 items-center">
-                        {/* WebSocket Status */}
-                        <div className="text-xs text-gray-400 bg-black/20 rounded-lg p-2 space-y-1">
-                          <div className="flex justify-between gap-4">
-                            <span>Status:</span>
-                            <span
-                              className={
-                                connectionStatus === "connected"
-                                  ? "text-green-400"
-                                  : "text-red-400"
-                              }>
-                              {connectionStatus === "connected"
-                                ? "Active"
-                                : "Inactive"}
-                            </span>
-                          </div>
+    {/* DESKTOP ONLY */}
+    <div className="hidden md:block w-full max-w-4xl">
+      <div className="flex flex-col items-center justify-center gap-8">
+        {/* Desktop Animation - Ripple Effect */}
+        <div className="w-32 h-32 relative flex items-center justify-center">
+          {/* Multiple ripple circles */}
+          <div className="absolute w-32 h-32 rounded-full border-2 border-green-400 animate-ping opacity-75"></div>
+          <div className="absolute w-24 h-24 rounded-full border-2 border-green-300 animate-ping opacity-50" style={{animationDelay: '0.5s'}}></div>
+          <div className="absolute w-16 h-16 rounded-full border-2 border-green-200 animate-ping opacity-25" style={{animationDelay: '1s'}}></div>
+          
+          {/* Center logo */}
+          <div className="relative z-10 w-16 h-16 flex items-center justify-center   rounded-full">
+            <img
+              src="./logo.png"
+              className="w-16 h-16 block dark:hidden"
+              alt="Logo"
+            />
+            <img
+              src="./q.png"
+              className="w-16 h-16 hidden dark:block"
+              alt="Logo"
+            />
+          </div>
+        </div>
 
-                          <div className="flex justify-between gap-4">
-                            <span>Audio Stream:</span>
-                            <span
-                              className={
-                                isVoiceMode ? "text-green-400" : "text-red-400"
-                              }>
-                              {isVoiceMode ? "Active" : "Inactive"}
-                            </span>
-                          </div>
-                        </div>
-                        {/* Stop Button */}
-                        <button
-                          disabled={!socketOpen}
-                          onClick={() => {
-                            console.log("🖱️ Stop button clicked");
-                            stopVoiceMode();
-                          }}
-                          className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full shadow-lg transition-all duration-300 flex items-center gap-2 min-w-[140px] justify-center relative overflow-hidden">
-                          <span className="absolute inset-0 bg-white/10 rounded-full animate-pulse"></span>
-                          <span className="relative z-10 flex items-center gap-2">
-                            <span>🛑</span>
-                            <span>Stop Voice</span>
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </div>
+        {/* Desktop Status */}
+        <div className="text-lg font-semibold text-center">
+          {isProcessing && (
+            <p className="text-yellow-400 animate-pulse">Initializing voice mode...</p>
+          )}
+          {isAISpeaking && (
+            <p className="text-blue-400 animate-pulse">AI is responding...</p>
+          )}
+          {!isProcessing && !isAISpeaking && connectionStatus === "connected" && (
+            <p className="text-green-400">Listening for speech...</p>
+          )}
+        </div>
+
+        {/* Desktop Transcript */}
+        <div className="w-full max-w-2xl p-4 bg-black/40 rounded-lg backdrop-blur-sm border border-green-400/30">
+          <p className="text-base text-white min-h-[60px] break-words text-center">
+            {voiceTranscript || "Listening for speech..."}
+          </p>
+        </div>
+
+        {/* Desktop Stop Button */}
+        <button
+          onClick={stopVoiceMode}
+          className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full">
+          🛑 Stop Voice Mode
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+</div>
 
             {/* Hidden File Input */}
             <input
