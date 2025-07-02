@@ -88,11 +88,11 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
 
   return (
 <div className="fixed top-0 left-0 w-full pt-2 px-4 pb-2 z-30 navbar-transparent" style={{ width: 'calc(100% - 12px)' }}>
-  <div className={`flex items-center gap-7 navbar-interactive ${!isGuest ? 'justify-between' : 'sm:justify-between justify-around'}`}>
+  <div className={`flex items-center gap-7 navbar-interactive ${!isGuest ? 'justify-between ' : 'sm:justify-between justify-around'}`}>
 
         {/* Logo */}
         <div className="relative ml-16 justify-center items-center cursor-pointer bg-white/80 dark:bg-[#121212]/80 backdrop-blur-sm rounded-lg px-2 py-1">
-          <span className="text-2xl mt-2 flex items-center cursor-pointer sm:text-center font-bold text-black dark:text-white">
+          <span className="text-2xl mt-2  flex items-center cursor-pointer sm:text-center font-bold text-black dark:text-white">
             <img
               src="./logo.png"
               className="w-12 h-12 hidden md:block dark:hidden"
@@ -117,6 +117,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
                 />
               </>
             )}
+            
           </span>
         </div>
 
