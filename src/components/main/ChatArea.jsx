@@ -1335,65 +1335,56 @@ const startRecording = async () => {
   const nextPlayTimeRef = useRef(0);
   const pcmBufferRef = useRef([]);
 
+  const handleTTSChunk = (
+  base64Audio,
+  encoding = "linear16",
+  sampleRate = 24000
+) => {
+  try {
+    // ✅ Process immediately - no logging delays
+    const binaryString = atob(base64Audio);
+    const pcmData = new Int16Array(binaryString.length / 2);
+
+    for (let i = 0; i < pcmData.length; i++) {
+      const byte1 = binaryString.charCodeAt(i * 2);
+      const byte2 = binaryString.charCodeAt(i * 2 + 1);
+      pcmData[i] = (byte2 << 8) | byte1;
+    }
+
+    // ✅ Process every chunk immediately
+    pcmBufferRef.current.push(pcmData);
+    processHumanLikeAudioBuffer(); // ✅ Process immediately, no buffering
+    
+    } catch (error) {
+      console.error("❌ Error processing audio chunk:", error);
+    }
+  };
+
   const initializeTTSAudio = () => {
-    try {
-      // Create Web Audio Context for human-like playback
-      audioContextRef.current = new (window.AudioContext ||
-        window.webkitAudioContext)({
-        sampleRate: 24000,
-      });
+  try {
+    // Create Web Audio Context for immediate playback
+    audioContextRef.current = new (window.AudioContext ||
+      window.webkitAudioContext)({
+      sampleRate: 24000,
+    });
 
-      audioBufferQueueRef.current = [];
-      pcmBufferRef.current = [];
-      isPlayingAudioRef.current = false;
-      nextPlayTimeRef.current = 0;
+    // ✅ Force resume immediately
+    audioContextRef.current.resume();
 
-      setIsTTSPlaying(true);
-      console.log("🔊 Human-like Web Audio API initialized");
+    audioBufferQueueRef.current = [];
+    pcmBufferRef.current = [];
+    isPlayingAudioRef.current = false;
+    nextPlayTimeRef.current = 0;
+
+    setIsTTSPlaying(true);
+    console.log("🔊 Web Audio API initialized for immediate playback");
     } catch (error) {
       console.error("❌ Failed to initialize Web Audio API:", error);
       setIsTTSPlaying(true);
     }
   };
 
-  const handleTTSChunk = (
-    base64Audio,
-    encoding = "linear16",
-    sampleRate = 24000
-  ) => {
-    try {
-      console.log(
-        `🔊 Processing human-like audio chunk: ${base64Audio.length} chars`
-      );
-
-      // Decode base64 to PCM
-      const binaryString = atob(base64Audio);
-      const pcmData = new Int16Array(binaryString.length / 2);
-
-      for (let i = 0; i < pcmData.length; i++) {
-        const byte1 = binaryString.charCodeAt(i * 2);
-        const byte2 = binaryString.charCodeAt(i * 2 + 1);
-        pcmData[i] = (byte2 << 8) | byte1;
-      }
-
-      // Add to continuous buffer
-      pcmBufferRef.current.push(pcmData);
-
-      // Process larger chunks for more natural speech flow
-      const totalSamples = pcmBufferRef.current.reduce(
-        (sum, chunk) => sum + chunk.length,
-        0
-      );
-
-      // Process when we have ~800ms of audio for natural pacing
-      if (totalSamples >= 19200) {
-        // 800ms at 24kHz for more natural chunks
-        processHumanLikeAudioBuffer();
-      }
-    } catch (error) {
-      console.error("❌ Error processing audio chunk:", error);
-    }
-  };
+  
 
   const processHumanLikeAudioBuffer = async () => {
     try {
@@ -1444,23 +1435,10 @@ const startRecording = async () => {
   };
 
   // ✅ HUMAN-LIKE EFFECTS: Make speech more natural
-  const applyHumanLikeEffects = (pcmData) => {
-    try {
-      // 1. Slight volume normalization for consistent levels
-      const normalizedData = normalizeAudio(pcmData);
-
-      // 2. Add subtle natural variations
-      const naturalData = addNaturalVariations(normalizedData);
-
-      // 3. Smooth transitions between chunks
-      const smoothedData = smoothTransitions(naturalData);
-
-      return smoothedData;
-    } catch (error) {
-      console.error("❌ Error applying human-like effects:", error);
-      return pcmData; // Return original if processing fails
-    }
-  };
+const applyHumanLikeEffects = (pcmData) => {
+  // ✅ No processing - return immediately
+  return pcmData;
+};
 
   const normalizeAudio = (pcmData) => {
     // Find peak amplitude
@@ -1482,86 +1460,31 @@ const startRecording = async () => {
     return normalizedData;
   };
 
-  const addNaturalVariations = (pcmData) => {
-    // Add very subtle natural variations (like human speech micro-variations)
-    const naturalData = new Int16Array(pcmData.length);
+const addNaturalVariations = (pcmData) => {
+  // ✅ Skip variations for maximum speed
+  return pcmData;
+};
+const smoothTransitions = (pcmData) => {
+  // ✅ No processing - return original data immediately
+  return pcmData;
+};
 
-    for (let i = 0; i < pcmData.length; i++) {
-      // Add tiny random variations (±1% max) for more natural sound
-      const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
-      naturalData[i] = Math.round(pcmData[i] * (1 + variation));
-    }
+ const scheduleHumanLikeAudioBuffer = (audioBuffer) => {
+  try {
+    if (!audioContextRef.current) return;
 
-    return naturalData;
-  };
+    const source = audioContextRef.current.createBufferSource();
 
-  const smoothTransitions = (pcmData) => {
-    // Apply gentle fade-in/fade-out to chunk edges for seamless transitions
-    const smoothedData = new Int16Array(pcmData.length);
-    const fadeLength = Math.min(480, pcmData.length / 10); // 20ms fade at 24kHz
-
-    for (let i = 0; i < pcmData.length; i++) {
-      let sample = pcmData[i];
-
-      // Fade in at the beginning
-      if (i < fadeLength) {
-        const fadeIn = i / fadeLength;
-        sample = Math.round(sample * fadeIn);
-      }
-
-      // Fade out at the end
-      if (i >= pcmData.length - fadeLength) {
-        const fadeOut = (pcmData.length - 1 - i) / fadeLength;
-        sample = Math.round(sample * fadeOut);
-      }
-
-      smoothedData[i] = sample;
-    }
-
-    return smoothedData;
-  };
-
-  const scheduleHumanLikeAudioBuffer = (audioBuffer) => {
-    try {
-      if (!audioContextRef.current) return;
-
-      const source = audioContextRef.current.createBufferSource();
-
-      // ✅ HUMAN-LIKE AUDIO PROCESSING: Add subtle effects
-      const gainNode = audioContextRef.current.createGain();
-      const compressor = audioContextRef.current.createDynamicsCompressor();
-
-      // Configure compressor for more natural speech
-      compressor.threshold.setValueAtTime(
-        -24,
-        audioContextRef.current.currentTime
-      );
-      compressor.knee.setValueAtTime(30, audioContextRef.current.currentTime);
-      compressor.ratio.setValueAtTime(3, audioContextRef.current.currentTime);
-      compressor.attack.setValueAtTime(
-        0.003,
-        audioContextRef.current.currentTime
-      );
-      compressor.release.setValueAtTime(
-        0.25,
-        audioContextRef.current.currentTime
-      );
-
-      // Set natural volume level
-      gainNode.gain.setValueAtTime(0.85, audioContextRef.current.currentTime);
-
-      // Connect audio chain: source -> compressor -> gain -> destination
-      source.buffer = audioBuffer;
-      source.connect(compressor);
-      compressor.connect(gainNode);
-      gainNode.connect(audioContextRef.current.destination);
+    // ✅ DIRECT CONNECTION: No processing delays
+    source.buffer = audioBuffer;
+    source.connect(audioContextRef.current.destination); 
 
       const currentTime = audioContextRef.current.currentTime;
 
       // Schedule with natural pacing
       if (!isPlayingAudioRef.current) {
         // First chunk - start with slight delay for natural feel
-        nextPlayTimeRef.current = currentTime + 0.15; // Slightly longer delay for natural start
+       nextPlayTimeRef.current = currentTime; // Slightly longer delay for natural start
         isPlayingAudioRef.current = true;
       }
 
@@ -1569,7 +1492,7 @@ const startRecording = async () => {
       source.start(nextPlayTimeRef.current);
 
       // ✅ NATURAL PACING: Add small gaps between chunks for breathing room
-      const naturalGap = 0.05; // 50ms gap for natural speech rhythm
+      const naturalGap = 0; // ✅ Only 20ms gap for smoother flow
       nextPlayTimeRef.current += audioBuffer.duration + naturalGap;
 
       // Handle completion
@@ -1585,28 +1508,26 @@ const startRecording = async () => {
     }
   };
 
-  const playTTSAudio = () => {
-    // Process any remaining buffered audio
-    if (pcmBufferRef.current.length > 0) {
-      processHumanLikeAudioBuffer();
-    }
+ const playTTSAudio = () => {
+  // Process any remaining buffered audio immediately
+  if (pcmBufferRef.current.length > 0) {
+    processHumanLikeAudioBuffer();
+  }
 
-    // Set completion timeout with natural timing
+  // ✅ Immediate completion check - no delays
+  if (audioContextRef.current) {
+    const remainingTime =
+      nextPlayTimeRef.current - audioContextRef.current.currentTime;
+
     setTimeout(() => {
-      if (audioContextRef.current) {
-        const remainingTime =
-          nextPlayTimeRef.current - audioContextRef.current.currentTime;
+      setIsTTSPlaying(false);
+      isPlayingAudioRef.current = false;
+      console.log("🔊 TTS audio completed");
+    }, Math.max(remainingTime * 1000, 100)); // ✅ Minimal 100ms only
+  }
 
-        setTimeout(() => {
-          setIsTTSPlaying(false);
-          isPlayingAudioRef.current = false;
-          console.log("🔊 All human-like TTS audio completed naturally");
-        }, Math.max(remainingTime * 1000, 1500)); // Longer timeout for natural completion
-      }
-    }, 800); // Longer initial delay
-
-    console.log("🔊 Human-like TTS playback finalized");
-  };
+  console.log("🔊 TTS playback finalized");
+};
 
   const cleanupTTSAudio = () => {
     try {
@@ -2532,16 +2453,19 @@ ${
           handleLoginPrompt();
           return;
         }
+        // if (!isGuest) {
+        //   return; // Do nothing for logged-in users
+        // }
         startVoiceMode();
       }}
       disabled={isVoiceMode || isProcessing}
       className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
         isVoiceMode
-          ? "bg-red-600 text-white cursor-not-allowed"
-          : "bg-green-600 hover:bg-green-700 text-white"
+          ? "bg-red-600 text-black cursor-not-allowed"
+          : "bg-white hover:bg-green-700 text-black border border-black"
       } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
       <span className="md:block hidden text-xs md:text-base items-center gap-2">
-        <AudioLines size={20} />
+        <AudioLines size={18} />
       </span>
       <span className="block md:hidden text-xs md:text-base items-center gap-2">
         <AudioLines size={12} />
@@ -2552,7 +2476,9 @@ ${
             ? "Login for Voice Mode"
             : isVoiceMode
             ? "Voice Active"
-            : "Voice Mode"}
+            // : "Coming Soon"
+            : "Voice Mode"
+            }
           <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900" />
         </div>
       )}

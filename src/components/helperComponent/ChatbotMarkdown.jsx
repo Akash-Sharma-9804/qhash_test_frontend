@@ -698,94 +698,176 @@ const ChatbotMarkdown = forwardRef(
     }));
 
     
+// useEffect(() => {
+//   if (!containerRef.current) return;
+  
+//   // Force process code blocks whenever content changes
+//   const timer = setTimeout(() => {
+//     const codeBlocks = containerRef.current.querySelectorAll('pre code:not(.hljs)');
+//     if (codeBlocks.length > 0) {
+//       console.log('🔄 Processing', codeBlocks.length, 'new code blocks');
+//       codeBlocks.forEach(block => {
+//         if (!block.hasAttribute('data-original-content')) {
+//           block.setAttribute('data-original-content', block.textContent || '');
+//         }
+//         hljs.highlightElement(block);
+//       });
+//     }
+
+//     // ✅ ADD COPY BUTTONS - Add copy buttons to all new pre blocks
+//     const preBlocks = containerRef.current.querySelectorAll('pre');
+//     preBlocks.forEach((pre, index) => {
+//       // Skip if already has copy button
+//       if (pre.querySelector('.code-copy-btn')) return;
+//       const code = pre.querySelector('code');
+//       if (!code) return;
+      
+//       const originalContent = code.getAttribute('data-original-content') || code.textContent || code.innerText || '';
+//       const className = code.className || '';
+//       const match = /language-(\w+)/.exec(className);
+//       const lang = match?.[1] || 'code';
+//       const blockId = `code-block-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+
+//       // Create header
+//       const header = document.createElement('div');
+//       header.className = 'code-header';
+//       const langSpan = document.createElement('span');
+//       langSpan.className = 'code-lang';
+//       langSpan.textContent = lang.toUpperCase();
+//       const button = document.createElement('button');
+//       button.className = 'code-copy-btn';
+//       button.setAttribute('data-block-id', blockId);
+
+//       const updateButtonContent = (isCopied) => {
+//         button.innerHTML = `
+//           <div class="flex items-center gap-1.5">
+//             ${isCopied 
+//               ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4cd327" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>`
+//               : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`
+//             }
+//             <span style="color: ${isCopied ? '#4cd327' : 'inherit'}">${isCopied ? 'Copied!' : 'Copy code'}</span>
+//           </div>
+//         `;
+//       };
+//       updateButtonContent(false);
+
+//       button.addEventListener('click', async (e) => {
+//         e.preventDefault();
+//         e.stopPropagation();
+//         try {
+//           await navigator.clipboard.writeText(originalContent);
+//           updateButtonContent(true);
+//           setTimeout(() => updateButtonContent(false), 2000);
+//           console.log('✅ Code copied successfully');
+//         } catch (err) {
+//           console.error('❌ Failed to copy code:', err);
+//           // Fallback for older browsers
+//           try {
+//             const textArea = document.createElement('textarea');
+//             textArea.value = originalContent;
+//             document.body.appendChild(textArea);
+//             textArea.select();
+//             document.execCommand('copy');
+//             document.body.removeChild(textArea);
+//             updateButtonContent(true);
+//             setTimeout(() => updateButtonContent(false), 2000);
+//             console.log('✅ Code copied via fallback');
+//           } catch (fallbackErr) {
+//             console.error('❌ Fallback copy also failed:', fallbackErr);
+//           }
+//         }
+//       });
+
+//       header.appendChild(langSpan);
+//       header.appendChild(button);
+//       pre.insertBefore(header, pre.firstChild);
+//     });
+//   }, 50);
+  
+//   return () => clearTimeout(timer);
+// }, [content]); // This will run every time content updates during streaming
+
 useEffect(() => {
   if (!containerRef.current) return;
   
-  // Force process code blocks whenever content changes
+  // Debounced processing - waits for streaming to pause
   const timer = setTimeout(() => {
-    const codeBlocks = containerRef.current.querySelectorAll('pre code:not(.hljs)');
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Process code highlighting
+    const codeBlocks = container.querySelectorAll('pre code:not(.hljs)');
     if (codeBlocks.length > 0) {
-      console.log('🔄 Processing', codeBlocks.length, 'new code blocks');
+      console.log('🔄 Processing', codeBlocks.length, 'code blocks');
       codeBlocks.forEach(block => {
-        if (!block.hasAttribute('data-original-content')) {
-          block.setAttribute('data-original-content', block.textContent || '');
-        }
         hljs.highlightElement(block);
       });
     }
 
-    // ✅ ADD COPY BUTTONS - Add copy buttons to all new pre blocks
-    const preBlocks = containerRef.current.querySelectorAll('pre');
-    preBlocks.forEach((pre, index) => {
-      // Skip if already has copy button
-      if (pre.querySelector('.code-copy-btn')) return;
-      const code = pre.querySelector('code');
-      if (!code) return;
-      
-      const originalContent = code.getAttribute('data-original-content') || code.textContent || code.innerText || '';
-      const className = code.className || '';
-      const match = /language-(\w+)/.exec(className);
-      const lang = match?.[1] || 'code';
-      const blockId = `code-block-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    // Add copy buttons to code blocks
+    const preBlocks = container.querySelectorAll('pre:not([data-copy-added])');
+    if (preBlocks.length > 0) {
+      console.log('➕ Adding copy buttons to', preBlocks.length, 'blocks');
+      preBlocks.forEach(pre => {
+        pre.setAttribute('data-copy-added', 'true');
+        
+        const code = pre.querySelector('code');
+        if (!code) return;
+        
+        const codeContent = code.textContent || '';
+        const className = code.className || '';
+        const match = /language-(\w+)/.exec(className);
+        const lang = match?.[1] || 'code';
 
-      // Create header
-      const header = document.createElement('div');
-      header.className = 'code-header';
-      const langSpan = document.createElement('span');
-      langSpan.className = 'code-lang';
-      langSpan.textContent = lang.toUpperCase();
-      const button = document.createElement('button');
-      button.className = 'code-copy-btn';
-      button.setAttribute('data-block-id', blockId);
-
-      const updateButtonContent = (isCopied) => {
-        button.innerHTML = `
-          <div class="flex items-center gap-1.5">
-            ${isCopied 
-              ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4cd327" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>`
-              : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`
-            }
-            <span style="color: ${isCopied ? '#4cd327' : 'inherit'}">${isCopied ? 'Copied!' : 'Copy code'}</span>
-          </div>
+        // Create header with language and copy button
+        const header = document.createElement('div');
+        header.className = 'code-header';
+        header.innerHTML = `
+          <span class="code-lang">${lang.toUpperCase()}</span>
+          <button class="code-copy-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy code</span>
+          </button>
         `;
-      };
-      updateButtonContent(false);
 
-      button.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        try {
-          await navigator.clipboard.writeText(originalContent);
-          updateButtonContent(true);
-          setTimeout(() => updateButtonContent(false), 2000);
-          console.log('✅ Code copied successfully');
-        } catch (err) {
-          console.error('❌ Failed to copy code:', err);
-          // Fallback for older browsers
+        const copyBtn = header.querySelector('.code-copy-btn');
+        copyBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
           try {
-            const textArea = document.createElement('textarea');
-            textArea.value = originalContent;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            updateButtonContent(true);
-            setTimeout(() => updateButtonContent(false), 2000);
-            console.log('✅ Code copied via fallback');
-          } catch (fallbackErr) {
-            console.error('❌ Fallback copy also failed:', fallbackErr);
+            await navigator.clipboard.writeText(codeContent);
+            copyBtn.innerHTML = `
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4cd327" stroke-width="2">
+                <polyline points="20,6 9,17 4,12"></polyline>
+              </svg>
+              <span style="color: #4cd327">Copied!</span>
+            `;
+            setTimeout(() => {
+              copyBtn.innerHTML = `
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Copy code</span>
+              `;
+            }, 1000);
+          } catch (err) {
+            console.error('Copy failed:', err);
           }
-        }
-      });
+        });
 
-      header.appendChild(langSpan);
-      header.appendChild(button);
-      pre.insertBefore(header, pre.firstChild);
-    });
-  }, 50);
-  
+        // Insert header at the beginning of pre
+        pre.insertBefore(header, pre.firstChild);
+      });
+    }
+  }, 500); // Increased delay to wait for code block completion
+
   return () => clearTimeout(timer);
-}, [content]); // This will run every time content updates during streaming
+}, [content]); // Runs on every content change but with debounce
 
 
     return (
