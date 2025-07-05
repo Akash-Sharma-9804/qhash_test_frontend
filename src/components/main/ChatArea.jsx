@@ -2142,7 +2142,7 @@ useEffect(() => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative mb-5  z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white  w-5/6 md:max-w-2xl md:w-fit self-end ml-auto">
+                        className="relative mb-5  z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white  w-fit max-w-[90%] md:max-w-2xl md:w-fit self-end ml-auto">
                         <div className="flex items-start gap-2">
                           <div className="p-1 rounded-full flex-shrink-0">
                             {/* Fallback to default circle icon if user_img is not available */}
