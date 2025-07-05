@@ -91,7 +91,7 @@ const Navbar = ({ setSidebarOpen, isGuest }) => {
   <div className={`flex items-center gap-7 navbar-interactive ${!isGuest ? 'justify-between ' : 'sm:justify-between justify-around'}`}>
 
         {/* Logo */}
-        <div className="relative ml-16 justify-center items-center cursor-pointer bg-white/80 dark:bg-[#121212]/80 backdrop-blur-sm rounded-lg px-2 py-1">
+        <div className="relative ml-16 justify-center items-center cursor-pointer   backdrop-blur-sm rounded-lg px-2 py-1">
           <span className="text-2xl mt-2  flex items-center cursor-pointer sm:text-center font-bold text-black dark:text-white">
             <img
               src="./logo.png"

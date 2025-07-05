@@ -2290,7 +2290,7 @@ useEffect(() => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className={`absolute md:right-80  bottom-2  w-full   md:w-3/5 flex font-centurygothic flex-col items-center justify-center text-center text-gray-800 dark:text-white`}>
+                className={`absolute md:right-80  bottom-8  w-full   md:w-3/5 flex font-centurygothic flex-col items-center justify-center text-center text-gray-800 dark:text-white`}>
                 {/* <img
                   src="./logo.png"
                   className="w-12 h-12 block dark:hidden"
@@ -2621,7 +2621,7 @@ ${
       className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
         isVoiceMode
           ? "bg-red-600 text-black cursor-not-allowed"
-          : "bg-white hover:bg-gray-400 text-black border border-gray-400"
+          : "  hover:bg-gray-400 text-black border border-gray-400"
       } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
       <span className="md:block hidden text-xs md:text-base items-center gap-2">
         <AudioLines size={18} />
