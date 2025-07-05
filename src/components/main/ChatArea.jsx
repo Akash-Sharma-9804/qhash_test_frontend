@@ -1335,13 +1335,17 @@ const startRecording = async () => {
   const nextPlayTimeRef = useRef(0);
   const pcmBufferRef = useRef([]);
 
-  const handleTTSChunk = (
-  base64Audio,
-  encoding = "linear16",
-  sampleRate = 24000
-) => {
+ // ✅ REPLACE: handleTTSChunk function (around line 1340)
+const handleTTSChunk = (base64Audio, encoding = "linear16", sampleRate = 24000) => {
   try {
-    // ✅ Process immediately - no logging delays
+    console.log(`🔊 [TTS Chunk] Received: ${base64Audio.length} chars`);
+    
+    // ✅ Ensure audio context is ready
+    if (!audioContextRef.current) {
+      initializeAudioContext();
+    }
+
+    // ✅ Process audio data
     const binaryString = atob(base64Audio);
     const pcmData = new Int16Array(binaryString.length / 2);
 
@@ -1351,94 +1355,227 @@ const startRecording = async () => {
       pcmData[i] = (byte2 << 8) | byte1;
     }
 
-    // ✅ Process every chunk immediately
-    pcmBufferRef.current.push(pcmData);
-    processHumanLikeAudioBuffer(); // ✅ Process immediately, no buffering
+    // ✅ IMMEDIATE PLAYBACK - No buffering delays
+    playAudioChunkImmediately(pcmData, sampleRate);
     
-    } catch (error) {
-      console.error("❌ Error processing audio chunk:", error);
-    }
-  };
+  } catch (error) {
+    console.error("❌ Error processing audio chunk:", error);
+  }
+};
 
-  const initializeTTSAudio = () => {
-  try {
-    // Create Web Audio Context for immediate playback
-    audioContextRef.current = new (window.AudioContext ||
-      window.webkitAudioContext)({
+
+const initializeAudioContext = () => {
+  if (!audioContextRef.current) {
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
       sampleRate: 24000,
     });
-
-    // ✅ Force resume immediately
-    audioContextRef.current.resume();
-
-    audioBufferQueueRef.current = [];
-    pcmBufferRef.current = [];
-    isPlayingAudioRef.current = false;
-    nextPlayTimeRef.current = 0;
-
-    setIsTTSPlaying(true);
-    console.log("🔊 Web Audio API initialized for immediate playback");
-    } catch (error) {
-      console.error("❌ Failed to initialize Web Audio API:", error);
-      setIsTTSPlaying(true);
+    
+    // Resume immediately
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
     }
-  };
+    
+    // Reset timing
+    nextPlayTimeRef.current = audioContextRef.current.currentTime;
+    isPlayingAudioRef.current = false;
+    
+    console.log("🔊 Audio context initialized");
+  }
+};
+// ✅ NEW: Add audio to buffer and play immediately
+const addToAudioBuffer = (pcmData, sampleRate = 24000) => {
+  try {
+    if (!audioContextRef.current) return;
+
+    // ✅ Convert PCM to Float32
+    const float32Data = new Float32Array(pcmData.length);
+    for (let i = 0; i < pcmData.length; i++) {
+      float32Data[i] = pcmData[i] / 32768.0;
+    }
+
+    // ✅ Create AudioBuffer
+    const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, sampleRate);
+    audioBuffer.getChannelData(0).set(float32Data);
+
+    // ✅ Schedule for immediate playback
+    scheduleAudioBuffer(audioBuffer);
+    
+  } catch (error) {
+    console.error("❌ Error adding to audio buffer:", error);
+  }
+};
+
+// ✅ NEW: Schedule audio buffer for seamless playback
+const scheduleAudioBuffer = (audioBuffer) => {
+  try {
+    if (!audioContextRef.current) return;
+
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContextRef.current.destination);
+
+    const currentTime = audioContextRef.current.currentTime;
+    
+    if (!isPlayingAudioRef.current) {
+      // ✅ First chunk - start immediately
+      nextPlayTimeRef.current = Math.max(currentTime, nextPlayTimeRef.current);
+      isPlayingAudioRef.current = true;
+      console.log("🔊 Starting immediate audio playback");
+    }
+
+    // ✅ Schedule with NO gaps for seamless playback
+    source.start(nextPlayTimeRef.current);
+    nextPlayTimeRef.current += audioBuffer.duration;
+
+    console.log(`🔊 [SCHEDULED] Playing ${audioBuffer.length} samples at ${nextPlayTimeRef.current.toFixed(3)}s`);
+
+    // ✅ Handle completion
+    source.onended = () => {
+      console.log("🔊 Audio chunk completed");
+    };
+
+  } catch (error) {
+    console.error("❌ Error scheduling audio buffer:", error);
+  }
+};
+
+// ✅ NEW: Play audio chunk immediately without any delays
+const playAudioChunkImmediately = (pcmData, sampleRate = 24000) => {
+  try {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: sampleRate,
+      });
+      audioContextRef.current.resume();
+      console.log("🔊 Audio context initialized for immediate playback");
+    }
+
+    // ✅ Convert PCM to Float32 immediately
+    const float32Data = new Float32Array(pcmData.length);
+    for (let i = 0; i < pcmData.length; i++) {
+      float32Data[i] = pcmData[i] / 32768.0;
+    }
+
+    // ✅ Create and play AudioBuffer immediately
+    const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, sampleRate);
+    audioBuffer.getChannelData(0).set(float32Data);
+
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContextRef.current.destination);
+
+    // ✅ SEAMLESS SCHEDULING - No gaps between chunks
+    const currentTime = audioContextRef.current.currentTime;
+    
+    if (!isPlayingAudioRef.current) {
+      // ✅ First chunk - start immediately with minimal delay
+      nextPlayTimeRef.current = Math.max(currentTime + 0.01, nextPlayTimeRef.current);
+      isPlayingAudioRef.current = true;
+      console.log("🔊 Starting immediate audio playback");
+    }
+
+    // ✅ Schedule with ZERO gaps for seamless playback
+    source.start(nextPlayTimeRef.current);
+    nextPlayTimeRef.current += audioBuffer.duration; // No gap between chunks
+
+    console.log(`🔊 [SEAMLESS] Playing ${pcmData.length} samples at ${nextPlayTimeRef.current.toFixed(3)}s`);
+
+    // ✅ Handle completion
+    source.onended = () => {
+      console.log("🔊 Audio chunk completed seamlessly");
+    };
+
+  } catch (error) {
+    console.error("❌ Error in immediate audio playback:", error);
+  }
+};
+
+ // ✅ SIMPLIFIED TTS INITIALIZATION - Remove delays
+const initializeTTSAudio = () => {
+  try {
+    console.log("🔊 TTS Audio initializing...");
+    
+    // ✅ Initialize audio context immediately
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: 24000,
+      });
+      
+      // ✅ Resume immediately without user interaction (works in most browsers now)
+      if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
+      
+      console.log("🔊 Audio context initialized");
+    }
+    
+    // ✅ Reset playback state for new stream
+    isPlayingAudioRef.current = false;
+    nextPlayTimeRef.current = audioContextRef.current.currentTime;
+    setIsTTSPlaying(true);
+
+    console.log("🔊 TTS Audio ready for immediate streaming");
+  } catch (error) {
+    console.error("❌ Failed to initialize TTS audio:", error);
+  }
+};
+
 
   
 
-  const processHumanLikeAudioBuffer = async () => {
-    try {
-      if (!audioContextRef.current || pcmBufferRef.current.length === 0) return;
+  // const processHumanLikeAudioBuffer = async () => {
+  //   try {
+  //     if (!audioContextRef.current || pcmBufferRef.current.length === 0) return;
 
-      // Combine all PCM data
-      const totalLength = pcmBufferRef.current.reduce(
-        (sum, chunk) => sum + chunk.length,
-        0
-      );
-      const combinedPCM = new Int16Array(totalLength);
+  //     // Combine all PCM data
+  //     const totalLength = pcmBufferRef.current.reduce(
+  //       (sum, chunk) => sum + chunk.length,
+  //       0
+  //     );
+  //     const combinedPCM = new Int16Array(totalLength);
 
-      let offset = 0;
-      for (const chunk of pcmBufferRef.current) {
-        combinedPCM.set(chunk, offset);
-        offset += chunk.length;
-      }
+  //     let offset = 0;
+  //     for (const chunk of pcmBufferRef.current) {
+  //       combinedPCM.set(chunk, offset);
+  //       offset += chunk.length;
+  //     }
 
-      // Clear buffer
-      pcmBufferRef.current = [];
+  //     // Clear buffer
+  //     pcmBufferRef.current = [];
 
-      // ✅ HUMAN-LIKE PROCESSING: Apply natural speech effects
-      const processedPCM = applyHumanLikeEffects(combinedPCM);
+  //     // ✅ HUMAN-LIKE PROCESSING: Apply natural speech effects
+  //     const processedPCM = applyHumanLikeEffects(combinedPCM);
 
-      // Convert PCM to Float32 for Web Audio API
-      const float32Data = new Float32Array(processedPCM.length);
-      for (let i = 0; i < processedPCM.length; i++) {
-        float32Data[i] = processedPCM[i] / 32768.0;
-      }
+  //     // Convert PCM to Float32 for Web Audio API
+  //     const float32Data = new Float32Array(processedPCM.length);
+  //     for (let i = 0; i < processedPCM.length; i++) {
+  //       float32Data[i] = processedPCM[i] / 32768.0;
+  //     }
 
-      // Create AudioBuffer
-      const audioBuffer = audioContextRef.current.createBuffer(
-        1,
-        float32Data.length,
-        24000
-      );
-      audioBuffer.getChannelData(0).set(float32Data);
+  //     // Create AudioBuffer
+  //     const audioBuffer = audioContextRef.current.createBuffer(
+  //       1,
+  //       float32Data.length,
+  //       24000
+  //     );
+  //     audioBuffer.getChannelData(0).set(float32Data);
 
-      // Schedule with natural pacing
-      scheduleHumanLikeAudioBuffer(audioBuffer);
+  //     // Schedule with natural pacing
+  //     scheduleHumanLikeAudioBuffer(audioBuffer);
 
-      console.log(
-        `🔊 Scheduled ${float32Data.length} samples with human-like processing`
-      );
-    } catch (error) {
-      console.error("❌ Error processing human-like audio buffer:", error);
-    }
-  };
+  //     console.log(
+  //       `🔊 Scheduled ${float32Data.length} samples with human-like processing`
+  //     );
+  //   } catch (error) {
+  //     console.error("❌ Error processing human-like audio buffer:", error);
+  //   }
+  // };
 
   // ✅ HUMAN-LIKE EFFECTS: Make speech more natural
-const applyHumanLikeEffects = (pcmData) => {
-  // ✅ No processing - return immediately
-  return pcmData;
-};
+// const applyHumanLikeEffects = (pcmData) => {
+//   // ✅ No processing - return immediately
+//   return pcmData;
+// };
 
   const normalizeAudio = (pcmData) => {
     // Find peak amplitude
@@ -1460,96 +1597,104 @@ const applyHumanLikeEffects = (pcmData) => {
     return normalizedData;
   };
 
-const addNaturalVariations = (pcmData) => {
-  // ✅ Skip variations for maximum speed
-  return pcmData;
-};
-const smoothTransitions = (pcmData) => {
-  // ✅ No processing - return original data immediately
-  return pcmData;
-};
+// const addNaturalVariations = (pcmData) => {
+//   // ✅ Skip variations for maximum speed
+//   return pcmData;
+// };
+// const smoothTransitions = (pcmData) => {
+//   // ✅ No processing - return original data immediately
+//   return pcmData;
+// };
 
- const scheduleHumanLikeAudioBuffer = (audioBuffer) => {
-  try {
-    if (!audioContextRef.current) return;
+//  const scheduleHumanLikeAudioBuffer = (audioBuffer) => {
+//   try {
+//     if (!audioContextRef.current) return;
 
-    const source = audioContextRef.current.createBufferSource();
+//     const source = audioContextRef.current.createBufferSource();
 
-    // ✅ DIRECT CONNECTION: No processing delays
-    source.buffer = audioBuffer;
-    source.connect(audioContextRef.current.destination); 
+//     // ✅ DIRECT CONNECTION: No processing delays
+//     source.buffer = audioBuffer;
+//     source.connect(audioContextRef.current.destination); 
 
-      const currentTime = audioContextRef.current.currentTime;
+//       const currentTime = audioContextRef.current.currentTime;
 
-      // Schedule with natural pacing
-      if (!isPlayingAudioRef.current) {
-        // First chunk - start with slight delay for natural feel
-       nextPlayTimeRef.current = currentTime; // Slightly longer delay for natural start
-        isPlayingAudioRef.current = true;
-      }
+//       // Schedule with natural pacing
+//       if (!isPlayingAudioRef.current) {
+//         // First chunk - start with slight delay for natural feel
+//        nextPlayTimeRef.current = currentTime; // Slightly longer delay for natural start
+//         isPlayingAudioRef.current = true;
+//       }
 
-      // Schedule this buffer to play with natural timing
-      source.start(nextPlayTimeRef.current);
+//       // Schedule this buffer to play with natural timing
+//       source.start(nextPlayTimeRef.current);
 
-      // ✅ NATURAL PACING: Add small gaps between chunks for breathing room
-      const naturalGap = 0; // ✅ Only 20ms gap for smoother flow
-      nextPlayTimeRef.current += audioBuffer.duration + naturalGap;
+//       // ✅ NATURAL PACING: Add small gaps between chunks for breathing room
+//       const naturalGap = 0; // ✅ Only 20ms gap for smoother flow
+//       nextPlayTimeRef.current += audioBuffer.duration + naturalGap;
 
-      // Handle completion
-      source.onended = () => {
-        console.log("🔊 Human-like audio buffer completed naturally");
-      };
+//       // Handle completion
+//       source.onended = () => {
+//         console.log("🔊 Human-like audio buffer completed naturally");
+//       };
 
-      console.log(
-        `🔊 Human-like audio scheduled at ${nextPlayTimeRef.current}, duration: ${audioBuffer.duration}s`
-      );
-    } catch (error) {
-      console.error("❌ Error scheduling human-like audio buffer:", error);
-    }
-  };
+//       console.log(
+//         `🔊 Human-like audio scheduled at ${nextPlayTimeRef.current}, duration: ${audioBuffer.duration}s`
+//       );
+//     } catch (error) {
+//       console.error("❌ Error scheduling human-like audio buffer:", error);
+//     }
+//   };
 
- const playTTSAudio = () => {
-  // Process any remaining buffered audio immediately
-  if (pcmBufferRef.current.length > 0) {
-    processHumanLikeAudioBuffer();
-  }
-
-  // ✅ Immediate completion check - no delays
-  if (audioContextRef.current) {
-    const remainingTime =
-      nextPlayTimeRef.current - audioContextRef.current.currentTime;
-
+const playTTSAudio = () => {
+  console.log("🔊 TTS stream completed");
+  
+  if (audioContextRef.current && isPlayingAudioRef.current) {
+    // ✅ Calculate remaining audio time more accurately
+    const currentTime = audioContextRef.current.currentTime;
+    const remainingTime = Math.max(nextPlayTimeRef.current - currentTime, 0);
+    
+    console.log(`🔊 Waiting ${remainingTime.toFixed(2)}s for audio to complete`);
+    
+    // ✅ Wait for audio to finish, then cleanup
     setTimeout(() => {
       setIsTTSPlaying(false);
       isPlayingAudioRef.current = false;
-      console.log("🔊 TTS audio completed");
-    }, Math.max(remainingTime * 1000, 100)); // ✅ Minimal 100ms only
+      console.log("🔊 TTS playback completed seamlessly");
+    }, (remainingTime * 1000) + 50); // Reduced buffer time
+  } else {
+    // ✅ No audio playing, cleanup immediately
+    setIsTTSPlaying(false);
+    isPlayingAudioRef.current = false;
+    console.log("🔊 TTS completed (no audio was playing)");
   }
-
-  console.log("🔊 TTS playback finalized");
 };
 
-  const cleanupTTSAudio = () => {
-    try {
-      if (
-        audioContextRef.current &&
-        audioContextRef.current.state !== "closed"
-      ) {
-        audioContextRef.current.close();
-      }
-
-      audioContextRef.current = null;
-      audioBufferQueueRef.current = [];
-      pcmBufferRef.current = [];
-      isPlayingAudioRef.current = false;
-      nextPlayTimeRef.current = 0;
-      setIsTTSPlaying(false);
-
-      console.log("🔊 Human-like audio cleanup complete");
-    } catch (error) {
-      console.error("❌ Error during audio cleanup:", error);
+ const cleanupTTSAudio = () => {
+  try {
+    console.log("🔊 Cleaning up TTS audio...");
+    
+    // ✅ Stop any scheduled audio
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      // Don't close the context immediately, let current audio finish
+      setTimeout(() => {
+        if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+          audioContextRef.current.close();
+        }
+      }, 1000);
     }
-  };
+
+    // ✅ Reset all refs and state
+    audioContextRef.current = null;
+    audioBufferQueueRef.current = [];
+    isPlayingAudioRef.current = false;
+    nextPlayTimeRef.current = 0;
+    setIsTTSPlaying(false);
+
+    console.log("🔊 TTS audio cleanup complete");
+  } catch (error) {
+    console.error("❌ Error during audio cleanup:", error);
+  }
+};
 
   // dictate mode starts 
   // Update your startVoiceMode function
@@ -1612,11 +1757,17 @@ const smoothTransitions = (pcmData) => {
             console.log("✅ WebSocket connected:", data.message);
             break;
 
-          case "transcript":
-            // Live transcript from Deepgram
-            console.log("📝 [Live Transcript]", data.text);
-            setVoiceTranscript(data.text);
-            break;
+         case "transcript":
+  // Live transcript from Deepgram
+  console.log("📝 [Live Transcript]", data.text);
+  
+  // ✅ Accumulate live transcript pieces
+  setVoiceTranscript(prev => {
+    const accumulated = prev + data.text + " ";
+    console.log("🔄 [Accumulated Transcript]", accumulated.trim());
+    return accumulated;
+  });
+  break;
 
           case "user-message":
             // Final user message after processing
@@ -1932,7 +2083,7 @@ useEffect(() => {
 
 
   return (
-   <div className="flex flex-col w-full mobile-viewport md:h-screen overflow-y-auto bg-white dark:bg-[#121212] transition-colors duration-300 fixed md:relative inset-0 md:inset-auto z-40 md:z-auto mobile-full-height">
+   <div className="flex flex-col w-full mobile-viewport md:h-screen overflow-y-auto bg-gradient-to-tr from-[#ffffff] via-[#ededed] to-[#e0e0e0] dark:bg-gradient-to-bl dark:from-[#1e1e1e] dark:via-[#2a2a2a] dark:to-[#121212] transition-colors duration-300 fixed md:relative inset-0 md:inset-auto z-40 md:z-auto mobile-full-height">
 
  {/* ✅ ADD: Mobile Menu Button - Now in ChatArea with conditional z-index */}
   {!isGuest && (
@@ -1952,7 +2103,7 @@ useEffect(() => {
         ref={chatContainerRef}
         onWheel={handleUserScrollInterruption} // Detect mouse wheel
         onTouchMove={handleUserScrollInterruption} // Detect touch scroll
-       className="relative flex-1 h-[calc(100dvh-140px)] md:h-[calc(100vh-160px)] w-full scrollbar-hover md:p-4 mt-16 md:mt-0 space-y-6 overflow-auto mx-auto bg-white dark:bg-[#121212] transition-colors duration-300"
+       className="relative flex-1 h-[calc(100dvh-140px)] md:h-[calc(100vh-160px)] w-full scrollbar-hover md:p-4 mt-16 md:mt-0 space-y-6 overflow-auto mx-auto  transition-colors duration-300"
 
 
         style={{}}>
@@ -1991,7 +2142,7 @@ useEffect(() => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative   z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white  max-w-full md:max-w-2xl w-fit self-end ml-auto">
+                        className="relative mb-5  z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white  w-5/6 md:max-w-2xl md:w-fit self-end ml-auto">
                         <div className="flex items-start gap-2">
                           <div className="p-1 rounded-full flex-shrink-0">
                             {/* Fallback to default circle icon if user_img is not available */}
@@ -2039,7 +2190,7 @@ useEffect(() => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative   z-30 p-3 rounded-lg break-words  dark:bg-[#282828] text-sm shadow-md backdrop-blur-2xl bg-white/10 border border-white/20 text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3">
+                        className="relative   z-30 p-3 rounded-lg break-words    text-sm   text-gray-800 dark:text-white max-w-full self-start mr-auto mt-3">
                         <div className="flex items-start gap-2">
                           <div className="p-1 hidden md:block rounded-full">
                             <img
@@ -2049,7 +2200,7 @@ useEffect(() => {
                             />
                           </div>
                           {/* Replace the ChatbotMarkdown component with this */}
-                          <div className="w-full text-base  mr-2 font-poppins relative">
+                          <div className="w-full text-base   mr-2 font-poppins relative">
                             <ChatbotMarkdown
                               ref={(ref) =>
                                 (markdownRefs.current[msg.id] = ref)
@@ -2139,22 +2290,22 @@ useEffect(() => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className={`absolute md:right-80  bottom-44 md:bottom-24 w-full gap-3 md:w-3/5 flex font-centurygothic flex-col items-center justify-center text-center text-gray-800 dark:text-white`}>
-                <img
+                className={`absolute md:right-80  bottom-2  w-full   md:w-3/5 flex font-centurygothic flex-col items-center justify-center text-center text-gray-800 dark:text-white`}>
+                {/* <img
                   src="./logo.png"
-                  className="w-16 h-16 block dark:hidden"
+                  className="w-12 h-12 block dark:hidden"
                   alt="Logo"
                 />
                 <img
                   src="./q.png"
-                  className="w-16 h-16 hidden dark:block"
+                  className="w-12 h-12 hidden dark:block"
                   alt="Logo"
-                />
-                <span className="md:text-3xl font-centurygothic text-base font-extrabold mb-2 bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 text-transparent bg-clip-text">
-                  Quantum<span className="text-base md:text-4xl">Ai</span>
+                /> */}
+                <span className="md:text-2xl font-centurygothic text-base font-extrabold mb-2 bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 text-transparent bg-clip-text">
+                  Quantum<span className="text-base md:text-2xl">Ai</span>
                 </span>
 
-                <h2 className="md:text-3xl text-base font-bold mb-2 bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 text-transparent bg-clip-text">
+                <h2 className="md:text-2xl text-base font-bold   bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 text-transparent bg-clip-text">
                   {greeting}
                   <span>
                     {isGuest && (
@@ -2170,7 +2321,7 @@ useEffect(() => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 1.5 }}
-                  className="text-base md:text-2xl font-bold text-gray-500 dark:text-gray-300 font-centurygothic">
+                  className="text-base md:text-lg font-semibold text-gray-500 dark:text-gray-300 font-centurygothic">
                   {getTimeBasedGreeting()} {user?.username}
                 </motion.p>
               </motion.div>
@@ -2208,7 +2359,15 @@ useEffect(() => {
       )}
       {/* chat area ends*/}
       {/* Input Section div starts */}
-      <div className="flex flex-col  mx-auto     mb-3 mt-2 w-[95%] sm:w-[70%] shadow-2xl rounded-3xl bg-white dark:bg-[#282828]  px-2 py-4 md:px-2 md:py-2 transition-colors duration-300">
+    {/* Input Section div starts */}
+<div className={`flex flex-col mx-auto mb-3 w-[95%] sm:w-[70%] shadow-2xl rounded-3xl bg-[#ededed]   dark:bg-[#282828] px-2 py-4 md:px-2 md:py-2 transition-colors duration-300 ${
+  conversationMessages.length === 0 
+    ? 'mb-[300px] md:mb-[200px]' 
+    : 'mt-2'
+} relative`}>
+
+
+
         {/* File Previews Section — ✅ UPDATED LIKE CHATGPT */}
 
         {/* test  */}
@@ -2262,7 +2421,7 @@ useEffect(() => {
        <div className="relative w-full">
   <textarea
     ref={textareaRef}
-    className="w-full h-auto text-xs md:text-base max-h-36 min-h-[38px] md:min-h-[44px] p-2 pt-3 md:p-3  rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
+    className="w-full h-auto text-xs md:text-base max-h-36 min-h-[38px] md:min-h-[44px] p-2 pt-3 md:p-3 border border-gray-300 md:border-none rounded-2xl bg-white dark:bg-[#717171] transition-all duration-200 ease-in-out text-black dark:text-white      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 placeholder:text-gray-400 dark:placeholder-gray-300   resize-none overflow-y-auto scrollbar-hide leading-relaxed relative z-10"
     value={inputMessage} // 👈 CLEAN: Only inputMessage, no live transcript
     onChange={handleInputChange}
     onKeyDown={(e) => {
@@ -2335,7 +2494,7 @@ useEffect(() => {
             {/* Upload Button */}
             <div className="relative">
               <div
-                className="cursor-pointer border-[0.5px] border-gray-800 dark:border-gray-300 rounded-full p-2 text-black dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+                className="cursor-pointer border-[0.5px] border-gray-400 dark:border-gray-300 rounded-full p-2 text-black dark:text-white hover:bg-zinc-400 dark:hover:bg-gray-700 transition-colors"
                 onClick={() => {
                   if (isGuest) return handleLoginPrompt();
                   fileInputRef.current.click();
@@ -2402,11 +2561,11 @@ useEffect(() => {
             {/* Mic Button */}
             <div className="relative">
               <div
-                className={`cursor-pointer border-[0.5px] text-black dark:text-white border-gray-800 dark:border-gray-300 rounded-full p-2 
+                className={`cursor-pointer border-[0.5px] text-black dark:text-white border-gray-400 dark:border-gray-300 rounded-full p-2 
 ${
   isRecording
     ? "bg-red-500 animate-pulse text-white"
-    : "hover:bg-gray-300 dark:hover:bg-gray-700"
+    : "hover:bg-gray-400 hover:font-bold  "
 } transition-all duration-300 ${!isGuest ? " " : ""}`}
                 onClick={() => {
                   if (isGuest) {
@@ -2462,7 +2621,7 @@ ${
       className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
         isVoiceMode
           ? "bg-red-600 text-black cursor-not-allowed"
-          : "bg-white hover:bg-green-700 text-black border border-black"
+          : "bg-white hover:bg-gray-400 text-black border border-gray-400"
       } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
       <span className="md:block hidden text-xs md:text-base items-center gap-2">
         <AudioLines size={18} />
@@ -2634,6 +2793,7 @@ ${
             </button>
           </div>
         </div>
+     
       </div>
       <p className="mx-auto text-gray-400 dark:text-gray-700 text-xs md:text-sm font-mono font-bold">
         AI generated content for reference only
