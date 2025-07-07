@@ -1309,18 +1309,38 @@ const startRecording = async () => {
 
   // test2 working 14-05-25
   // ✅ Voice mode refs
-  const [isVoiceMode, setIsVoiceMode] = useState(false);
-  const [voiceTranscript, setVoiceTranscript] = useState("");
-  const [isAISpeaking, setIsAISpeaking] = useState(false);
-  const [socketOpen, setSocketOpen] = useState(false);
-  const [currentUserMessage, setCurrentUserMessage] = useState("");
-  const [aiResponseText, setAiResponseText] = useState("");
-  const [connectionStatus, setConnectionStatus] = useState("disconnected");
-  const [isTTSPlaying, setIsTTSPlaying] = useState(false);
-  const audioChunksBufferRef = useRef([]);
-  const currentTTSAudioRef = useRef(null);
+  // const [isVoiceMode, setIsVoiceMode] = useState(false);
+  // const [voiceTranscript, setVoiceTranscript] = useState("");
+  // const [isAISpeaking, setIsAISpeaking] = useState(false);
+  // const [socketOpen, setSocketOpen] = useState(false);
+  // const [currentUserMessage, setCurrentUserMessage] = useState("");
+  // const [aiResponseText, setAiResponseText] = useState("");
+  // const [connectionStatus, setConnectionStatus] = useState("disconnected");
+  // const [isTTSPlaying, setIsTTSPlaying] = useState(false);
+  // const audioChunksBufferRef = useRef([]);
+  // const currentTTSAudioRef = useRef(null);
 
-  let audioContext, mediaStream, processor, socket;
+  // let audioContext, mediaStream, processor, socket;
+
+  
+const [isVoiceMode, setIsVoiceMode] = useState(false);
+const [voiceTranscript, setVoiceTranscript] = useState("");
+const [isAISpeaking, setIsAISpeaking] = useState(false);
+const [socketOpen, setSocketOpen] = useState(false);
+const [currentUserMessage, setCurrentUserMessage] = useState("");
+const [aiResponseText, setAiResponseText] = useState("");
+const [connectionStatus, setConnectionStatus] = useState("disconnected");
+const [isTTSPlaying, setIsTTSPlaying] = useState(false);
+
+
+const audioContextRef = useRef(null);
+const processorRef = useRef(null);
+const mediaStreamRef = useRef(null);
+// ✅ SIMPLIFIED AUDIO REFS - Remove complex buffering
+// const audioContextRef = useRef(null);
+const audioQueueRef = useRef([]);
+const isPlayingRef = useRef(false);
+const currentSourceRef = useRef(null);
 
   const [currentBotMessageId, setCurrentBotMessageId] = useState(null);
   // OR better yet, use useRef for callback usage:
@@ -1329,716 +1349,838 @@ const startRecording = async () => {
 
   // tts part
   // ✅ HUMAN-LIKE: Web Audio API with natural speech processing
-  const audioContextRef = useRef(null);
+ 
   const audioBufferQueueRef = useRef([]);
   const isPlayingAudioRef = useRef(false);
   const nextPlayTimeRef = useRef(0);
   const pcmBufferRef = useRef([]);
 
- // ✅ REPLACE: handleTTSChunk function (around line 1340)
-const handleTTSChunk = (base64Audio, encoding = "linear16", sampleRate = 24000) => {
-  try {
-    console.log(`🔊 [TTS Chunk] Received: ${base64Audio.length} chars`);
+
+  
+// ✅ REPLACE: handleTTSChunk function
+// const handleTTSChunk = async (base64Audio, encoding = "linear16", sampleRate = 24000) => {
+//   try {
+//     console.log(`🔊 [TTS Chunk] Received: ${base64Audio.length} chars`);
     
-    // ✅ Ensure audio context is ready
-    if (!audioContextRef.current) {
-      initializeAudioContext();
+//     // ✅ Initialize audio context if needed
+//     if (!audioContextRef.current) {
+//       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+//         sampleRate: sampleRate,
+//       });
+      
+//       if (audioContextRef.current.state === 'suspended') {
+//         await audioContextRef.current.resume();
+//       }
+      
+//       console.log("🔊 Audio context initialized");
+//     }
+
+//     // ✅ Skip empty or invalid chunks
+//     if (!base64Audio || base64Audio.length < 10) {
+//       console.log("🔊 [Skip] Empty or too small audio chunk");
+//       return;
+//     }
+
+//     // ✅ Convert base64 to PCM
+//     const binaryString = atob(base64Audio);
+//     const pcmData = new Int16Array(binaryString.length / 2);
+    
+//     for (let i = 0; i < pcmData.length; i++) {
+//       const byte1 = binaryString.charCodeAt(i * 2);
+//       const byte2 = binaryString.charCodeAt(i * 2 + 1);
+//       pcmData[i] = (byte2 << 8) | byte1;
+//     }
+
+//     // ✅ Convert to Float32 and create audio buffer
+//     const float32Data = new Float32Array(pcmData.length);
+//     for (let i = 0; i < pcmData.length; i++) {
+//       float32Data[i] = pcmData[i] / 32768.0;
+//     }
+
+//     const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, sampleRate);
+//     audioBuffer.getChannelData(0).set(float32Data);
+
+//     // ✅ IMMEDIATE STREAMING: Add to queue and start playing immediately
+//     audioQueueRef.current.push(audioBuffer);
+//     console.log(`🔊 [Queue] Added chunk (${audioBuffer.duration.toFixed(3)}s). Queue: ${audioQueueRef.current.length}`);
+    
+//     // ✅ CRITICAL: Start playing immediately if not already playing
+//     if (!isPlayingRef.current && audioQueueRef.current.length >= 1) {
+//       console.log("🔊 [Stream] Starting immediate playback");
+//       playNextAudioChunk();
+//     }
+
+//   } catch (error) {
+//     console.error("❌ Error processing audio chunk:", error);
+//   }
+// };
+const handleTTSChunk = async (base64Audio, encoding = "linear16", sampleRate = 24000) => {
+  try {
+    // ✅ SKIP INVALID OR EMPTY CHUNKS
+    if (!base64Audio || base64Audio.length < 50) {
+      console.log("🔊 [Skip] Invalid or empty audio chunk");
+      return;
     }
 
-    // ✅ Process audio data
+    // ✅ CHECK FOR JSON ERROR MESSAGES (backend warnings)
+    try {
+      const decoded = atob(base64Audio);
+      if (decoded.startsWith('{"type":"Warning"')) {
+        console.warn("⚠️ [TTS] Received warning message, skipping:", decoded);
+        return;
+      }
+    } catch (e) {
+      // Expected for valid audio data
+    }
+
+    // ✅ INITIALIZE AUDIO CONTEXT ONCE WITH OPTIMAL SETTINGS
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate,
+        latencyHint: "interactive", // ✅ LOW LATENCY
+      });
+      
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+      
+      // ✅ START IMMEDIATELY - NO DELAY
+      nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.005; // 5ms buffer only
+      console.log("🔊 [TTS] AudioContext initialized for immediate playback");
+    }
+
+    // ✅ FAST PCM CONVERSION
     const binaryString = atob(base64Audio);
     const pcmData = new Int16Array(binaryString.length / 2);
-
+    
     for (let i = 0; i < pcmData.length; i++) {
       const byte1 = binaryString.charCodeAt(i * 2);
       const byte2 = binaryString.charCodeAt(i * 2 + 1);
       pcmData[i] = (byte2 << 8) | byte1;
     }
 
-    // ✅ IMMEDIATE PLAYBACK - No buffering delays
-    playAudioChunkImmediately(pcmData, sampleRate);
-    
+    // ✅ FAST FLOAT32 CONVERSION
+    const float32Data = new Float32Array(pcmData.length);
+    for (let i = 0; i < pcmData.length; i++) {
+      float32Data[i] = pcmData[i] / 32768.0;
+    }
+
+    // ✅ CREATE AUDIO BUFFER
+    const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, sampleRate);
+    audioBuffer.getChannelData(0).set(float32Data);
+
+    // ✅ IMMEDIATE SEQUENTIAL PLAYBACK
+    playAudioSequentially(audioBuffer);
+
   } catch (error) {
-    console.error("❌ Error processing audio chunk:", error);
+    console.error("❌ [TTS] Error processing chunk:", error);
   }
 };
 
+const playAudioSequentially = (audioBuffer) => {
+  if (!audioContextRef.current || !audioBuffer) return;
 
-const initializeAudioContext = () => {
-  if (!audioContextRef.current) {
-    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-      sampleRate: 24000,
+  // ✅ ENSURE AUDIO CONTEXT IS READY
+  if (audioContextRef.current.state === 'suspended') {
+    audioContextRef.current.resume().then(() => {
+      playAudioSequentially(audioBuffer);
     });
-    
-    // Resume immediately
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
-    }
-    
-    // Reset timing
-    nextPlayTimeRef.current = audioContextRef.current.currentTime;
-    isPlayingAudioRef.current = false;
-    
-    console.log("🔊 Audio context initialized");
+    return;
   }
-};
-// ✅ NEW: Add audio to buffer and play immediately
-const addToAudioBuffer = (pcmData, sampleRate = 24000) => {
-  try {
-    if (!audioContextRef.current) return;
 
-    // ✅ Convert PCM to Float32
-    const float32Data = new Float32Array(pcmData.length);
-    for (let i = 0; i < pcmData.length; i++) {
-      float32Data[i] = pcmData[i] / 32768.0;
-    }
+  const source = audioContextRef.current.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(audioContextRef.current.destination);
 
-    // ✅ Create AudioBuffer
-    const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, sampleRate);
-    audioBuffer.getChannelData(0).set(float32Data);
+  const currentTime = audioContextRef.current.currentTime;
 
-    // ✅ Schedule for immediate playback
-    scheduleAudioBuffer(audioBuffer);
-    
-  } catch (error) {
-    console.error("❌ Error adding to audio buffer:", error);
+  // ✅ SEAMLESS SEQUENTIAL TIMING
+  if (nextPlayTimeRef.current <= currentTime) {
+    // If we're behind, catch up immediately with minimal buffer
+    nextPlayTimeRef.current = currentTime + 0.002; // 2ms buffer to prevent underruns
   }
-};
 
-// ✅ NEW: Schedule audio buffer for seamless playback
-const scheduleAudioBuffer = (audioBuffer) => {
-  try {
-    if (!audioContextRef.current) return;
-
-    const source = audioContextRef.current.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContextRef.current.destination);
-
-    const currentTime = audioContextRef.current.currentTime;
-    
-    if (!isPlayingAudioRef.current) {
-      // ✅ First chunk - start immediately
-      nextPlayTimeRef.current = Math.max(currentTime, nextPlayTimeRef.current);
-      isPlayingAudioRef.current = true;
-      console.log("🔊 Starting immediate audio playback");
-    }
-
-    // ✅ Schedule with NO gaps for seamless playback
-    source.start(nextPlayTimeRef.current);
-    nextPlayTimeRef.current += audioBuffer.duration;
-
-    console.log(`🔊 [SCHEDULED] Playing ${audioBuffer.length} samples at ${nextPlayTimeRef.current.toFixed(3)}s`);
-
-    // ✅ Handle completion
-    source.onended = () => {
-      console.log("🔊 Audio chunk completed");
-    };
-
-  } catch (error) {
-    console.error("❌ Error scheduling audio buffer:", error);
-  }
-};
-
-// ✅ NEW: Play audio chunk immediately without any delays
-const playAudioChunkImmediately = (pcmData, sampleRate = 24000) => {
-  try {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-        sampleRate: sampleRate,
-      });
-      audioContextRef.current.resume();
-      console.log("🔊 Audio context initialized for immediate playback");
-    }
-
-    // ✅ Convert PCM to Float32 immediately
-    const float32Data = new Float32Array(pcmData.length);
-    for (let i = 0; i < pcmData.length; i++) {
-      float32Data[i] = pcmData[i] / 32768.0;
-    }
-
-    // ✅ Create and play AudioBuffer immediately
-    const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, sampleRate);
-    audioBuffer.getChannelData(0).set(float32Data);
-
-    const source = audioContextRef.current.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContextRef.current.destination);
-
-    // ✅ SEAMLESS SCHEDULING - No gaps between chunks
-    const currentTime = audioContextRef.current.currentTime;
-    
-    if (!isPlayingAudioRef.current) {
-      // ✅ First chunk - start immediately with minimal delay
-      nextPlayTimeRef.current = Math.max(currentTime + 0.01, nextPlayTimeRef.current);
-      isPlayingAudioRef.current = true;
-      console.log("🔊 Starting immediate audio playback");
-    }
-
-    // ✅ Schedule with ZERO gaps for seamless playback
-    source.start(nextPlayTimeRef.current);
-    nextPlayTimeRef.current += audioBuffer.duration; // No gap between chunks
-
-    console.log(`🔊 [SEAMLESS] Playing ${pcmData.length} samples at ${nextPlayTimeRef.current.toFixed(3)}s`);
-
-    // ✅ Handle completion
-    source.onended = () => {
-      console.log("🔊 Audio chunk completed seamlessly");
-    };
-
-  } catch (error) {
-    console.error("❌ Error in immediate audio playback:", error);
-  }
-};
-
- // ✅ SIMPLIFIED TTS INITIALIZATION - Remove delays
-const initializeTTSAudio = () => {
-  try {
-    console.log("🔊 TTS Audio initializing...");
-    
-    // ✅ Initialize audio context immediately
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-        sampleRate: 24000,
-      });
-      
-      // ✅ Resume immediately without user interaction (works in most browsers now)
-      if (audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume();
-      }
-      
-      console.log("🔊 Audio context initialized");
-    }
-    
-    // ✅ Reset playback state for new stream
-    isPlayingAudioRef.current = false;
-    nextPlayTimeRef.current = audioContextRef.current.currentTime;
-    setIsTTSPlaying(true);
-
-    console.log("🔊 TTS Audio ready for immediate streaming");
-  } catch (error) {
-    console.error("❌ Failed to initialize TTS audio:", error);
-  }
-};
-
-
+  const startTime = nextPlayTimeRef.current;
   
+  // ✅ START AUDIO CHUNK
+  source.start(startTime);
+  console.log(`🔊 [TTS] Playing at ${startTime.toFixed(3)}s, duration: ${audioBuffer.duration.toFixed(3)}s`);
 
-  // const processHumanLikeAudioBuffer = async () => {
-  //   try {
-  //     if (!audioContextRef.current || pcmBufferRef.current.length === 0) return;
-
-  //     // Combine all PCM data
-  //     const totalLength = pcmBufferRef.current.reduce(
-  //       (sum, chunk) => sum + chunk.length,
-  //       0
-  //     );
-  //     const combinedPCM = new Int16Array(totalLength);
-
-  //     let offset = 0;
-  //     for (const chunk of pcmBufferRef.current) {
-  //       combinedPCM.set(chunk, offset);
-  //       offset += chunk.length;
-  //     }
-
-  //     // Clear buffer
-  //     pcmBufferRef.current = [];
-
-  //     // ✅ HUMAN-LIKE PROCESSING: Apply natural speech effects
-  //     const processedPCM = applyHumanLikeEffects(combinedPCM);
-
-  //     // Convert PCM to Float32 for Web Audio API
-  //     const float32Data = new Float32Array(processedPCM.length);
-  //     for (let i = 0; i < processedPCM.length; i++) {
-  //       float32Data[i] = processedPCM[i] / 32768.0;
-  //     }
-
-  //     // Create AudioBuffer
-  //     const audioBuffer = audioContextRef.current.createBuffer(
-  //       1,
-  //       float32Data.length,
-  //       24000
-  //     );
-  //     audioBuffer.getChannelData(0).set(float32Data);
-
-  //     // Schedule with natural pacing
-  //     scheduleHumanLikeAudioBuffer(audioBuffer);
-
-  //     console.log(
-  //       `🔊 Scheduled ${float32Data.length} samples with human-like processing`
-  //     );
-  //   } catch (error) {
-  //     console.error("❌ Error processing human-like audio buffer:", error);
-  //   }
-  // };
-
-  // ✅ HUMAN-LIKE EFFECTS: Make speech more natural
-// const applyHumanLikeEffects = (pcmData) => {
-//   // ✅ No processing - return immediately
-//   return pcmData;
-// };
-
-  const normalizeAudio = (pcmData) => {
-    // Find peak amplitude
-    let maxAmplitude = 0;
-    for (let i = 0; i < pcmData.length; i++) {
-      maxAmplitude = Math.max(maxAmplitude, Math.abs(pcmData[i]));
-    }
-
-    // Normalize to ~70% of max to avoid clipping and sound more natural
-    const targetAmplitude = 32768 * 0.7;
-    const normalizationFactor =
-      maxAmplitude > 0 ? targetAmplitude / maxAmplitude : 1;
-
-    const normalizedData = new Int16Array(pcmData.length);
-    for (let i = 0; i < pcmData.length; i++) {
-      normalizedData[i] = Math.round(pcmData[i] * normalizationFactor);
-    }
-
-    return normalizedData;
+  // ✅ CRITICAL: UPDATE NEXT PLAY TIME FOR SEAMLESS CONTINUATION
+  nextPlayTimeRef.current = startTime + audioBuffer.duration;
+  
+  // ✅ COMPLETION HANDLER
+  source.onended = () => {
+    console.log(`🔊 [TTS] Chunk completed, next scheduled at ${nextPlayTimeRef.current.toFixed(3)}s`);
   };
 
-// const addNaturalVariations = (pcmData) => {
-//   // ✅ Skip variations for maximum speed
-//   return pcmData;
-// };
-// const smoothTransitions = (pcmData) => {
-//   // ✅ No processing - return original data immediately
-//   return pcmData;
-// };
-
-//  const scheduleHumanLikeAudioBuffer = (audioBuffer) => {
-//   try {
-//     if (!audioContextRef.current) return;
-
-//     const source = audioContextRef.current.createBufferSource();
-
-//     // ✅ DIRECT CONNECTION: No processing delays
-//     source.buffer = audioBuffer;
-//     source.connect(audioContextRef.current.destination); 
-
-//       const currentTime = audioContextRef.current.currentTime;
-
-//       // Schedule with natural pacing
-//       if (!isPlayingAudioRef.current) {
-//         // First chunk - start with slight delay for natural feel
-//        nextPlayTimeRef.current = currentTime; // Slightly longer delay for natural start
-//         isPlayingAudioRef.current = true;
-//       }
-
-//       // Schedule this buffer to play with natural timing
-//       source.start(nextPlayTimeRef.current);
-
-//       // ✅ NATURAL PACING: Add small gaps between chunks for breathing room
-//       const naturalGap = 0; // ✅ Only 20ms gap for smoother flow
-//       nextPlayTimeRef.current += audioBuffer.duration + naturalGap;
-
-//       // Handle completion
-//       source.onended = () => {
-//         console.log("🔊 Human-like audio buffer completed naturally");
-//       };
-
-//       console.log(
-//         `🔊 Human-like audio scheduled at ${nextPlayTimeRef.current}, duration: ${audioBuffer.duration}s`
-//       );
-//     } catch (error) {
-//       console.error("❌ Error scheduling human-like audio buffer:", error);
-//     }
-//   };
-
-const playTTSAudio = () => {
-  console.log("🔊 TTS stream completed");
-  
-  if (audioContextRef.current && isPlayingAudioRef.current) {
-    // ✅ Calculate remaining audio time more accurately
-    const currentTime = audioContextRef.current.currentTime;
-    const remainingTime = Math.max(nextPlayTimeRef.current - currentTime, 0);
-    
-    console.log(`🔊 Waiting ${remainingTime.toFixed(2)}s for audio to complete`);
-    
-    // ✅ Wait for audio to finish, then cleanup
-    setTimeout(() => {
-      setIsTTSPlaying(false);
-      isPlayingAudioRef.current = false;
-      console.log("🔊 TTS playback completed seamlessly");
-    }, (remainingTime * 1000) + 50); // Reduced buffer time
-  } else {
-    // ✅ No audio playing, cleanup immediately
-    setIsTTSPlaying(false);
-    isPlayingAudioRef.current = false;
-    console.log("🔊 TTS completed (no audio was playing)");
-  }
+  source.onerror = (error) => {
+    console.error("❌ [TTS] Audio source error:", error);
+  };
 };
 
- const cleanupTTSAudio = () => {
+
+const scheduleAudioChunk = (audioBuffer) => {
+  if (!audioContextRef.current || !audioBuffer) return;
+
   try {
-    console.log("🔊 Cleaning up TTS audio...");
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = audioBuffer;
     
-    // ✅ Stop any scheduled audio
-    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-      // Don't close the context immediately, let current audio finish
-      setTimeout(() => {
-        if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-          audioContextRef.current.close();
-        }
-      }, 1000);
-    }
+    // ✅ ADD gain node to control volume and prevent clipping
+    const gainNode = audioContextRef.current.createGain();
+    gainNode.gain.setValueAtTime(0.8, audioContextRef.current.currentTime); // ✅ Reduce volume to prevent distortion
+    
+    source.connect(gainNode);
+    gainNode.connect(audioContextRef.current.destination);
 
-    // ✅ Reset all refs and state
-    audioContextRef.current = null;
-    audioBufferQueueRef.current = [];
-    isPlayingAudioRef.current = false;
-    nextPlayTimeRef.current = 0;
-    setIsTTSPlaying(false);
+    const currentTime = audioContextRef.current.currentTime;
 
-    console.log("🔊 TTS audio cleanup complete");
+// ✅ NEW: Reset nextPlayTimeRef if it's behind by >100ms
+if (currentTime - nextPlayTimeRef.current > 0.1) {
+  console.log(`⚠️ Resetting nextPlayTimeRef (drift detected). CurrentTime: ${currentTime.toFixed(3)}, NextPlayTime: ${nextPlayTimeRef.current.toFixed(3)}`);
+  nextPlayTimeRef.current = currentTime + 0.01; // minimal headroom to avoid underruns
+}
+
+const startTime = Math.max(nextPlayTimeRef.current, currentTime + 0.01);
+
+source.start(startTime);
+console.log(`🔊 Playing audio at ${startTime.toFixed(3)}s`);
+
+nextPlayTimeRef.current = startTime + audioBuffer.duration;
+
+
+    // ✅ TRACK current source for cleanup
+    currentSourceRef.current = source;
+
+    // ✅ CLEANUP when chunk ends
+    source.onended = () => {
+      console.log(`🔊 [Audio] Chunk completed, next scheduled at ${nextPlayTimeRef.current.toFixed(3)}s`);
+      if (currentSourceRef.current === source) {
+        currentSourceRef.current = null;
+      }
+    };
+
+    source.onerror = (error) => {
+      console.error("❌ [Audio] Playback error:", error);
+    };
+
   } catch (error) {
-    console.error("❌ Error during audio cleanup:", error);
+    console.error("❌ Error scheduling audio chunk:", error);
+  }
+};
+// ✅ IMPROVED: Sequential playback with proper completion handling
+// const playNextAudioChunk = () => {
+//   if (audioQueueRef.current.length === 0) {
+//     isPlayingRef.current = false;
+//     console.log("🔊 [Queue] Audio queue empty, stopping playback");
+//     return;
+//   }
+
+//   const audioBuffer = audioQueueRef.current.shift();
+//   isPlayingRef.current = true;
+
+//   try {
+//     // ✅ Stop any currently playing audio (safety measure)
+//     if (currentSourceRef.current) {
+//       try {
+//         currentSourceRef.current.stop();
+//       } catch (e) {
+//         // Ignore if already stopped
+//       }
+//       currentSourceRef.current = null;
+//     }
+
+//     // ✅ Create and play new audio source
+//     const source = audioContextRef.current.createBufferSource();
+//     source.buffer = audioBuffer;
+//     source.connect(audioContextRef.current.destination);
+    
+//     currentSourceRef.current = source;
+
+//     // ✅ Set up completion handler BEFORE starting
+//     source.onended = () => {
+//       console.log(`🔊 [Stream] Chunk completed (${audioBuffer.duration.toFixed(3)}s)`);
+//       currentSourceRef.current = null;
+      
+//       // ✅ IMMEDIATE: Play next chunk without delay
+//       setTimeout(() => {
+//         playNextAudioChunk();
+//       }, 5); // Reduced delay for smoother streaming
+//     };
+
+//     // ✅ Start playback immediately
+//     source.start(0);
+    
+//     console.log(`🔊 [Stream] Playing chunk: ${audioBuffer.duration.toFixed(3)}s, Queue: ${audioQueueRef.current.length}`);
+
+//   } catch (error) {
+//     console.error("❌ Error playing audio chunk:", error);
+//     isPlayingRef.current = false;
+//     currentSourceRef.current = null;
+    
+//     // Try to continue with next chunk after error
+//     setTimeout(() => {
+//       playNextAudioChunk();
+//     }, 50);
+//   }
+// };
+
+
+// // const initializeAudioContext = () => {
+// //   if (!audioContextRef.current) {
+// //     audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+// //       sampleRate: 24000,
+// //     });
+    
+// //     // Resume immediately
+// //     if (audioContextRef.current.state === 'suspended') {
+// //       audioContextRef.current.resume();
+// //     }
+    
+// //     // ✅ CRITICAL: Reset timing for new session
+// //     nextPlayTimeRef.current = audioContextRef.current.currentTime;
+// //     isPlayingAudioRef.current = false;
+    
+// //     console.log("🔊 Audio context initialized with perfect timing");
+// //   }
+// // };
+
+
+  
+// // // ✅ REPLACE: Sequential audio scheduling with proper timing
+// // const scheduleAudioChunkSequentially = (pcmData, sampleRate = 24000) => {
+// //   try {
+// //     if (!audioContextRef.current) return;
+
+// //     // ✅ Convert PCM to Float32
+// //     const float32Data = new Float32Array(pcmData.length);
+// //     for (let i = 0; i < pcmData.length; i++) {
+// //       float32Data[i] = pcmData[i] / 32768.0;
+// //     }
+
+// //     // ✅ Create AudioBuffer
+// //     const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, sampleRate);
+// //     audioBuffer.getChannelData(0).set(float32Data);
+
+// //     const source = audioContextRef.current.createBufferSource();
+// //     source.buffer = audioBuffer;
+// //     source.connect(audioContextRef.current.destination);
+
+// //     const currentTime = audioContextRef.current.currentTime;
+    
+// //     // ✅ IMMEDIATE SEQUENTIAL TIMING
+// //     if (!isPlayingAudioRef.current) {
+// //       // First chunk - start immediately with minimal delay
+// //       nextPlayTimeRef.current = currentTime + 0.01;
+// //       isPlayingAudioRef.current = true;
+// //       console.log("🔊 Starting immediate sequential audio playback");
+// //     }
+
+// //     // ✅ Schedule this chunk to play EXACTLY after the previous one
+// //     source.start(nextPlayTimeRef.current);
+    
+// //     console.log(`🔊 [Immediate] Chunk scheduled at ${nextPlayTimeRef.current.toFixed(3)}s, duration: ${audioBuffer.duration.toFixed(3)}s`);
+    
+// //     // ✅ CRITICAL: Update next play time to EXACTLY when this chunk ends
+// //     nextPlayTimeRef.current += audioBuffer.duration;
+
+// //     // ✅ Track completion
+// //     source.onended = () => {
+// //       console.log("🔊 Audio chunk completed at", audioContextRef.current.currentTime.toFixed(3));
+// //     };
+
+// //   } catch (error) {
+// //     console.error("❌ Error in immediate audio scheduling:", error);
+// //   }
+// // };
+
+
+ 
+ 
+
+//  // ✅ SIMPLIFIED TTS INITIALIZATION - Remove delays
+// // ✅ REPLACE: TTS initialization
+// // ✅ UPDATED: TTS initialization for immediate playback
+
+
+// const initializeTTSAudio = () => {
+//   try {
+//     console.log("🔊 TTS Audio initializing for queue-based playback...");
+    
+//     // ✅ Initialize audio context immediately
+//     if (!audioContextRef.current) {
+//       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+//         sampleRate: 24000,
+//       });
+      
+//       if (audioContextRef.current.state === 'suspended') {
+//         audioContextRef.current.resume();
+//       }
+//     }
+    
+//     // ✅ Clear any existing queue
+//     audioQueueRef.current = [];
+//     isPlayingRef.current = false;
+    
+//     setIsTTSPlaying(true);
+//     console.log("🔊 TTS Audio ready for queue-based streaming");
+//   } catch (error) {
+//     console.error("❌ Failed to initialize TTS audio:", error);
+//   }
+// };
+
+
+// // ✅ UPDATED: TTS completion handler
+// const playTTSAudio = () => {
+//   console.log("🔊 TTS stream completed - waiting for queue to finish");
+  
+//   // ✅ Check if queue is finished
+//   const checkCompletion = () => {
+//     if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
+//       setIsTTSPlaying(false);
+//       console.log("🔊 All queued audio completed");
+//     } else {
+//       console.log(`🔊 [Queue Status] Playing: ${isPlayingRef.current}, Queue: ${audioQueueRef.current.length}`);
+//       // Check again in 200ms
+//       setTimeout(checkCompletion, 200);
+//     }
+//   };
+  
+//   // Start checking after a small delay
+//   setTimeout(checkCompletion, 300);
+// };
+
+// ✅ IMPROVED: Cleanup function
+// ✅ IMPROVED TTS CLEANUP
+const cleanupTTSAudio = () => {
+  try {
+    console.log("🔊 [TTS] Cleaning up audio...");
+    
+    // ✅ RESET TIMING IMMEDIATELY
+    nextPlayTimeRef.current = 0;
+    
+    // ✅ CLOSE AUDIO CONTEXT PROPERLY
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    
+    setIsTTSPlaying(false);
+    console.log("🔊 [TTS] Cleanup complete");
+  } catch (error) {
+    console.error("❌ [TTS] Cleanup error:", error);
   }
 };
 
   // dictate mode starts 
   // Update your startVoiceMode function
-  const startVoiceMode = async () => {
-    try {
-      setUserHasScrolledUp(false);
-      setIsVoiceMode(true);
-      setIsProcessing(true);
-      setShowVoiceOverlay(true);
+ const startVoiceMode = async () => {
+  try {
+    setUserHasScrolledUp(false);
+    setIsVoiceMode(true);
+    setIsProcessing(true);
+    setShowVoiceOverlay(true);
 
-      // Initialize audio context and mic stream
-      audioContext = new AudioContext({ sampleRate: 16000 });
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // ✅ OPTIMIZED audio context with low latency settings
+    audioContextRef.current = new AudioContext({ 
+      sampleRate: 16000,
+      latencyHint: "interactive", // ✅ ADD for low latency
+    });
+    
+    mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ 
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 16000, // ✅ MATCH backend
+      }
+    });
 
-      const input = audioContext.createMediaStreamSource(mediaStream);
+    const input = audioContextRef.current.createMediaStreamSource(mediaStreamRef.current);
 
-      // Optional: apply filter to reduce background noise
-      const filter = audioContext.createBiquadFilter();
-      filter.type = "lowshelf";
-      filter.frequency.setValueAtTime(1000, audioContext.currentTime);
-      filter.gain.setValueAtTime(-10, audioContext.currentTime);
+    // ✅ OPTIMIZED filter settings
+    const filter = audioContextRef.current.createBiquadFilter();
+    filter.type = "lowshelf";
+    filter.frequency.setValueAtTime(1000, audioContextRef.current.currentTime);
+    filter.gain.setValueAtTime(-8, audioContextRef.current.currentTime); // ✅ REDUCED from -10 to -8
 
-      input.connect(filter);
+    input.connect(filter);
 
-      // Create audio processor node (deprecated but works widely)
-      processor = audioContext.createScriptProcessor(4096, 1, 1);
-      filter.connect(processor);
-      processor.connect(audioContext.destination);
+    // ✅ SMALLER buffer size for lower latency
+    processorRef.current = audioContextRef.current.createScriptProcessor(2048, 1, 1); // ✅ REDUCED from 4096 to 2048
+    filter.connect(processorRef.current);
+    processorRef.current.connect(audioContextRef.current.destination);
 
-      // Connect to WebSocket server
-      const token = localStorage.getItem("token");
-      const conversationId = activeConversation; // from Redux/state
-      const socket = new WebSocket(
-        `${WSS_BASE_URL}?token=${token}&conversation_id=${conversationId}`
-      );
-      socketRef.current = socket; // ✅ Store in ref
+    // ✅ OPTIMIZED WebSocket connection
+    const token = localStorage.getItem("token");
+    const conversationId = activeConversation;
+    const socket = new WebSocket(
+      `${WSS_BASE_URL}?token=${token}&conversation_id=${conversationId}`
+    );
+    socketRef.current = socket;
 
-      socket.onopen = () => {
-        console.log("🔌 WebSocket connected");
-        setSocketOpen(true);
-        setConnectionStatus("connected");
-        setIsProcessing(false);
+    socket.onopen = () => {
+      console.log("🔌 WebSocket connected");
+      setSocketOpen(true);
+      setConnectionStatus("connected");
+      setIsProcessing(false);
 
-        processor.onaudioprocess = (e) => {
-          if (socket.readyState === WebSocket.OPEN) {
-            const inputData = e.inputBuffer.getChannelData(0);
-            const int16Data = convertFloat32ToInt16(inputData);
-            socket.send(int16Data);
-          }
-        };
-      };
-
-      // ✅ Move the socket.onmessage handler here (outside of any other function)
-      socket.onmessage = (msg) => {
-        const data = JSON.parse(msg.data);
-        console.log("📥 [WebSocket Message]", data);
-
-        switch (data.type) {
-          case "connected":
-            console.log("✅ WebSocket connected:", data.message);
-            break;
-
-         case "transcript":
-  // Live transcript from Deepgram
-  console.log("📝 [Live Transcript]", data.text);
-  
-  // ✅ Accumulate live transcript pieces
-  setVoiceTranscript(prev => {
-    const accumulated = prev + data.text + " ";
-    console.log("🔄 [Accumulated Transcript]", accumulated.trim());
-    return accumulated;
-  });
-  break;
-
-          case "user-message":
-            // Final user message after processing
-            console.log("👤 [User Message]", data.text);
-            setVoiceTranscript(""); // Clear live transcript
-
-            // ✅ Add user message to Redux store
-            const userMessage = {
-              id: Date.now(),
-              message: data.text,
-              sender: "user",
-              files: [],
-              conversationId: data.conversation_id,
-            };
-
-            dispatch(
-              addMessage({
-                conversationId: data.conversation_id,
-                message: userMessage,
-              })
-            );
-            break;
-
-          case "bot-typing":
-            // AI is processing/typing
-            console.log("🤖 [Bot Typing]", data.status);
-            setIsAISpeaking(data.status);
-            setBotTyping(data.status);
-            break;
-
-          case "tts-start":
-            console.log("🔊 TTS started");
-            initializeTTSAudio();
-            break;
-
-          case "tts-audio-chunk":
-            console.log("🔊 Got audio chunk");
-            handleTTSChunk(data.audio, data.encoding, data.sample_rate);
-            break;
-
-          case "tts-end":
-            console.log("🔊 TTS finished, playing audio");
-            playTTSAudio();
-            break;
-
-          case "start":
-            // AI response stream started
-            console.log("🚀 [AI Response Start]", data);
-            setIsAISpeaking(true);
-            setBotTyping(true);
-
-            // ✅ Reset accumulated response for new message
-            voiceAccumulatedResponseRef.current = "";
-
-            // ✅ Create initial bot message for streaming
-            const newBotMessageId = Date.now() + 1;
-            const initialBotMessage = {
-              id: newBotMessageId,
-              message: "",
-              sender: "bot",
-              response: "",
-              files: data.uploaded_files || [],
-              suggestions: [],
-              isNewMessage: true,
-              isStreaming: true,
-            };
-
-            // Store the message ID using ref for callback access
-            currentBotMessageIdRef.current = newBotMessageId;
-
-            dispatch(
-              addMessage({
-                conversationId: data.conversation_id,
-                message: initialBotMessage,
-              })
-            );
-            break;
-
-          case "content":
-            // AI response chunk - accumulate and update the streaming message
-            console.log("🤖 [AI Chunk]", data.content);
-
-            // ✅ Accumulate the content (same pattern as handleSendMessage)
-            voiceAccumulatedResponseRef.current += data.content;
-            const currentFullResponse = voiceAccumulatedResponseRef.current;
-
-            // Hide typing when first content arrives
-            if (currentFullResponse.trim().length > 0) {
-              setBotTyping(false);
-            }
-
-            // ✅ Only update if we have a valid message ID
-            if (currentBotMessageIdRef.current) {
-              dispatch(
-                updateMessage({
-                  conversationId: activeConversation,
-                  id: currentBotMessageIdRef.current,
-                  message: currentFullResponse, // ✅ Use accumulated response
-                  response: currentFullResponse, // ✅ Use accumulated response
-                })
-              );
-
-              // ✅ Smart scroll to show new content
-              setTimeout(() => {
-                scrollToBottomSmooth();
-              }, 10);
-            }
-            break;
-
-          case "end":
-            // AI response completed
-            console.log("✅ [AI Response Complete]", data);
-            setIsAISpeaking(false);
-            setBotTyping(false);
-
-            // ✅ Final update with complete response and suggestions
-            if (currentBotMessageIdRef.current) {
-              // Use the full_response from backend or fallback to accumulated
-              const finalResponse =
-                data.full_response || voiceAccumulatedResponseRef.current;
-
-              dispatch(
-                updateMessage({
-                  conversationId: activeConversation,
-                  id: currentBotMessageIdRef.current,
-                  message: finalResponse,
-                  response: finalResponse,
-                  suggestions: data.suggestions || [],
-                  isStreaming: false,
-                })
-              );
-            }
-
-            // Reset the message ID and accumulated response
-            currentBotMessageIdRef.current = null;
-            voiceAccumulatedResponseRef.current = "";
-            break;
-
-          case "conversation_renamed":
-            // Conversation was renamed - refresh conversation list
-            console.log("🏷️ [Conversation Renamed]", data.new_name);
-            // ✅ Refresh conversations list
-            if (token) {
-              fetchConversations(token).then((updatedConversations) => {
-                dispatch(
-                  setConversations(updatedConversations?.conversations || [])
-                );
-              });
-            }
-            break;
-
-          case "error":
-            // Error occurred
-            console.error("❌ [Voice Error]", data.error);
-            setIsAISpeaking(false);
-            setBotTyping(false);
-
-            // ✅ Show error message in chat
-            const errorMessage = {
-              id: Date.now(),
-              message: `❌ Error: ${data.error}`,
-              sender: "bot",
-              response: `❌ Error: ${data.error}`,
-              error: true,
-            };
-
-            dispatch(
-              addMessage({
-                conversationId: activeConversation,
-                message: errorMessage,
-              })
-            );
-
-            toast.error(`❌ Voice Error: ${data.error}`);
-            break;
-
-          default:
-            console.log("🔍 [Unknown Message Type]", data);
-            break;
+      // ✅ IMMEDIATE audio processing start
+      processorRef.current.onaudioprocess = (e) => {
+        if (socket.readyState === WebSocket.OPEN) {
+          const inputData = e.inputBuffer.getChannelData(0);
+          const int16Data = convertFloat32ToInt16(inputData);
+          socket.send(int16Data);
         }
       };
+    };
 
-      socket.onclose = () => {
-        console.log("❌ WebSocket closed");
-        setConnectionStatus("disconnected");
-        cleanup();
-      };
+    // ✅ OPTIMIZED message handlers - same logic but with immediate processing
+    socket.onmessage = (msg) => {
+      const data = JSON.parse(msg.data);
+      console.log("📥 [WebSocket Message]", data);
 
-      socket.onerror = (e) => {
-        console.error("WebSocket error:", e);
-        setConnectionStatus("error");
-        cleanup();
-      };
-    } catch (err) {
-      console.error("Voice mode error:", err);
-      cleanup();
+      switch (data.type) {
+        case "connected":
+          console.log("✅ WebSocket connected:", data.message);
+          break;
+
+        case "transcript":
+          console.log("📝 [Live Transcript]", data.text);
+          setVoiceTranscript(prev => {
+            const accumulated = prev + data.text + " ";
+            console.log("🔄 [Accumulated Transcript]", accumulated.trim());
+            return accumulated;
+          });
+          break;
+
+  case "tts-start":
+  console.log("🔊 [TTS] Starting audio generation");
+  
+  // ✅ PREPARE AUDIO CONTEXT FOR IMMEDIATE PLAYBACK
+  if (!audioContextRef.current) {
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 24000,
+      latencyHint: "interactive",
+    });
+    
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
     }
-  };
+    
+    // ✅ START TIMING IMMEDIATELY
+    nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.005;
+  } else {
+    // ✅ RESET FOR NEW TTS SESSION
+    nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.002;
+  }
+  
+  setIsTTSPlaying(true);
+  break;
 
-  // ✅ Update stopVoiceMode function
-  const stopVoiceMode = () => {
-    console.log("🎤 stopVoiceMode called");
 
-    const socket = socketRef.current;
-    if (!socket) {
-      console.warn("⚠️ No socket instance found.");
-      cleanup();
-      return;
-    }
 
-    try {
-      if (socket.readyState === WebSocket.OPEN) {
-        console.log("🟢 WebSocket is OPEN, sending stop-voice...");
-        socket.send(JSON.stringify({ type: "stop-voice" }));
-        setTimeout(() => {
-          socket?.close();
-          console.log("🔌 WebSocket closed from frontend ✅");
-        }, 100);
-      } else if (socket.readyState === WebSocket.CONNECTING) {
-        console.warn("⏳ WebSocket is CONNECTING, will retry...");
-        const waitAndStop = setInterval(() => {
-          if (socket.readyState === WebSocket.OPEN) {
-            clearInterval(waitAndStop);
-            console.log("🟢 WebSocket became OPEN, sending stop-voice...");
-            socket.send(JSON.stringify({ type: "stop-voice" }));
+    case "tts-audio-chunk":
+      // ✅ INSTANT PROCESSING
+      handleTTSChunk(data.audio, data.encoding, data.sample_rate);
+      break;
+
+   case "tts-end":
+  console.log("🔊 [TTS] Audio generation completed");
+  // ✅ LET AUDIO FINISH NATURALLY - NO IMMEDIATE CLEANUP
+  setTimeout(() => {
+    setIsTTSPlaying(false);
+  }, 500); // Give time for last chunks to play
+  break;
+
+
+        case "user-message":
+          // Final user message after processing
+          console.log("👤 [User Message]", data.text);
+          setVoiceTranscript(""); // Clear live transcript
+
+          // ✅ Add user message to Redux store
+          const userMessage = {
+            id: Date.now(),
+            message: data.text,
+            sender: "user",
+            files: [],
+            conversationId: data.conversation_id,
+          };
+
+          dispatch(
+            addMessage({
+              conversationId: data.conversation_id,
+              message: userMessage,
+            })
+          );
+          break;
+
+        case "bot-typing":
+          // AI is processing/typing
+          console.log("🤖 [Bot Typing]", data.status);
+          setIsAISpeaking(data.status);
+          setBotTyping(data.status);
+          break;
+    case "start":
+          // AI response stream started
+          console.log("🚀 [AI Response Start]", data);
+          setIsAISpeaking(true);
+          setBotTyping(true);
+
+          // ✅ Reset accumulated response for new message
+          voiceAccumulatedResponseRef.current = "";
+
+          // ✅ Create initial bot message for streaming
+          const newBotMessageId = Date.now() + 1;
+          const initialBotMessage = {
+            id: newBotMessageId,
+            message: "",
+            sender: "bot",
+            response: "",
+            files: data.uploaded_files || [],
+            suggestions: [],
+            isNewMessage: true,
+            isStreaming: true,
+          };
+
+          // Store the message ID using ref for callback access
+          currentBotMessageIdRef.current = newBotMessageId;
+
+          dispatch(
+            addMessage({
+              conversationId: data.conversation_id,
+              message: initialBotMessage,
+            })
+          );
+          break;
+
+        case "content":
+          // AI response chunk - accumulate and update the streaming message
+          console.log("🤖 [AI Chunk]", data.content);
+
+          // ✅ Accumulate the content (same pattern as handleSendMessage)
+          voiceAccumulatedResponseRef.current += data.content;
+          const currentFullResponse = voiceAccumulatedResponseRef.current;
+
+          // Hide typing when first content arrives
+          if (currentFullResponse.trim().length > 0) {
+            setBotTyping(false);
+          }
+
+          // ✅ Only update if we have a valid message ID
+          if (currentBotMessageIdRef.current) {
+            dispatch(
+              updateMessage({
+                conversationId: activeConversation,
+                id: currentBotMessageIdRef.current,
+                message: currentFullResponse, // ✅ Use accumulated response
+                response: currentFullResponse, // ✅ Use accumulated response
+              })
+            );
+
+            // ✅ Smart scroll to show new content
             setTimeout(() => {
-              socket?.close();
-              console.log("🔌 WebSocket closed from frontend ✅");
-            }, 100);
-          } else if (socket.readyState >= WebSocket.CLOSING) {
-            clearInterval(waitAndStop);
-            console.warn(
-              "❌ WebSocket closed before we could send stop-voice."
+              scrollToBottomSmooth();
+            }, 10);
+          }
+          break;
+
+        case "end":
+          // AI response completed
+          console.log("✅ [AI Response Complete]", data);
+          setIsAISpeaking(false);
+          setBotTyping(false);
+
+          // ✅ Final update with complete response and suggestions
+          if (currentBotMessageIdRef.current) {
+            // Use the full_response from backend or fallback to accumulated
+            const finalResponse =
+              data.full_response || voiceAccumulatedResponseRef.current;
+
+            dispatch(
+              updateMessage({
+                conversationId: activeConversation,
+                id: currentBotMessageIdRef.current,
+                message: finalResponse,
+                response: finalResponse,
+                suggestions: data.suggestions || [],
+                isStreaming: false,
+              })
             );
           }
-        }, 50);
-      } else {
-        console.warn(
-          "⚠️ WebSocket not open or connecting, cannot stop properly"
-        );
+
+          // Reset the message ID and accumulated response
+          currentBotMessageIdRef.current = null;
+          voiceAccumulatedResponseRef.current = "";
+          break;
+
+        case "conversation_renamed":
+          // Conversation was renamed - refresh conversation list
+          console.log("🏷️ [Conversation Renamed]", data.new_name);
+          // ✅ Refresh conversations list
+          if (token) {
+            fetchConversations(token).then((updatedConversations) => {
+              dispatch(
+                setConversations(updatedConversations?.conversations || [])
+              );
+            });
+          }
+          break;
+
+        case "error":
+          // Error occurred
+          console.error("❌ [Voice Error]", data.error);
+          setIsAISpeaking(false);
+          setBotTyping(false);
+
+          // ✅ Show error message in chat
+          const errorMessage = {
+            id: Date.now(),
+            message: `❌ Error: ${data.error}`,
+            sender: "bot",
+            response: `❌ Error: ${data.error}`,
+            error: true,
+          };
+
+          dispatch(
+            addMessage({
+              conversationId: activeConversation,
+              message: errorMessage,
+            })
+          );
+
+          toast.error(`❌ Voice Error: ${data.error}`);
+          break;
+
+        default:
+          console.log("🔍 [Unknown Message Type]", data);
+          break;
       }
-    } catch (err) {
-      console.warn("⚠️ Failed to send stop-voice or close socket:", err);
-    }
+    };
 
-    setIsVoiceMode(false);
-    setVoiceTranscript("");
-    setShowVoiceOverlay(false);
-    currentBotMessageIdRef.current = null; // ✅ Reset message ID using ref
-    voiceAccumulatedResponseRef.current = ""; // ✅ Reset accumulated response
-    cleanupTTSAudio(); // Add this line
+    socket.onclose = () => {
+      console.log("❌ WebSocket closed");
+      setConnectionStatus("disconnected");
+      cleanup();
+    };
+
+    socket.onerror = (e) => {
+      console.error("WebSocket error:", e);
+      setConnectionStatus("error");
+      cleanup();
+    };
+  } catch (err) {
+    console.error("Voice mode error:", err);
     cleanup();
-  };
+  }
+};
 
-  const cleanup = () => {
-    processor?.disconnect();
-    audioContext?.close();
-    mediaStream?.getTracks().forEach((track) => track.stop());
-  };
+// ✅ FIXED stopVoiceMode function
+const stopVoiceMode = () => {
+  console.log("🎤 stopVoiceMode called");
 
-  const convertFloat32ToInt16 = (buffer) => {
-    const l = buffer.length;
-    const int16 = new Int16Array(l);
-    for (let i = 0; i < l; i++) {
-      const s = Math.max(-1, Math.min(1, buffer[i]));
-      int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  const socket = socketRef.current;
+  if (!socket) {
+    console.warn("⚠️ No socket instance found.");
+    cleanup();
+    return;
+  }
+
+  try {
+    if (socket.readyState === WebSocket.OPEN) {
+      console.log("🟢 WebSocket is OPEN, sending stop-voice...");
+      socket.send(JSON.stringify({ type: "stop-voice" }));
+      setTimeout(() => {
+        socket?.close();
+        console.log("🔌 WebSocket closed from frontend ✅");
+      }, 100);
+    } else if (socket.readyState === WebSocket.CONNECTING) {
+      console.warn("⏳ WebSocket is CONNECTING, will retry...");
+      const waitAndStop = setInterval(() => {
+        if (socket.readyState === WebSocket.OPEN) {
+          clearInterval(waitAndStop);
+          console.log("🟢 WebSocket became OPEN, sending stop-voice...");
+          socket.send(JSON.stringify({ type: "stop-voice" }));
+          setTimeout(() => {
+            socket?.close();
+            console.log("🔌 WebSocket closed from frontend ✅");
+          }, 100);
+        } else if (socket.readyState >= WebSocket.CLOSING) {
+          clearInterval(waitAndStop);
+          console.warn(
+            "❌ WebSocket closed before we could send stop-voice."
+          );
+        }
+      }, 50);
+    } else {
+      console.warn(
+        "⚠️ WebSocket not open or connecting, cannot stop properly"
+      );
     }
-    return int16.buffer;
-  };
+  } catch (err) {
+    console.warn("⚠️ Failed to send stop-voice or close socket:", err);
+  }
 
+  setIsVoiceMode(false);
+  setVoiceTranscript("");
+  setShowVoiceOverlay(false);
+  currentBotMessageIdRef.current = null; // ✅ Reset message ID using ref
+  voiceAccumulatedResponseRef.current = ""; // ✅ Reset accumulated response
+  cleanupTTSAudio(); // Add this line
+  cleanup();
+};
 
+// ✅ FIXED cleanup function
+const cleanup = () => {
+  try {
+    // ✅ Clean up processor
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current = null;
+    }
+
+    // ✅ Clean up audio context
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    // ✅ Clean up media stream
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+
+    // ✅ Clean up socket
+    if (socketRef.current) {
+      socketRef.current = null;
+    }
+
+    // ✅ Reset states
+    setSocketOpen(false);
+    setConnectionStatus("disconnected");
+    setIsProcessing(false);
+
+    console.log("✅ Voice mode cleanup completed");
+  } catch (error) {
+    console.error("❌ Error during cleanup:", error);
+  }
+};
+
+// ✅ KEEP existing convertFloat32ToInt16 function
+const convertFloat32ToInt16 = (buffer) => {
+  const l = buffer.length;
+  const int16 = new Int16Array(l);
+  for (let i = 0; i < l; i++) {
+    const s = Math.max(-1, Math.min(1, buffer[i]));
+    int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return int16.buffer;
+};
+
+// ✅ KEEP existing preprocessMessage function
 function preprocessMessage(msg) {
   // Auto-wrap full HTML in code block if detected
   if (msg.includes('<html') || msg.includes('<!DOCTYPE')) {
@@ -2142,7 +2284,7 @@ useEffect(() => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative mb-5  z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md hover:dark:bg-gradient-to-r hover:dark:from-[#0076FF] hover:dark:to-[#0000b591]  dark:bg-gradient-to-r dark:from-[#0000B5] dark:to-[#0076FF] text-[#1e293b] dark:text-white  w-fit max-w-[90%] md:max-w-2xl md:w-fit self-end ml-auto">
+                        className="relative mb-5  z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md dark:bg-[#717171] text-[#1e293b] dark:text-white  w-fit max-w-[90%] md:max-w-2xl md:w-fit self-end ml-auto">
                         <div className="flex items-start gap-2">
                           <div className="p-1 rounded-full flex-shrink-0">
                             {/* Fallback to default circle icon if user_img is not available */}
@@ -2621,7 +2763,7 @@ ${
       className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
         isVoiceMode
           ? "bg-red-600 text-black cursor-not-allowed"
-          : "  hover:bg-gray-400 text-black border border-gray-400"
+          : "  hover:bg-gray-400 text-black dark:text-white border border-gray-400"
       } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
       <span className="md:block hidden text-xs md:text-base items-center gap-2">
         <AudioLines size={18} />
