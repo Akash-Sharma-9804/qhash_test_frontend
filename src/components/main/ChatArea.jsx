@@ -1331,7 +1331,10 @@ const [currentUserMessage, setCurrentUserMessage] = useState("");
 const [aiResponseText, setAiResponseText] = useState("");
 const [connectionStatus, setConnectionStatus] = useState("disconnected");
 const [isTTSPlaying, setIsTTSPlaying] = useState(false);
-
+const [isSTTActive, setIsSTTActive] = useState(false); // ✅ ADD THIS STATE
+// ✅ ADD THESE NEW STATE VARIABLES
+const [isFrontendAudioPlaying, setIsFrontendAudioPlaying] = useState(false);
+const [audioPlaybackStarted, setAudioPlaybackStarted] = useState(false);
 
 const audioContextRef = useRef(null);
 const processorRef = useRef(null);
@@ -1354,133 +1357,145 @@ const currentSourceRef = useRef(null);
   const isPlayingAudioRef = useRef(false);
   const nextPlayTimeRef = useRef(0);
   const pcmBufferRef = useRef([]);
+const ttsTotalChunksRef = useRef(0);
+const ttsChunksPlayedRef = useRef(0);
+const isTTSComplete = useRef(false);
+const currentSpeakPCMChunksRef = useRef([]); // Buffer for current sentence
+const speakQueueRef = useRef([]); // Queue of AudioBuffers for sequential playback
+const isPlayingSpeakRef = useRef(false); // Track if a Speak is currently playing
 
+const audioChunkQueueRef = useRef({}); // { [chunk_number]: { audioBuffer, is_final } }
+const expectedChunkNumberRef = useRef(1);
+ 
 
-  
-// ✅ REPLACE: handleTTSChunk function
-// const handleTTSChunk = async (base64Audio, encoding = "linear16", sampleRate = 24000) => {
-//   try {
-//     console.log(`🔊 [TTS Chunk] Received: ${base64Audio.length} chars`);
-    
-//     // ✅ Initialize audio context if needed
-//     if (!audioContextRef.current) {
-//       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-//         sampleRate: sampleRate,
-//       });
-      
-//       if (audioContextRef.current.state === 'suspended') {
-//         await audioContextRef.current.resume();
-//       }
-      
-//       console.log("🔊 Audio context initialized");
-//     }
-
-//     // ✅ Skip empty or invalid chunks
-//     if (!base64Audio || base64Audio.length < 10) {
-//       console.log("🔊 [Skip] Empty or too small audio chunk");
-//       return;
-//     }
-
-//     // ✅ Convert base64 to PCM
-//     const binaryString = atob(base64Audio);
-//     const pcmData = new Int16Array(binaryString.length / 2);
-    
-//     for (let i = 0; i < pcmData.length; i++) {
-//       const byte1 = binaryString.charCodeAt(i * 2);
-//       const byte2 = binaryString.charCodeAt(i * 2 + 1);
-//       pcmData[i] = (byte2 << 8) | byte1;
-//     }
-
-//     // ✅ Convert to Float32 and create audio buffer
-//     const float32Data = new Float32Array(pcmData.length);
-//     for (let i = 0; i < pcmData.length; i++) {
-//       float32Data[i] = pcmData[i] / 32768.0;
-//     }
-
-//     const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, sampleRate);
-//     audioBuffer.getChannelData(0).set(float32Data);
-
-//     // ✅ IMMEDIATE STREAMING: Add to queue and start playing immediately
-//     audioQueueRef.current.push(audioBuffer);
-//     console.log(`🔊 [Queue] Added chunk (${audioBuffer.duration.toFixed(3)}s). Queue: ${audioQueueRef.current.length}`);
-    
-//     // ✅ CRITICAL: Start playing immediately if not already playing
-//     if (!isPlayingRef.current && audioQueueRef.current.length >= 1) {
-//       console.log("🔊 [Stream] Starting immediate playback");
-//       playNextAudioChunk();
-//     }
-
-//   } catch (error) {
-//     console.error("❌ Error processing audio chunk:", error);
-//   }
-// };
-const handleTTSChunk = async (base64Audio, encoding = "linear16", sampleRate = 24000) => {
+const handleTTSChunk = async (
+  base64Audio,
+  encoding = "linear16",
+  sampleRate = 24000,
+  chunk_number = null,
+  is_final = false
+) => {
   try {
-    // ✅ SKIP INVALID OR EMPTY CHUNKS
-    if (!base64Audio || base64Audio.length < 50) {
+    if (!base64Audio || base64Audio.length < 50 || !chunk_number) {
       console.log("🔊 [Skip] Invalid or empty audio chunk");
       return;
     }
 
-    // ✅ CHECK FOR JSON ERROR MESSAGES (backend warnings)
-    try {
-      const decoded = atob(base64Audio);
-      if (decoded.startsWith('{"type":"Warning"')) {
-        console.warn("⚠️ [TTS] Received warning message, skipping:", decoded);
-        return;
-      }
-    } catch (e) {
-      // Expected for valid audio data
-    }
-
-    // ✅ INITIALIZE AUDIO CONTEXT ONCE WITH OPTIMAL SETTINGS
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-        sampleRate,
-        latencyHint: "interactive", // ✅ LOW LATENCY
-      });
-      
-      if (audioContextRef.current.state === 'suspended') {
-        await audioContextRef.current.resume();
-      }
-      
-      // ✅ START IMMEDIATELY - NO DELAY
-      nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.005; // 5ms buffer only
-      console.log("🔊 [TTS] AudioContext initialized for immediate playback");
-    }
-
-    // ✅ FAST PCM CONVERSION
+    // PCM decode
     const binaryString = atob(base64Audio);
     const pcmData = new Int16Array(binaryString.length / 2);
-    
     for (let i = 0; i < pcmData.length; i++) {
       const byte1 = binaryString.charCodeAt(i * 2);
       const byte2 = binaryString.charCodeAt(i * 2 + 1);
       pcmData[i] = (byte2 << 8) | byte1;
     }
 
-    // ✅ FAST FLOAT32 CONVERSION
+    // Convert to Float32
     const float32Data = new Float32Array(pcmData.length);
     for (let i = 0; i < pcmData.length; i++) {
       float32Data[i] = pcmData[i] / 32768.0;
     }
 
-    // ✅ CREATE AUDIO BUFFER
+    // Create AudioBuffer
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate,
+        latencyHint: "interactive",
+      });
+    }
     const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, sampleRate);
     audioBuffer.getChannelData(0).set(float32Data);
 
-    // ✅ IMMEDIATE SEQUENTIAL PLAYBACK
-    playAudioSequentially(audioBuffer);
+    // Buffer this chunk by chunk_number
+    audioChunkQueueRef.current[chunk_number] = { audioBuffer, is_final };
 
+    // Try to play next chunk(s) in order
+    playNextAudioChunk();
   } catch (error) {
     console.error("❌ [TTS] Error processing chunk:", error);
   }
 };
 
+const playNextSpeak = () => {
+  if (isPlayingSpeakRef.current) return;
+  if (!audioContextRef.current) return;
+  if (speakQueueRef.current.length === 0) return;
+
+  const audioBuffer = speakQueueRef.current.shift();
+  if (!audioBuffer) return;
+
+  isPlayingSpeakRef.current = true;
+
+  const source = audioContextRef.current.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(audioContextRef.current.destination);
+
+  const currentTime = audioContextRef.current.currentTime;
+  if (nextPlayTimeRef.current < currentTime) {
+    nextPlayTimeRef.current = currentTime;
+  }
+  const startTime = nextPlayTimeRef.current;
+  source.start(startTime);
+  nextPlayTimeRef.current = startTime + audioBuffer.duration;
+
+  source.onended = () => {
+    isPlayingSpeakRef.current = false;
+    playNextSpeak(); // Play next Speak in queue, if any
+    ttsChunksPlayedRef.current += 1;
+    console.log(`[AUDIO] Played chunk, ttsChunksPlayedRef.current = ${ttsChunksPlayedRef.current} / ${ttsTotalChunksRef.current}`);
+    checkAudioCompletion();
+  };
+  source.onerror = (error) => {
+    isPlayingSpeakRef.current = false;
+    console.error("❌ [TTS] Audio source error:", error);
+    playNextSpeak();
+  };
+};
+
+ 
+
+const playNextAudioChunk = () => {
+  if (!audioContextRef.current) return;
+
+  // Play all available chunks in order
+  while (audioChunkQueueRef.current[expectedChunkNumberRef.current]) {
+    const { audioBuffer } = audioChunkQueueRef.current[expectedChunkNumberRef.current];
+    delete audioChunkQueueRef.current[expectedChunkNumberRef.current];
+
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContextRef.current.destination);
+
+    const currentTime = audioContextRef.current.currentTime;
+    if (nextPlayTimeRef.current < currentTime) {
+      nextPlayTimeRef.current = currentTime;
+    }
+    const startTime = nextPlayTimeRef.current;
+    source.start(startTime);
+    nextPlayTimeRef.current = startTime + audioBuffer.duration;
+
+    source.onended = () => {
+      ttsChunksPlayedRef.current += 1;
+      expectedChunkNumberRef.current += 1;
+      checkAudioCompletion();
+      // Try to play the next chunk if it has arrived
+      setTimeout(playNextAudioChunk, 0);
+    };
+    source.onerror = (error) => {
+      console.error("❌ [TTS] Audio source error:", error);
+      expectedChunkNumberRef.current += 1;
+      setTimeout(playNextAudioChunk, 0);
+    };
+
+    // Only play one chunk at a time (wait for onended)
+    break;
+  }
+};
+
+// --- END REPLACEMENT ---
 const playAudioSequentially = (audioBuffer) => {
   if (!audioContextRef.current || !audioBuffer) return;
 
-  // ✅ ENSURE AUDIO CONTEXT IS READY
   if (audioContextRef.current.state === 'suspended') {
     audioContextRef.current.resume().then(() => {
       playAudioSequentially(audioBuffer);
@@ -1493,272 +1508,132 @@ const playAudioSequentially = (audioBuffer) => {
   source.connect(audioContextRef.current.destination);
 
   const currentTime = audioContextRef.current.currentTime;
-
-  // ✅ SEAMLESS SEQUENTIAL TIMING
   if (nextPlayTimeRef.current <= currentTime) {
-    // If we're behind, catch up immediately with minimal buffer
-    nextPlayTimeRef.current = currentTime + 0.002; // 2ms buffer to prevent underruns
+    nextPlayTimeRef.current = currentTime + 0.002;
   }
-
   const startTime = nextPlayTimeRef.current;
-  
-  // ✅ START AUDIO CHUNK
   source.start(startTime);
-  console.log(`🔊 [TTS] Playing at ${startTime.toFixed(3)}s, duration: ${audioBuffer.duration.toFixed(3)}s`);
-
-  // ✅ CRITICAL: UPDATE NEXT PLAY TIME FOR SEAMLESS CONTINUATION
   nextPlayTimeRef.current = startTime + audioBuffer.duration;
-  
-  // ✅ COMPLETION HANDLER
-  source.onended = () => {
-    console.log(`🔊 [TTS] Chunk completed, next scheduled at ${nextPlayTimeRef.current.toFixed(3)}s`);
-  };
 
+  source.onended = () => {
+    ttsChunksPlayedRef.current += 1;
+    checkAudioCompletion();
+  };
   source.onerror = (error) => {
     console.error("❌ [TTS] Audio source error:", error);
   };
 };
 
 
-const scheduleAudioChunk = (audioBuffer) => {
-  if (!audioContextRef.current || !audioBuffer) return;
 
-  try {
-    const source = audioContextRef.current.createBufferSource();
-    source.buffer = audioBuffer;
-    
-    // ✅ ADD gain node to control volume and prevent clipping
-    const gainNode = audioContextRef.current.createGain();
-    gainNode.gain.setValueAtTime(0.8, audioContextRef.current.currentTime); // ✅ Reduce volume to prevent distortion
-    
-    source.connect(gainNode);
-    gainNode.connect(audioContextRef.current.destination);
+// ✅ NEW: Track when all audio chunks have finished playing
+const audioCompletionTimeoutRef = useRef(null);
+const lastChunkEndTimeRef = useRef(0);
 
-    const currentTime = audioContextRef.current.currentTime;
+const checkAudioCompletion = () => {
+  // Only proceed if we've received tts-complete and played all chunks
+  if (
+    isTTSComplete.current &&
+    ttsTotalChunksRef.current > 0 &&
+    ttsChunksPlayedRef.current >= ttsTotalChunksRef.current
+  ) {
+    console.log("🔊 [Frontend] All audio chunks played, sending audio-playback-ended");
+    // ✅ ADD WEBSOCKET STATE CHECK
+    console.log("🔍 [WebSocket State]", socketRef.current?.readyState);
 
-// ✅ NEW: Reset nextPlayTimeRef if it's behind by >100ms
-if (currentTime - nextPlayTimeRef.current > 0.1) {
-  console.log(`⚠️ Resetting nextPlayTimeRef (drift detected). CurrentTime: ${currentTime.toFixed(3)}, NextPlayTime: ${nextPlayTimeRef.current.toFixed(3)}`);
-  nextPlayTimeRef.current = currentTime + 0.01; // minimal headroom to avoid underruns
-}
-
-const startTime = Math.max(nextPlayTimeRef.current, currentTime + 0.01);
-
-source.start(startTime);
-console.log(`🔊 Playing audio at ${startTime.toFixed(3)}s`);
-
-nextPlayTimeRef.current = startTime + audioBuffer.duration;
-
-
-    // ✅ TRACK current source for cleanup
-    currentSourceRef.current = source;
-
-    // ✅ CLEANUP when chunk ends
-    source.onended = () => {
-      console.log(`🔊 [Audio] Chunk completed, next scheduled at ${nextPlayTimeRef.current.toFixed(3)}s`);
-      if (currentSourceRef.current === source) {
-        currentSourceRef.current = null;
-      }
-    };
-
-    source.onerror = (error) => {
-      console.error("❌ [Audio] Playback error:", error);
-    };
-
-  } catch (error) {
-    console.error("❌ Error scheduling audio chunk:", error);
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: "audio-playback-ended" }));
+    } else {
+      console.error("❌ [Frontend] WebSocket not open, cannot send audio-playback-ended");
+    }
+    // Reset for next time
+    isTTSComplete.current = false;
+    ttsTotalChunksRef.current = 0;
+    ttsChunksPlayedRef.current = 0;
+    expectedChunkNumberRef.current = 1;
+    audioChunkQueueRef.current = [];
+    nextPlayTimeRef.current = audioContextRef.current ? audioContextRef.current.currentTime : 0;
+  } else {
+    // Fallback: re-check after a short delay in case tts-complete and playback are racing
+    if (isTTSComplete.current && ttsTotalChunksRef.current > 0) {
+      setTimeout(checkAudioCompletion, 50);
+    }
   }
 };
-// ✅ IMPROVED: Sequential playback with proper completion handling
-// const playNextAudioChunk = () => {
-//   if (audioQueueRef.current.length === 0) {
-//     isPlayingRef.current = false;
-//     console.log("🔊 [Queue] Audio queue empty, stopping playback");
-//     return;
-//   }
 
-//   const audioBuffer = audioQueueRef.current.shift();
-//   isPlayingRef.current = true;
-
-//   try {
-//     // ✅ Stop any currently playing audio (safety measure)
-//     if (currentSourceRef.current) {
-//       try {
-//         currentSourceRef.current.stop();
-//       } catch (e) {
-//         // Ignore if already stopped
-//       }
-//       currentSourceRef.current = null;
-//     }
-
-//     // ✅ Create and play new audio source
-//     const source = audioContextRef.current.createBufferSource();
-//     source.buffer = audioBuffer;
-//     source.connect(audioContextRef.current.destination);
-    
-//     currentSourceRef.current = source;
-
-//     // ✅ Set up completion handler BEFORE starting
-//     source.onended = () => {
-//       console.log(`🔊 [Stream] Chunk completed (${audioBuffer.duration.toFixed(3)}s)`);
-//       currentSourceRef.current = null;
-      
-//       // ✅ IMMEDIATE: Play next chunk without delay
-//       setTimeout(() => {
-//         playNextAudioChunk();
-//       }, 5); // Reduced delay for smoother streaming
-//     };
-
-//     // ✅ Start playback immediately
-//     source.start(0);
-    
-//     console.log(`🔊 [Stream] Playing chunk: ${audioBuffer.duration.toFixed(3)}s, Queue: ${audioQueueRef.current.length}`);
-
-//   } catch (error) {
-//     console.error("❌ Error playing audio chunk:", error);
-//     isPlayingRef.current = false;
-//     currentSourceRef.current = null;
-    
-//     // Try to continue with next chunk after error
-//     setTimeout(() => {
-//       playNextAudioChunk();
-//     }, 50);
-//   }
-// };
-
-
-// // const initializeAudioContext = () => {
-// //   if (!audioContextRef.current) {
-// //     audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-// //       sampleRate: 24000,
-// //     });
-    
-// //     // Resume immediately
-// //     if (audioContextRef.current.state === 'suspended') {
-// //       audioContextRef.current.resume();
-// //     }
-    
-// //     // ✅ CRITICAL: Reset timing for new session
-// //     nextPlayTimeRef.current = audioContextRef.current.currentTime;
-// //     isPlayingAudioRef.current = false;
-    
-// //     console.log("🔊 Audio context initialized with perfect timing");
-// //   }
-// // };
-
-
-  
-// // // ✅ REPLACE: Sequential audio scheduling with proper timing
-// // const scheduleAudioChunkSequentially = (pcmData, sampleRate = 24000) => {
-// //   try {
-// //     if (!audioContextRef.current) return;
-
-// //     // ✅ Convert PCM to Float32
-// //     const float32Data = new Float32Array(pcmData.length);
-// //     for (let i = 0; i < pcmData.length; i++) {
-// //       float32Data[i] = pcmData[i] / 32768.0;
-// //     }
-
-// //     // ✅ Create AudioBuffer
-// //     const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, sampleRate);
-// //     audioBuffer.getChannelData(0).set(float32Data);
-
-// //     const source = audioContextRef.current.createBufferSource();
-// //     source.buffer = audioBuffer;
-// //     source.connect(audioContextRef.current.destination);
-
-// //     const currentTime = audioContextRef.current.currentTime;
-    
-// //     // ✅ IMMEDIATE SEQUENTIAL TIMING
-// //     if (!isPlayingAudioRef.current) {
-// //       // First chunk - start immediately with minimal delay
-// //       nextPlayTimeRef.current = currentTime + 0.01;
-// //       isPlayingAudioRef.current = true;
-// //       console.log("🔊 Starting immediate sequential audio playback");
-// //     }
-
-// //     // ✅ Schedule this chunk to play EXACTLY after the previous one
-// //     source.start(nextPlayTimeRef.current);
-    
-// //     console.log(`🔊 [Immediate] Chunk scheduled at ${nextPlayTimeRef.current.toFixed(3)}s, duration: ${audioBuffer.duration.toFixed(3)}s`);
-    
-// //     // ✅ CRITICAL: Update next play time to EXACTLY when this chunk ends
-// //     nextPlayTimeRef.current += audioBuffer.duration;
-
-// //     // ✅ Track completion
-// //     source.onended = () => {
-// //       console.log("🔊 Audio chunk completed at", audioContextRef.current.currentTime.toFixed(3));
-// //     };
-
-// //   } catch (error) {
-// //     console.error("❌ Error in immediate audio scheduling:", error);
-// //   }
-// // };
 
 
  
+const stopSTT = () => {
+  console.log("🔇 [STT] Stopping audio processing");
+  setIsSTTActive(false);
+  
+  // ✅ IMMEDIATELY STOP AUDIO PROCESSING
+  if (processorRef.current) {
+    processorRef.current.onaudioprocess = null;
+    processorRef.current.disconnect(); // ✅ ADD THIS LINE
+  }
+  
+  // ✅ MUTE MICROPHONE TEMPORARILY
+  if (mediaStreamRef.current) {
+    mediaStreamRef.current.getAudioTracks().forEach(track => {
+      track.enabled = false; // ✅ ADD THIS LINE
+    });
+  }
+};
+
+const startSTT = () => {
+  console.log("▶️ [STT] Starting audio processing");
+  setIsSTTActive(true);
+  
+  // ✅ RE-ENABLE MICROPHONE
+  if (mediaStreamRef.current) {
+    mediaStreamRef.current.getAudioTracks().forEach(track => {
+      track.enabled = true; // ✅ ADD THIS LINE
+    });
+  }
+  
+  if (processorRef.current && socketRef.current?.readyState === WebSocket.OPEN) {
+    // ✅ RECONNECT PROCESSOR
+    if (audioContextRef.current) {
+      processorRef.current.connect(audioContextRef.current.destination);
+    }
+    
+    processorRef.current.onaudioprocess = (e) => {
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        const inputData = e.inputBuffer.getChannelData(0);
+        const int16Data = convertFloat32ToInt16(inputData);
+        socketRef.current.send(int16Data);
+      }
+    };
+  }
+};
  
-
-//  // ✅ SIMPLIFIED TTS INITIALIZATION - Remove delays
-// // ✅ REPLACE: TTS initialization
-// // ✅ UPDATED: TTS initialization for immediate playback
-
-
-// const initializeTTSAudio = () => {
-//   try {
-//     console.log("🔊 TTS Audio initializing for queue-based playback...");
-    
-//     // ✅ Initialize audio context immediately
-//     if (!audioContextRef.current) {
-//       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-//         sampleRate: 24000,
-//       });
-      
-//       if (audioContextRef.current.state === 'suspended') {
-//         audioContextRef.current.resume();
-//       }
-//     }
-    
-//     // ✅ Clear any existing queue
-//     audioQueueRef.current = [];
-//     isPlayingRef.current = false;
-    
-//     setIsTTSPlaying(true);
-//     console.log("🔊 TTS Audio ready for queue-based streaming");
-//   } catch (error) {
-//     console.error("❌ Failed to initialize TTS audio:", error);
-//   }
-// };
-
-
-// // ✅ UPDATED: TTS completion handler
-// const playTTSAudio = () => {
-//   console.log("🔊 TTS stream completed - waiting for queue to finish");
-  
-//   // ✅ Check if queue is finished
-//   const checkCompletion = () => {
-//     if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
-//       setIsTTSPlaying(false);
-//       console.log("🔊 All queued audio completed");
-//     } else {
-//       console.log(`🔊 [Queue Status] Playing: ${isPlayingRef.current}, Queue: ${audioQueueRef.current.length}`);
-//       // Check again in 200ms
-//       setTimeout(checkCompletion, 200);
-//     }
-//   };
-  
-//   // Start checking after a small delay
-//   setTimeout(checkCompletion, 300);
-// };
-
-// ✅ IMPROVED: Cleanup function
 // ✅ IMPROVED TTS CLEANUP
 const cleanupTTSAudio = () => {
   try {
     console.log("🔊 [TTS] Cleaning up audio...");
     
+    // ✅ STOP STT SMOOTHLY
+    stopSTT();
+    
+    // ✅ CLEAR COMPLETION TIMEOUT
+    if (audioCompletionTimeoutRef.current) {
+      clearTimeout(audioCompletionTimeoutRef.current);
+      audioCompletionTimeoutRef.current = null;
+    }
+    
+    // ✅ SEND AUDIO ENDED SIGNAL IF AUDIO WAS PLAYING
+    if (isFrontendAudioPlaying && socketRef.current?.readyState === WebSocket.OPEN) {
+      console.log("🔊 [Frontend] Sending audio-playback-ended signal (cleanup)");
+      socketRef.current.send(JSON.stringify({
+        type: "audio-playback-ended"
+      }));
+    }
+    
     // ✅ RESET TIMING IMMEDIATELY
     nextPlayTimeRef.current = 0;
+    lastChunkEndTimeRef.current = 0;
     
     // ✅ CLOSE AUDIO CONTEXT PROPERLY
     if (audioContextRef.current && audioContextRef.current.state !== "closed") {
@@ -1767,11 +1642,15 @@ const cleanupTTSAudio = () => {
     }
     
     setIsTTSPlaying(false);
+    setIsAISpeaking(false);
+    setIsFrontendAudioPlaying(false);
+    setAudioPlaybackStarted(false);
     console.log("🔊 [TTS] Cleanup complete");
   } catch (error) {
     console.error("❌ [TTS] Cleanup error:", error);
   }
 };
+
 
   // dictate mode starts 
   // Update your startVoiceMode function
@@ -1825,6 +1704,8 @@ const cleanupTTSAudio = () => {
       setSocketOpen(true);
       setConnectionStatus("connected");
       setIsProcessing(false);
+      // ✅ START STT WITH PROPER CONTROL
+      startSTT();
 
       // ✅ IMMEDIATE audio processing start
       processorRef.current.onaudioprocess = (e) => {
@@ -1846,19 +1727,35 @@ const cleanupTTSAudio = () => {
           console.log("✅ WebSocket connected:", data.message);
           break;
 
-        case "transcript":
-          console.log("📝 [Live Transcript]", data.text);
-          setVoiceTranscript(prev => {
-            const accumulated = prev + data.text + " ";
-            console.log("🔄 [Accumulated Transcript]", accumulated.trim());
-            return accumulated;
-          });
-          break;
-
-  case "tts-start":
-  console.log("🔊 [TTS] Starting audio generation");
+       case "transcript":
+  console.log("📝 [Live Transcript]", data.text);
   
-  // ✅ PREPARE AUDIO CONTEXT FOR IMMEDIATE PLAYBACK
+  // ✅ SIMPLIFIED: Direct accumulation without redundant logging
+  setVoiceTranscript(prev => {
+    const newTranscript = prev + data.text + " ";
+    return newTranscript;
+  });
+  break;
+
+ case "tts-start":
+  console.log("🔊 [TTS] Starting audio generation");
+ 
+  // ✅ SIMPLE: Stop STT and send signal
+  stopSTT();
+  setIsAISpeaking(true);
+  setIsTTSPlaying(true);
+  setAudioPlaybackStarted(true);
+  setIsFrontendAudioPlaying(true);
+  
+  // ✅ SEND AUDIO STARTED SIGNAL IMMEDIATELY
+  if (socketRef.current?.readyState === WebSocket.OPEN) {
+    console.log("🔊 [Frontend] Sending audio-playback-started signal");
+    socketRef.current.send(JSON.stringify({
+      type: "audio-playback-started"
+    }));
+  }
+  
+  // Initialize audio context
   if (!audioContextRef.current) {
     audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
       sampleRate: 24000,
@@ -1869,30 +1766,49 @@ const cleanupTTSAudio = () => {
       audioContextRef.current.resume();
     }
     
-    // ✅ START TIMING IMMEDIATELY
     nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.005;
   } else {
-    // ✅ RESET FOR NEW TTS SESSION
     nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.002;
   }
-  
-  setIsTTSPlaying(true);
   break;
 
 
 
-    case "tts-audio-chunk":
-      // ✅ INSTANT PROCESSING
-      handleTTSChunk(data.audio, data.encoding, data.sample_rate);
+   case "tts-audio-chunk":
+  // Pass is_final to handler!
+  handleTTSChunk(
+    data.audio,
+    data.encoding,
+    data.sample_rate,
+    data.chunk_number,
+    data.is_final // <-- pass this!
+  );
+  break;
+
+
+
+case "tts-end":
+      console.log("🔊 [TTS] Backend finished sending audio chunks");
+      // ✅ MARK TTS AS COMPLETE BUT DON'T SEND SIGNAL YET
+      isTTSComplete.current = true;
+      
+      // ✅ CHECK IF PLAYBACK IS ALREADY COMPLETE
+      checkAudioCompletion();
       break;
 
-   case "tts-end":
-  console.log("🔊 [TTS] Audio generation completed");
-  // ✅ LET AUDIO FINISH NATURALLY - NO IMMEDIATE CLEANUP
-  setTimeout(() => {
-    setIsTTSPlaying(false);
-  }, 500); // Give time for last chunks to play
+case "tts-complete":
+  console.log("🔊 [TTS] Backend reports all chunks sent:", data);
+  isTTSComplete.current = true;
+  ttsTotalChunksRef.current = data.total_chunks || 0;
+  // Call checkAudioCompletion twice: once now, and again after a short delay
+  checkAudioCompletion();
+  setTimeout(checkAudioCompletion, 50); // <-- ensures check runs after all audio events
+  startSTT()
   break;
+
+
+
+
 
 
         case "user-message":
@@ -1926,6 +1842,9 @@ const cleanupTTSAudio = () => {
     case "start":
           // AI response stream started
           console.log("🚀 [AI Response Start]", data);
+          
+          // ✅ STOP STT IMMEDIATELY AND SMOOTHLY
+          stopSTT();
           setIsAISpeaking(true);
           setBotTyping(true);
 
@@ -1945,7 +1864,6 @@ const cleanupTTSAudio = () => {
             isStreaming: true,
           };
 
-          // Store the message ID using ref for callback access
           currentBotMessageIdRef.current = newBotMessageId;
 
           dispatch(
@@ -1990,12 +1908,11 @@ const cleanupTTSAudio = () => {
         case "end":
           // AI response completed
           console.log("✅ [AI Response Complete]", data);
-          setIsAISpeaking(false);
           setBotTyping(false);
+          // ✅ DON'T SET isAISpeaking to false here - wait for tts-end
 
           // ✅ Final update with complete response and suggestions
           if (currentBotMessageIdRef.current) {
-            // Use the full_response from backend or fallback to accumulated
             const finalResponse =
               data.full_response || voiceAccumulatedResponseRef.current;
 
@@ -2080,6 +1997,17 @@ const cleanupTTSAudio = () => {
 // ✅ FIXED stopVoiceMode function
 const stopVoiceMode = () => {
   console.log("🎤 stopVoiceMode called");
+  
+  // ✅ SEND AUDIO ENDED SIGNAL IF NEEDED
+  if (isFrontendAudioPlaying && socketRef.current?.readyState === WebSocket.OPEN) {
+    console.log("🔊 [Frontend] Sending audio-playback-ended signal (stop voice mode)");
+    socketRef.current.send(JSON.stringify({
+      type: "audio-playback-ended"
+    }));
+  }
+  
+  // ✅ STOP STT IMMEDIATELY
+  stopSTT();
 
   const socket = socketRef.current;
   if (!socket) {
@@ -2123,12 +2051,15 @@ const stopVoiceMode = () => {
     console.warn("⚠️ Failed to send stop-voice or close socket:", err);
   }
 
-  setIsVoiceMode(false);
+setIsVoiceMode(false);
   setVoiceTranscript("");
   setShowVoiceOverlay(false);
-  currentBotMessageIdRef.current = null; // ✅ Reset message ID using ref
-  voiceAccumulatedResponseRef.current = ""; // ✅ Reset accumulated response
-  cleanupTTSAudio(); // Add this line
+  setIsSTTActive(false);
+  setIsFrontendAudioPlaying(false);
+  setAudioPlaybackStarted(false);
+  currentBotMessageIdRef.current = null;
+  voiceAccumulatedResponseRef.current = "";
+  cleanupTTSAudio();
   cleanup();
 };
 
