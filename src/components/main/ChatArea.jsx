@@ -1141,7 +1141,7 @@ const [liveTranscriptText, setLiveTranscriptText] = useState("");
 const [accumulatedTranscript, setAccumulatedTranscript] = useState(""); // 👈 NEW: For full transcript
 const [isTranscriptFinal, setIsTranscriptFinal] = useState(false);
 
-  // ✅ Call this to start recording
+  // ✅ Call this to start recordin
 const startRecording = async () => {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
