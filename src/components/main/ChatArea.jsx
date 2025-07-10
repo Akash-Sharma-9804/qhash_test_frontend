@@ -1654,44 +1654,390 @@ const cleanupTTSAudio = () => {
 
   // dictate mode starts 
   // Update your startVoiceMode function
- const startVoiceMode = async () => {
+//  const startVoiceMode = async () => {
+//   try {
+//     setUserHasScrolledUp(false);
+//     setIsVoiceMode(true);
+//     setIsProcessing(true);
+//     setShowVoiceOverlay(true);
+
+//     // ✅ OPTIMIZED audio context with low latency settings
+//     audioContextRef.current = new AudioContext({ 
+//       sampleRate: 16000,
+//       latencyHint: "interactive", // ✅ ADD for low latency
+//     });
+    
+//     mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ 
+//       audio: {
+//         echoCancellation: true,
+//         noiseSuppression: true,
+//         autoGainControl: true,
+//         sampleRate: 16000, // ✅ MATCH backend
+//       }
+//     });
+
+//     const input = audioContextRef.current.createMediaStreamSource(mediaStreamRef.current);
+
+//     // ✅ OPTIMIZED filter settings
+//     const filter = audioContextRef.current.createBiquadFilter();
+//     filter.type = "lowshelf";
+//     filter.frequency.setValueAtTime(1000, audioContextRef.current.currentTime);
+//     filter.gain.setValueAtTime(-8, audioContextRef.current.currentTime); // ✅ REDUCED from -10 to -8
+
+//     input.connect(filter);
+
+//     // ✅ SMALLER buffer size for lower latency
+//     processorRef.current = audioContextRef.current.createScriptProcessor(2048, 1, 1); // ✅ REDUCED from 4096 to 2048
+//     filter.connect(processorRef.current);
+//     processorRef.current.connect(audioContextRef.current.destination);
+
+//     // ✅ OPTIMIZED WebSocket connection
+//     const token = localStorage.getItem("token");
+//     const conversationId = activeConversation;
+//     const socket = new WebSocket(
+//       `${WSS_BASE_URL}?token=${token}&conversation_id=${conversationId}`
+//     );
+//     socketRef.current = socket;
+
+//     socket.onopen = () => {
+//       console.log("🔌 WebSocket connected");
+//       setSocketOpen(true);
+//       setConnectionStatus("connected");
+//       setIsProcessing(false);
+//       // ✅ START STT WITH PROPER CONTROL
+//       startSTT();
+
+//       // ✅ IMMEDIATE audio processing start
+//       processorRef.current.onaudioprocess = (e) => {
+//         if (socket.readyState === WebSocket.OPEN) {
+//           const inputData = e.inputBuffer.getChannelData(0);
+//           const int16Data = convertFloat32ToInt16(inputData);
+//           socket.send(int16Data);
+//         }
+//       };
+//     };
+
+//     // ✅ OPTIMIZED message handlers - same logic but with immediate processing
+//     socket.onmessage = (msg) => {
+//       const data = JSON.parse(msg.data);
+//       console.log("📥 [WebSocket Message]", data);
+
+//       switch (data.type) {
+//         case "connected":
+//           console.log("✅ WebSocket connected:", data.message);
+//           break;
+
+//        case "transcript":
+//   console.log("📝 [Live Transcript]", data.text);
+  
+//   // ✅ SIMPLIFIED: Direct accumulation without redundant logging
+//   setVoiceTranscript(prev => {
+//     const newTranscript = prev + data.text + " ";
+//     return newTranscript;
+//   });
+//   break;
+
+//  case "tts-start":
+//   console.log("🔊 [TTS] Starting audio generation");
+ 
+//   // ✅ SIMPLE: Stop STT and send signal
+//   stopSTT();
+//   setIsAISpeaking(true);
+//   setIsTTSPlaying(true);
+//   setAudioPlaybackStarted(true);
+//   setIsFrontendAudioPlaying(true);
+  
+//   // ✅ SEND AUDIO STARTED SIGNAL IMMEDIATELY
+//   if (socketRef.current?.readyState === WebSocket.OPEN) {
+//     console.log("🔊 [Frontend] Sending audio-playback-started signal");
+//     socketRef.current.send(JSON.stringify({
+//       type: "audio-playback-started"
+//     }));
+//   }
+  
+//   // Initialize audio context
+//   if (!audioContextRef.current) {
+//     audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+//       sampleRate: 24000,
+//       latencyHint: "interactive",
+//     });
+    
+//     if (audioContextRef.current.state === 'suspended') {
+//       audioContextRef.current.resume();
+//     }
+    
+//     nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.005;
+//   } else {
+//     nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.002;
+//   }
+//   break;
+
+
+
+//    case "tts-audio-chunk":
+//   // Pass is_final to handler!
+//   handleTTSChunk(
+//     data.audio,
+//     data.encoding,
+//     data.sample_rate,
+//     data.chunk_number,
+//     data.is_final // <-- pass this!
+//   );
+//   break;
+
+
+
+// case "tts-end":
+//       console.log("🔊 [TTS] Backend finished sending audio chunks");
+//       // ✅ MARK TTS AS COMPLETE BUT DON'T SEND SIGNAL YET
+//       isTTSComplete.current = true;
+      
+//       // ✅ CHECK IF PLAYBACK IS ALREADY COMPLETE
+//       checkAudioCompletion();
+//       break;
+
+// case "tts-complete":
+//   console.log("🔊 [TTS] Backend reports all chunks sent:", data);
+//   isTTSComplete.current = true;
+//   ttsTotalChunksRef.current = data.total_chunks || 0;
+//   // Call checkAudioCompletion twice: once now, and again after a short delay
+//   checkAudioCompletion();
+//   setTimeout(checkAudioCompletion, 50); // <-- ensures check runs after all audio events
+//   startSTT()
+//   break;
+
+
+
+
+
+
+//         case "user-message":
+//           // Final user message after processing
+//           console.log("👤 [User Message]", data.text);
+//           setVoiceTranscript(""); // Clear live transcript
+
+//           // ✅ Add user message to Redux store
+//           const userMessage = {
+//             id: Date.now(),
+//             message: data.text,
+//             sender: "user",
+//             files: [],
+//             conversationId: data.conversation_id,
+//           };
+
+//           dispatch(
+//             addMessage({
+//               conversationId: data.conversation_id,
+//               message: userMessage,
+//             })
+//           );
+//           break;
+
+//         case "bot-typing":
+//           // AI is processing/typing
+//           console.log("🤖 [Bot Typing]", data.status);
+//           setIsAISpeaking(data.status);
+//           setBotTyping(data.status);
+//           break;
+//     case "start":
+//           // AI response stream started
+//           console.log("🚀 [AI Response Start]", data);
+          
+//           // ✅ STOP STT IMMEDIATELY AND SMOOTHLY
+//           stopSTT();
+//           setIsAISpeaking(true);
+//           setBotTyping(true);
+
+//           // ✅ Reset accumulated response for new message
+//           voiceAccumulatedResponseRef.current = "";
+
+//           // ✅ Create initial bot message for streaming
+//           const newBotMessageId = Date.now() + 1;
+//           const initialBotMessage = {
+//             id: newBotMessageId,
+//             message: "",
+//             sender: "bot",
+//             response: "",
+//             files: data.uploaded_files || [],
+//             suggestions: [],
+//             isNewMessage: true,
+//             isStreaming: true,
+//           };
+
+//           currentBotMessageIdRef.current = newBotMessageId;
+
+//           dispatch(
+//             addMessage({
+//               conversationId: data.conversation_id,
+//               message: initialBotMessage,
+//             })
+//           );
+//           break;
+
+//         case "content":
+//           // AI response chunk - accumulate and update the streaming message
+//           console.log("🤖 [AI Chunk]", data.content);
+
+//           // ✅ Accumulate the content (same pattern as handleSendMessage)
+//           voiceAccumulatedResponseRef.current += data.content;
+//           const currentFullResponse = voiceAccumulatedResponseRef.current;
+
+//           // Hide typing when first content arrives
+//           if (currentFullResponse.trim().length > 0) {
+//             setBotTyping(false);
+//           }
+
+//           // ✅ Only update if we have a valid message ID
+//           if (currentBotMessageIdRef.current) {
+//             dispatch(
+//               updateMessage({
+//                 conversationId: activeConversation,
+//                 id: currentBotMessageIdRef.current,
+//                 message: currentFullResponse, // ✅ Use accumulated response
+//                 response: currentFullResponse, // ✅ Use accumulated response
+//               })
+//             );
+
+//             // ✅ Smart scroll to show new content
+//             setTimeout(() => {
+//               scrollToBottomSmooth();
+//             }, 10);
+//           }
+//           break;
+
+//         case "end":
+//           // AI response completed
+//           console.log("✅ [AI Response Complete]", data);
+//           setBotTyping(false);
+//           // ✅ DON'T SET isAISpeaking to false here - wait for tts-end
+
+//           // ✅ Final update with complete response and suggestions
+//           if (currentBotMessageIdRef.current) {
+//             const finalResponse =
+//               data.full_response || voiceAccumulatedResponseRef.current;
+
+//             dispatch(
+//               updateMessage({
+//                 conversationId: activeConversation,
+//                 id: currentBotMessageIdRef.current,
+//                 message: finalResponse,
+//                 response: finalResponse,
+//                 suggestions: data.suggestions || [],
+//                 isStreaming: false,
+//               })
+//             );
+//           }
+
+//           // Reset the message ID and accumulated response
+//           currentBotMessageIdRef.current = null;
+//           voiceAccumulatedResponseRef.current = "";
+//           break;
+
+//         case "conversation_renamed":
+//           // Conversation was renamed - refresh conversation list
+//           console.log("🏷️ [Conversation Renamed]", data.new_name);
+//           // ✅ Refresh conversations list
+//           if (token) {
+//             fetchConversations(token).then((updatedConversations) => {
+//               dispatch(
+//                 setConversations(updatedConversations?.conversations || [])
+//               );
+//             });
+//           }
+//           break;
+
+//         case "error":
+//           // Error occurred
+//           console.error("❌ [Voice Error]", data.error);
+//           setIsAISpeaking(false);
+//           setBotTyping(false);
+
+//           // ✅ Show error message in chat
+//           const errorMessage = {
+//             id: Date.now(),
+//             message: `❌ Error: ${data.error}`,
+//             sender: "bot",
+//             response: `❌ Error: ${data.error}`,
+//             error: true,
+//           };
+
+//           dispatch(
+//             addMessage({
+//               conversationId: activeConversation,
+//               message: errorMessage,
+//             })
+//           );
+
+//           toast.error(`❌ Voice Error: ${data.error}`);
+//           break;
+
+//         default:
+//           console.log("🔍 [Unknown Message Type]", data);
+//           break;
+//       }
+//     };
+
+//     socket.onclose = () => {
+//       console.log("❌ WebSocket closed");
+//       setConnectionStatus("disconnected");
+//       cleanup();
+//     };
+
+//     socket.onerror = (e) => {
+//       console.error("WebSocket error:", e);
+//       setConnectionStatus("error");
+//       cleanup();
+//     };
+//   } catch (err) {
+//     console.error("Voice mode error:", err);
+//     cleanup();
+//   }
+// };
+const startVoiceMode = async () => {
   try {
     setUserHasScrolledUp(false);
     setIsVoiceMode(true);
     setIsProcessing(true);
     setShowVoiceOverlay(true);
 
-    // ✅ OPTIMIZED audio context with low latency settings
-    audioContextRef.current = new AudioContext({ 
+    // Mobile compatibility: Use webkitAudioContext if needed
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    audioContextRef.current = new AudioCtx({
       sampleRate: 16000,
-      latencyHint: "interactive", // ✅ ADD for low latency
+      latencyHint: "interactive",
     });
-    
-    mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ 
+
+    // On iOS, AudioContext starts as 'suspended' and must be resumed in a user gesture
+    if (audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume();
+    }
+
+    // Request microphone access
+    mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
-        sampleRate: 16000, // ✅ MATCH backend
+        sampleRate: 16000,
       }
     });
 
     const input = audioContextRef.current.createMediaStreamSource(mediaStreamRef.current);
 
-    // ✅ OPTIMIZED filter settings
+    // Filter
     const filter = audioContextRef.current.createBiquadFilter();
     filter.type = "lowshelf";
     filter.frequency.setValueAtTime(1000, audioContextRef.current.currentTime);
-    filter.gain.setValueAtTime(-8, audioContextRef.current.currentTime); // ✅ REDUCED from -10 to -8
+    filter.gain.setValueAtTime(-8, audioContextRef.current.currentTime);
 
     input.connect(filter);
 
-    // ✅ SMALLER buffer size for lower latency
-    processorRef.current = audioContextRef.current.createScriptProcessor(2048, 1, 1); // ✅ REDUCED from 4096 to 2048
+    // ScriptProcessor for audio processing
+    processorRef.current = audioContextRef.current.createScriptProcessor(2048, 1, 1);
     filter.connect(processorRef.current);
     processorRef.current.connect(audioContextRef.current.destination);
 
-    // ✅ OPTIMIZED WebSocket connection
+    // WebSocket connection
     const token = localStorage.getItem("token");
     const conversationId = activeConversation;
     const socket = new WebSocket(
@@ -1700,14 +2046,11 @@ const cleanupTTSAudio = () => {
     socketRef.current = socket;
 
     socket.onopen = () => {
-      console.log("🔌 WebSocket connected");
       setSocketOpen(true);
       setConnectionStatus("connected");
       setIsProcessing(false);
-      // ✅ START STT WITH PROPER CONTROL
       startSTT();
 
-      // ✅ IMMEDIATE audio processing start
       processorRef.current.onaudioprocess = (e) => {
         if (socket.readyState === WebSocket.OPEN) {
           const inputData = e.inputBuffer.getChannelData(0);
@@ -1717,106 +2060,68 @@ const cleanupTTSAudio = () => {
       };
     };
 
-    // ✅ OPTIMIZED message handlers - same logic but with immediate processing
     socket.onmessage = (msg) => {
       const data = JSON.parse(msg.data);
-      console.log("📥 [WebSocket Message]", data);
 
       switch (data.type) {
         case "connected":
-          console.log("✅ WebSocket connected:", data.message);
           break;
 
-       case "transcript":
-  console.log("📝 [Live Transcript]", data.text);
-  
-  // ✅ SIMPLIFIED: Direct accumulation without redundant logging
-  setVoiceTranscript(prev => {
-    const newTranscript = prev + data.text + " ";
-    return newTranscript;
-  });
-  break;
+        case "transcript":
+          setVoiceTranscript(prev => prev + data.text + " ");
+          break;
 
- case "tts-start":
-  console.log("🔊 [TTS] Starting audio generation");
- 
-  // ✅ SIMPLE: Stop STT and send signal
-  stopSTT();
-  setIsAISpeaking(true);
-  setIsTTSPlaying(true);
-  setAudioPlaybackStarted(true);
-  setIsFrontendAudioPlaying(true);
-  
-  // ✅ SEND AUDIO STARTED SIGNAL IMMEDIATELY
-  if (socketRef.current?.readyState === WebSocket.OPEN) {
-    console.log("🔊 [Frontend] Sending audio-playback-started signal");
-    socketRef.current.send(JSON.stringify({
-      type: "audio-playback-started"
-    }));
-  }
-  
-  // Initialize audio context
-  if (!audioContextRef.current) {
-    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-      sampleRate: 24000,
-      latencyHint: "interactive",
-    });
-    
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
-    }
-    
-    nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.005;
-  } else {
-    nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.002;
-  }
-  break;
+        case "tts-start":
+          stopSTT();
+          setIsAISpeaking(true);
+          setIsTTSPlaying(true);
+          setAudioPlaybackStarted(true);
+          setIsFrontendAudioPlaying(true);
 
+          if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({
+              type: "audio-playback-started"
+            }));
+          }
 
+          // For TTS playback, ensure AudioContext is resumed
+          if (!audioContextRef.current) {
+            audioContextRef.current = new AudioCtx({
+              sampleRate: 24000,
+              latencyHint: "interactive",
+            });
+          }
+          if (audioContextRef.current.state === 'suspended') {
+            audioContextRef.current.resume();
+          }
+          nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.005;
+          break;
 
-   case "tts-audio-chunk":
-  // Pass is_final to handler!
-  handleTTSChunk(
-    data.audio,
-    data.encoding,
-    data.sample_rate,
-    data.chunk_number,
-    data.is_final // <-- pass this!
-  );
-  break;
+        case "tts-audio-chunk":
+          handleTTSChunk(
+            data.audio,
+            data.encoding,
+            data.sample_rate,
+            data.chunk_number,
+            data.is_final
+          );
+          break;
 
+        case "tts-end":
+          isTTSComplete.current = true;
+          checkAudioCompletion();
+          break;
 
-
-case "tts-end":
-      console.log("🔊 [TTS] Backend finished sending audio chunks");
-      // ✅ MARK TTS AS COMPLETE BUT DON'T SEND SIGNAL YET
-      isTTSComplete.current = true;
-      
-      // ✅ CHECK IF PLAYBACK IS ALREADY COMPLETE
-      checkAudioCompletion();
-      break;
-
-case "tts-complete":
-  console.log("🔊 [TTS] Backend reports all chunks sent:", data);
-  isTTSComplete.current = true;
-  ttsTotalChunksRef.current = data.total_chunks || 0;
-  // Call checkAudioCompletion twice: once now, and again after a short delay
-  checkAudioCompletion();
-  setTimeout(checkAudioCompletion, 50); // <-- ensures check runs after all audio events
-  startSTT()
-  break;
-
-
-
-
-
+        case "tts-complete":
+          isTTSComplete.current = true;
+          ttsTotalChunksRef.current = data.total_chunks || 0;
+          checkAudioCompletion();
+          setTimeout(checkAudioCompletion, 50);
+          startSTT();
+          break;
 
         case "user-message":
-          // Final user message after processing
-          console.log("👤 [User Message]", data.text);
-          setVoiceTranscript(""); // Clear live transcript
-
-          // ✅ Add user message to Redux store
+          setVoiceTranscript("");
           const userMessage = {
             id: Date.now(),
             message: data.text,
@@ -1824,7 +2129,6 @@ case "tts-complete":
             files: [],
             conversationId: data.conversation_id,
           };
-
           dispatch(
             addMessage({
               conversationId: data.conversation_id,
@@ -1834,24 +2138,15 @@ case "tts-complete":
           break;
 
         case "bot-typing":
-          // AI is processing/typing
-          console.log("🤖 [Bot Typing]", data.status);
           setIsAISpeaking(data.status);
           setBotTyping(data.status);
           break;
-    case "start":
-          // AI response stream started
-          console.log("🚀 [AI Response Start]", data);
-          
-          // ✅ STOP STT IMMEDIATELY AND SMOOTHLY
+
+        case "start":
           stopSTT();
           setIsAISpeaking(true);
           setBotTyping(true);
-
-          // ✅ Reset accumulated response for new message
           voiceAccumulatedResponseRef.current = "";
-
-          // ✅ Create initial bot message for streaming
           const newBotMessageId = Date.now() + 1;
           const initialBotMessage = {
             id: newBotMessageId,
@@ -1863,9 +2158,7 @@ case "tts-complete":
             isNewMessage: true,
             isStreaming: true,
           };
-
           currentBotMessageIdRef.current = newBotMessageId;
-
           dispatch(
             addMessage({
               conversationId: data.conversation_id,
@@ -1875,30 +2168,20 @@ case "tts-complete":
           break;
 
         case "content":
-          // AI response chunk - accumulate and update the streaming message
-          console.log("🤖 [AI Chunk]", data.content);
-
-          // ✅ Accumulate the content (same pattern as handleSendMessage)
           voiceAccumulatedResponseRef.current += data.content;
           const currentFullResponse = voiceAccumulatedResponseRef.current;
-
-          // Hide typing when first content arrives
           if (currentFullResponse.trim().length > 0) {
             setBotTyping(false);
           }
-
-          // ✅ Only update if we have a valid message ID
           if (currentBotMessageIdRef.current) {
             dispatch(
               updateMessage({
                 conversationId: activeConversation,
                 id: currentBotMessageIdRef.current,
-                message: currentFullResponse, // ✅ Use accumulated response
-                response: currentFullResponse, // ✅ Use accumulated response
+                message: currentFullResponse,
+                response: currentFullResponse,
               })
             );
-
-            // ✅ Smart scroll to show new content
             setTimeout(() => {
               scrollToBottomSmooth();
             }, 10);
@@ -1906,16 +2189,10 @@ case "tts-complete":
           break;
 
         case "end":
-          // AI response completed
-          console.log("✅ [AI Response Complete]", data);
           setBotTyping(false);
-          // ✅ DON'T SET isAISpeaking to false here - wait for tts-end
-
-          // ✅ Final update with complete response and suggestions
           if (currentBotMessageIdRef.current) {
             const finalResponse =
               data.full_response || voiceAccumulatedResponseRef.current;
-
             dispatch(
               updateMessage({
                 conversationId: activeConversation,
@@ -1927,16 +2204,11 @@ case "tts-complete":
               })
             );
           }
-
-          // Reset the message ID and accumulated response
           currentBotMessageIdRef.current = null;
           voiceAccumulatedResponseRef.current = "";
           break;
 
         case "conversation_renamed":
-          // Conversation was renamed - refresh conversation list
-          console.log("🏷️ [Conversation Renamed]", data.new_name);
-          // ✅ Refresh conversations list
           if (token) {
             fetchConversations(token).then((updatedConversations) => {
               dispatch(
@@ -1947,12 +2219,8 @@ case "tts-complete":
           break;
 
         case "error":
-          // Error occurred
-          console.error("❌ [Voice Error]", data.error);
           setIsAISpeaking(false);
           setBotTyping(false);
-
-          // ✅ Show error message in chat
           const errorMessage = {
             id: Date.now(),
             message: `❌ Error: ${data.error}`,
@@ -1960,36 +2228,44 @@ case "tts-complete":
             response: `❌ Error: ${data.error}`,
             error: true,
           };
-
           dispatch(
             addMessage({
               conversationId: activeConversation,
               message: errorMessage,
             })
           );
-
           toast.error(`❌ Voice Error: ${data.error}`);
           break;
 
         default:
-          console.log("🔍 [Unknown Message Type]", data);
           break;
       }
     };
 
     socket.onclose = () => {
-      console.log("❌ WebSocket closed");
       setConnectionStatus("disconnected");
       cleanup();
     };
 
     socket.onerror = (e) => {
-      console.error("WebSocket error:", e);
       setConnectionStatus("error");
       cleanup();
     };
   } catch (err) {
-    console.error("Voice mode error:", err);
+    // Mobile-friendly error handling
+    if (
+      err.name === "NotAllowedError" ||
+      err.name === "PermissionDeniedError"
+    ) {
+      alert("Microphone access denied. Please enable it in your browser settings.");
+    } else if (
+      err.message &&
+      err.message.includes("Only secure origins are allowed")
+    ) {
+      alert("Microphone access requires HTTPS. Please use a secure connection.");
+    } else {
+      alert("Microphone error: " + err.message);
+    }
     cleanup();
   }
 };
