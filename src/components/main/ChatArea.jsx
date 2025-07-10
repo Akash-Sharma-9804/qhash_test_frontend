@@ -103,6 +103,8 @@ const isMobileDevice = () => {
     ) || window.innerWidth <= 768
   );
 };
+ 
+
 
 const ChatArea = ({ isGuest, sidebarOpen, setSidebarOpen  }) => {
   const [loading, setLoading] = useState(false);
@@ -1246,8 +1248,7 @@ const startRecording = async () => {
     console.error("❌ Dictate WebSocket Error:", err);
   };
 };
-
-
+ 
  const stopRecording = () => {
   if (recorderRef.current) {
     setIsUploading(true);
@@ -1304,6 +1305,12 @@ const startRecording = async () => {
     if (socketRef.current) socketRef.current.close();
   }, 1000);
 };
+ 
+ 
+
+
+
+
 
   // voice functions dictation part ends
 
