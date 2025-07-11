@@ -104,9 +104,6 @@ const isMobileDevice = () => {
   );
 };
  
-export function isMobile() {
-  return /Mobi|Android/i.test(navigator.userAgent);
-}
 
 
 const ChatArea = ({ isGuest, sidebarOpen, setSidebarOpen  }) => {
@@ -1145,257 +1142,91 @@ const [accumulatedTranscript, setAccumulatedTranscript] = useState(""); // 👈 
 const [isTranscriptFinal, setIsTranscriptFinal] = useState(false);
 
   // ✅ Call this to start recordin
-// const startRecording = async () => {
-//   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-//   recorderRef.current = RecordRTC(stream, {
-//     type: "audio",
-//     mimeType: "audio/wav", // 👈 Changed from webm to wav
-//     recorderType: RecordRTC.StereoAudioRecorder,
-//     desiredSampRate: 16000, // 👈 Match backend sample rate
-//     numberOfAudioChannels: 1, // 👈 Mono audio for better compatibility
-//     timeSlice: 1000,
-//     ondataavailable: (blob) => {
-//       if (socketRef.current?.readyState === WebSocket.OPEN) {
-//         // 👈 Convert blob to ArrayBuffer for raw audio data
-//         blob.arrayBuffer().then(buffer => {
-//           socketRef.current.send(buffer);
-//         });
-//       }
-//     },
-//   });
-
-//   const token = localStorage.getItem("token");
-//   console.log("🎙️ Token:", token);
-  
-//   socketRef.current = new WebSocket(`${WSS_BASE_URL}?token=${token}&mode=dictate`);
-
-//   socketRef.current.onopen = () => {
-//     console.log("🎙️ Dictate WebSocket connected");
-//     recorderRef.current.startRecording();
-//     setIsRecording(true);
-//     setShowLiveTranscript(true);
-//     setLiveTranscriptText("");
-//     setAccumulatedTranscript(""); // 👈 Reset accumulated transcript
-//   };
-
-//   socketRef.current.onmessage = (event) => {
-//     const data = JSON.parse(event.data);
-    
-//     if (data.type === "dictate-ready") {
-//       console.log("✅ Dictate mode ready");
-//       setLiveTranscriptText("Listening...");
-//       setAccumulatedTranscript(""); // 👈 Reset on ready
-//     }
-    
-//     if (data.type === "dictate-transcript") {
-//       const transcript = data.text;
-//       if (transcript) {
-//         console.log("📝 Live dictate transcript:", transcript);
-        
-//         // 👈 NEW: Handle transcript accumulation
-//         if (data.is_final) {
-//           // Final transcript - add to accumulated and clear current
-//           setAccumulatedTranscript((prev) => {
-//             const newLine = prev.trim() ? prev + " " + transcript : transcript;
-//             return newLine;
-//           });
-//           setLiveTranscriptText(""); // Clear current interim
-//           setIsTranscriptFinal(true);
-          
-//           // Also update transcript buffer for fallback
-//           setTranscriptBuffer((prev) => prev + " " + transcript + " ");
-//         } else {
-//           // Interim transcript - show as current without adding to accumulated
-//           setLiveTranscriptText(transcript);
-//           setIsTranscriptFinal(false);
-//         }
-        
-//         if (voiceMode) {
-//           setTranscriptBuffer(transcript);
-//         }
-//       }
-//     }
-
-//     // Keep existing logic for backward compatibility
-//     if (data.type === "transcript") {
-//       const transcript = data.transcript;
-//       if (transcript) {
-//         console.log("📝 Live transcription:", transcript);
-        
-//         // 👈 NEW: Also handle accumulation for backward compatibility
-//         setAccumulatedTranscript((prev) => {
-//           const newLine = prev.trim() ? prev + " " + transcript : transcript;
-//           return newLine;
-//         });
-//         setLiveTranscriptText("");
-        
-//         if (voiceMode) {
-//           setTranscriptBuffer(transcript);
-//         } else {
-//           setTranscriptBuffer((prev) => prev + " " + transcript + " ");
-//         }
-//       }
-//     }
-
-//     if (data.type === "dictate-stopped") {
-//       console.log("🛑 Dictate mode stopped");
-//     }
-//   };
-
-//   socketRef.current.onclose = () => {
-//     console.log("🔌 Dictate WebSocket closed");
-//   };
-
-//   socketRef.current.onerror = (err) => {
-//     console.error("❌ Dictate WebSocket Error:", err);
-//   };
-// };
- 
-//  const stopRecording = () => {
-//   if (recorderRef.current) {
-//     setIsUploading(true);
-//     setIsRecording(false);
-//     setLiveTranscriptText("Processing..."); // 👈 Show processing message
-    
-//     if (socketRef.current?.readyState === WebSocket.OPEN) {
-//       socketRef.current.send(JSON.stringify({ type: "stop-dictate" }));
-//     }
-
-//     recorderRef.current.stopRecording(async () => {
-//       const blob = recorderRef.current.getBlob();
-//       const token = localStorage.getItem("token");
-
-//       try {
-//         const finalTranscript = await uploadFinalAudio(blob, token);
-//         const trimmedTranscript = finalTranscript.trim();
-
-//         if (trimmedTranscript) {
-//           if (voiceMode) {
-//             startRealtimeAI({
-//               conversationId: activeConversation,
-//               userMessage: trimmedTranscript,
-//             });
-//           } else {
-//             setInputMessage((prev) => prev + " " + trimmedTranscript);
-//           }
-//         } else {
-//           setInputMessage("");
-//         }
-//       } catch (err) {
-//         console.error("⚠️ Upload or transcription error", err);
-        
-//         // 👈 UPDATED: Use accumulated transcript as fallback
-//         const fallbackTranscript = accumulatedTranscript.trim() || transcriptBuffer.trim();
-//         if (fallbackTranscript) {
-//           setInputMessage((prev) => prev + " " + fallbackTranscript);
-//         }
-//       } finally {
-//         setIsUploading(false);
-//         setTranscriptBuffer("");
-//         setVoiceMode(false);
-//         // 👈 Hide live transcript overlay after processing
-//         setTimeout(() => {
-//           setShowLiveTranscript(false);
-//           setLiveTranscriptText("");
-//           setAccumulatedTranscript(""); // 👈 Reset accumulated transcript
-//         }, 1000);
-//       }
-//     });
-//   }
-
-//   setTimeout(() => {
-//     if (socketRef.current) socketRef.current.close();
-//   }, 1000);
-// };
- const startRecording = async () => {
+const startRecording = async () => {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+  recorderRef.current = RecordRTC(stream, {
+    type: "audio",
+    mimeType: "audio/wav", // 👈 Changed from webm to wav
+    recorderType: RecordRTC.StereoAudioRecorder,
+    desiredSampRate: 16000, // 👈 Match backend sample rate
+    numberOfAudioChannels: 1, // 👈 Mono audio for better compatibility
+    timeSlice: 1000,
+    ondataavailable: (blob) => {
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        // 👈 Convert blob to ArrayBuffer for raw audio data
+        blob.arrayBuffer().then(buffer => {
+          socketRef.current.send(buffer);
+        });
+      }
+    },
+  });
+
   const token = localStorage.getItem("token");
+  console.log("🎙️ Token:", token);
+  
   socketRef.current = new WebSocket(`${WSS_BASE_URL}?token=${token}&mode=dictate`);
 
   socketRef.current.onopen = () => {
+    console.log("🎙️ Dictate WebSocket connected");
+    recorderRef.current.startRecording();
     setIsRecording(true);
     setShowLiveTranscript(true);
     setLiveTranscriptText("");
-    setAccumulatedTranscript("");
-
-    // MOBILE: Use MediaRecorder if available
-    if (isMobile() && typeof window.MediaRecorder !== "undefined") {
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      recorderRef.current = mediaRecorder;
-      let chunks = [];
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && socketRef.current?.readyState === WebSocket.OPEN) {
-          event.data.arrayBuffer().then(buffer => {
-            socketRef.current.send(buffer);
-          });
-        }
-        chunks.push(event.data);
-      };
-      mediaRecorder.onstop = () => {
-        recorderRef.current.chunks = chunks;
-      };
-      mediaRecorder.start(1000); // send data every second
-    } else if (typeof RecordRTC !== "undefined") {
-      // DESKTOP: Use RecordRTC
-      recorderRef.current = RecordRTC(stream, {
-        type: "audio",
-        mimeType: "audio/wav",
-        recorderType: RecordRTC.StereoAudioRecorder,
-        desiredSampRate: 16000,
-        numberOfAudioChannels: 1,
-        timeSlice: 1000,
-        ondataavailable: (blob) => {
-          if (socketRef.current?.readyState === WebSocket.OPEN) {
-            blob.arrayBuffer().then(buffer => {
-              socketRef.current.send(buffer);
-            });
-          }
-        },
-      });
-      recorderRef.current.startRecording();
-    } else {
-      alert("Your browser does not support audio recording.");
-    }
+    setAccumulatedTranscript(""); // 👈 Reset accumulated transcript
   };
 
   socketRef.current.onmessage = (event) => {
     const data = JSON.parse(event.data);
-
+    
     if (data.type === "dictate-ready") {
+      console.log("✅ Dictate mode ready");
       setLiveTranscriptText("Listening...");
-      setAccumulatedTranscript("");
+      setAccumulatedTranscript(""); // 👈 Reset on ready
     }
-
+    
     if (data.type === "dictate-transcript") {
       const transcript = data.text;
       if (transcript) {
+        console.log("📝 Live dictate transcript:", transcript);
+        
+        // 👈 NEW: Handle transcript accumulation
         if (data.is_final) {
+          // Final transcript - add to accumulated and clear current
           setAccumulatedTranscript((prev) => {
             const newLine = prev.trim() ? prev + " " + transcript : transcript;
             return newLine;
           });
-          setLiveTranscriptText("");
+          setLiveTranscriptText(""); // Clear current interim
           setIsTranscriptFinal(true);
+          
+          // Also update transcript buffer for fallback
           setTranscriptBuffer((prev) => prev + " " + transcript + " ");
         } else {
+          // Interim transcript - show as current without adding to accumulated
           setLiveTranscriptText(transcript);
           setIsTranscriptFinal(false);
         }
+        
         if (voiceMode) {
           setTranscriptBuffer(transcript);
         }
       }
     }
 
+    // Keep existing logic for backward compatibility
     if (data.type === "transcript") {
       const transcript = data.transcript;
       if (transcript) {
+        console.log("📝 Live transcription:", transcript);
+        
+        // 👈 NEW: Also handle accumulation for backward compatibility
         setAccumulatedTranscript((prev) => {
           const newLine = prev.trim() ? prev + " " + transcript : transcript;
           return newLine;
         });
         setLiveTranscriptText("");
+        
         if (voiceMode) {
           setTranscriptBuffer(transcript);
         } else {
@@ -1403,103 +1234,78 @@ const [isTranscriptFinal, setIsTranscriptFinal] = useState(false);
         }
       }
     }
+
+    if (data.type === "dictate-stopped") {
+      console.log("🛑 Dictate mode stopped");
+    }
   };
 
-  socketRef.current.onclose = () => {};
-  socketRef.current.onerror = (err) => {};
-};
+  socketRef.current.onclose = () => {
+    console.log("🔌 Dictate WebSocket closed");
+  };
 
-const stopRecording = () => {
+  socketRef.current.onerror = (err) => {
+    console.error("❌ Dictate WebSocket Error:", err);
+  };
+};
+ 
+ const stopRecording = () => {
   if (recorderRef.current) {
     setIsUploading(true);
     setIsRecording(false);
-    setLiveTranscriptText("Processing...");
-
+    setLiveTranscriptText("Processing..."); // 👈 Show processing message
+    
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({ type: "stop-dictate" }));
     }
 
-    // MOBILE: MediaRecorder
-    if (isMobile() && recorderRef.current instanceof MediaRecorder) {
-      recorderRef.current.onstop = async () => {
-        const blob = new Blob(recorderRef.current.chunks || [], { type: "audio/webm" });
-        const token = localStorage.getItem("token");
-        try {
-          const finalTranscript = await uploadFinalAudio(blob, token);
-          const trimmedTranscript = finalTranscript.trim();
-          if (trimmedTranscript) {
-            if (voiceMode) {
-              startRealtimeAI({
-                conversationId: activeConversation,
-                userMessage: trimmedTranscript,
-              });
-            } else {
-              setInputMessage((prev) => prev + " " + trimmedTranscript);
-            }
+    recorderRef.current.stopRecording(async () => {
+      const blob = recorderRef.current.getBlob();
+      const token = localStorage.getItem("token");
+
+      try {
+        const finalTranscript = await uploadFinalAudio(blob, token);
+        const trimmedTranscript = finalTranscript.trim();
+
+        if (trimmedTranscript) {
+          if (voiceMode) {
+            startRealtimeAI({
+              conversationId: activeConversation,
+              userMessage: trimmedTranscript,
+            });
           } else {
-            setInputMessage("");
+            setInputMessage((prev) => prev + " " + trimmedTranscript);
           }
-        } catch (err) {
-          const fallbackTranscript = accumulatedTranscript.trim() || transcriptBuffer.trim();
-          if (fallbackTranscript) {
-            setInputMessage((prev) => prev + " " + fallbackTranscript);
-          }
-        } finally {
-          setIsUploading(false);
-          setTranscriptBuffer("");
-          setVoiceMode(false);
-          setTimeout(() => {
-            setShowLiveTranscript(false);
-            setLiveTranscriptText("");
-            setAccumulatedTranscript("");
-          }, 1000);
+        } else {
+          setInputMessage("");
         }
-      };
-      recorderRef.current.stop();
-    } else if (recorderRef.current.stopRecording) {
-      // DESKTOP: RecordRTC
-      recorderRef.current.stopRecording(async () => {
-        const blob = recorderRef.current.getBlob();
-        const token = localStorage.getItem("token");
-        try {
-          const finalTranscript = await uploadFinalAudio(blob, token);
-          const trimmedTranscript = finalTranscript.trim();
-          if (trimmedTranscript) {
-            if (voiceMode) {
-              startRealtimeAI({
-                conversationId: activeConversation,
-                userMessage: trimmedTranscript,
-              });
-            } else {
-              setInputMessage((prev) => prev + " " + trimmedTranscript);
-            }
-          } else {
-            setInputMessage("");
-          }
-        } catch (err) {
-          const fallbackTranscript = accumulatedTranscript.trim() || transcriptBuffer.trim();
-          if (fallbackTranscript) {
-            setInputMessage((prev) => prev + " " + fallbackTranscript);
-          }
-        } finally {
-          setIsUploading(false);
-          setTranscriptBuffer("");
-          setVoiceMode(false);
-          setTimeout(() => {
-            setShowLiveTranscript(false);
-            setLiveTranscriptText("");
-            setAccumulatedTranscript("");
-          }, 1000);
+      } catch (err) {
+        console.error("⚠️ Upload or transcription error", err);
+        
+        // 👈 UPDATED: Use accumulated transcript as fallback
+        const fallbackTranscript = accumulatedTranscript.trim() || transcriptBuffer.trim();
+        if (fallbackTranscript) {
+          setInputMessage((prev) => prev + " " + fallbackTranscript);
         }
-      });
-    }
+      } finally {
+        setIsUploading(false);
+        setTranscriptBuffer("");
+        setVoiceMode(false);
+        // 👈 Hide live transcript overlay after processing
+        setTimeout(() => {
+          setShowLiveTranscript(false);
+          setLiveTranscriptText("");
+          setAccumulatedTranscript(""); // 👈 Reset accumulated transcript
+        }, 1000);
+      }
+    });
   }
 
   setTimeout(() => {
     if (socketRef.current) socketRef.current.close();
   }, 1000);
 };
-
+ 
  
 
 
