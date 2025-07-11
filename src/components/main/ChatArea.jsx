@@ -2691,7 +2691,7 @@ useEffect(() => {
           onMouseEnter={() => setscrollTooltip(true)}
           onMouseLeave={() => setscrollTooltip(false)}
           onClick={scrollToBottom}
-          className={`absolute bottom-[125px] md:bottom-[160px] right-0 md:right-10 transform -translate-x-1/2 z-50 p-1  rounded-full shadow-lg bg-white dark:bg-gray-800 border border-black dark:border-white transition text-black dark:text-white`}
+          className={`absolute bottom-[155px] md:bottom-[160px] right-0 md:right-10 transform -translate-x-1/2 z-50 p-1  rounded-full shadow-lg bg-white dark:bg-gray-800 border border-black dark:border-white transition text-black dark:text-white`}
           aria-label="Scroll to bottom">
           {/* <CircleArrowDown /> */}
           <span className="hidden md:block">
