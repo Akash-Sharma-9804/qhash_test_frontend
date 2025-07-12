@@ -2439,7 +2439,8 @@ useEffect(() => {
 
 
   return (
-   <div className="flex flex-col w-full mobile-viewport md:h-screen overflow-y-auto bg-gradient-to-tr from-[#ffffff] via-[#ededed] to-[#e0e0e0] dark:bg-gradient-to-bl dark:from-[#1e1e1e] dark:via-[#2a2a2a] dark:to-[#121212] transition-colors duration-300 fixed md:relative inset-0 md:inset-auto z-40 md:z-auto mobile-full-height">
+   <div className="flex flex-col w-full mobile-viewport md:h-screen overflow-y-auto bg-gradient-to-br from-[#f7f7f7] via-[#eeeeee] to-[#e4e4e4]
+ dark:bg-gradient-to-bl dark:from-[#1e1e1e] dark:via-[#2a2a2a] dark:to-[#121212] transition-colors duration-300 fixed md:relative inset-0 md:inset-auto z-40 md:z-auto mobile-full-height">
 
  {/* ✅ ADD: Mobile Menu Button - Now in ChatArea with conditional z-index */}
   {!isGuest && (
@@ -2498,7 +2499,7 @@ useEffect(() => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative mb-5  z-30 p-3 rounded-lg mt-2 break-words text-sm shadow-md dark:bg-[#717171] text-[#1e293b] dark:text-white  w-fit max-w-[90%] md:max-w-2xl md:w-fit self-end ml-auto">
+                        className="relative mb-5  z-30 p-3 rounded-t-3xl rounded-b-3xl mt-2 break-words text-sm shadow-md dark:bg-[#323232d9] text-[#1e293b] dark:text-white  w-fit max-w-[90%] md:max-w-2xl md:w-fit self-end ml-auto">
                         <div className="flex items-start gap-2">
                           <div className="p-1 rounded-full flex-shrink-0">
                             {/* Fallback to default circle icon if user_img is not available */}
@@ -2513,11 +2514,11 @@ useEffect(() => {
                                 }}
                               />
                             ) : (
-                              <div className="h-7 w-7 md:h-8 md:w-8 rounded-full flex items-center justify-center bg-gray-200">
+                              <div className="h-7 w-7 md:h-8 md:w-8 text- rounded-full flex items-center justify-center bg-gray-200">
                                 {/* Default User Icon */}
                                 <CircleUserRound
                                   size={20} // Set the icon size to fit inside the circle
-                                  color="black"
+                                   
                                   strokeWidth={2.25}
                                 />
                               </div>
@@ -2525,9 +2526,7 @@ useEffect(() => {
                           </div>
 
                           <div className="flex prose max-w-none dark:text-white flex-col w-full mr-7  mt-1  overflow-auto text-justify text-sm md:text-base space-y-2 font-poppins">
-                            {/* <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                              {msg.message}
-                            </ReactMarkdown> */}
+                          
                            
   <ReactMarkdown>
     {preprocessMessage(msg.message)}
@@ -2646,7 +2645,7 @@ useEffect(() => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className={`absolute md:right-80  bottom-8  w-full   md:w-3/5 flex font-centurygothic flex-col items-center justify-center text-center text-gray-800 dark:text-white`}>
+                className={`absolute md:right-60  bottom-8  w-full   md:w-3/5 flex font-centurygothic flex-col items-center justify-center text-center text-gray-800 dark:text-white`}>
                 {/* <img
                   src="./logo.png"
                   className="w-12 h-12 block dark:hidden"
@@ -2846,11 +2845,11 @@ useEffect(() => {
 
         {/* Buttons Section */}
         <div className="buttons flex mt-2 md:mt-0 justify-between  ">
-          <div className="flex w-2/4 gap-2 md:gap-3 md:p-2 ">
+          <div className="flex w-2/4 gap-2 md:gap-0 md:p-2 ">
             {/* Upload Button */}
             <div className="relative">
               <div
-                className="cursor-pointer border-[0.5px] border-gray-400 dark:border-gray-300 rounded-full p-2 text-black dark:text-white hover:bg-zinc-400 dark:hover:bg-gray-700 transition-colors"
+                className="cursor-pointer  border-gray-400 dark:border-gray-300 rounded-full p-2 text-black dark:text-white hover:bg-zinc-400 dark:hover:bg-gray-700 transition-colors"
                 onClick={() => {
                   if (isGuest) return handleLoginPrompt();
                   fileInputRef.current.click();
@@ -2917,7 +2916,7 @@ useEffect(() => {
             {/* Mic Button */}
             <div className="relative">
               <div
-                className={`cursor-pointer border-[0.5px] text-black dark:text-white border-gray-400 dark:border-gray-300 rounded-full p-2 
+                className={`cursor-pointer   text-black dark:text-white border-gray-400 dark:border-gray-300 rounded-full p-2 
 ${
   isRecording
     ? "bg-red-500 animate-pulse text-white"
@@ -2974,10 +2973,10 @@ ${
         startVoiceMode();
       }}
       disabled={isVoiceMode || isProcessing}
-      className={`btn-voice font-bold px-4 py-2 rounded-xl shadow-md transition-all duration-300 ${
+      className={`btn-voice font-bold px-4 py-2 rounded-xl   transition-all duration-300 ${
         isVoiceMode
           ? "bg-red-600 text-black cursor-not-allowed"
-          : "  hover:bg-gray-400 text-black dark:text-white border border-gray-400"
+          : "  hover:bg-gray-400 text-black dark:text-white  border-gray-400"
       } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}>
       <span className="md:block hidden text-xs md:text-base items-center gap-2">
         <AudioLines size={18} />
