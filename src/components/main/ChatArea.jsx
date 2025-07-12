@@ -2499,8 +2499,8 @@ useEffect(() => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="relative mb-5  z-30 p-3  mt-2 break-words text-sm  text-[#1e293b] dark:text-white  w-fit max-w-[90%] md:max-w-2xl md:w-fit self-end ml-auto">
-                        <div className="flex items-center justify-center gap-2">
+                        className="relative mb-5  z-30 p-3 rounded-t-3xl rounded-b-3xl mt-2 break-words text-sm shadow-md dark:bg-[#323232d9] text-[#1e293b] dark:text-white  w-fit max-w-[90%] md:max-w-2xl md:w-fit self-end ml-auto">
+                        <div className="flex items-start gap-2">
                           <div className="p-1 rounded-full flex-shrink-0">
                             {/* Fallback to default circle icon if user_img is not available */}
                             {user?.user_img ? (
@@ -2525,7 +2525,7 @@ useEffect(() => {
                             )}
                           </div>
 
-                          <div className="flex prose max-w-none rounded-t-3xl rounded-b-3xl shadow-md dark:bg-[#323232d9] px-3 py-2 dark:text-white flex-col w-full mr-7  mt-1  overflow-auto text-justify text-sm md:text-base space-y-2 font-poppins">
+                          <div className="flex prose max-w-none dark:text-white flex-col w-full mr-7  mt-1  overflow-auto text-justify text-sm md:text-base space-y-2 font-poppins">
                           
                            
   <ReactMarkdown>
