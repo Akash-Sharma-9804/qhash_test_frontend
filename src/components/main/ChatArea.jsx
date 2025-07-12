@@ -2845,7 +2845,7 @@ useEffect(() => {
 
         {/* Buttons Section */}
         <div className="buttons flex mt-2 md:mt-0 justify-between  ">
-          <div className="flex w-2/4 gap-2 md:gap-0 md:p-2 ">
+          <div className="flex w-2/4 gap-0 md:gap-0 md:p-2 ">
             {/* Upload Button */}
             <div className="relative">
               <div
