@@ -28,6 +28,7 @@ const [guestLoading, setGuestLoading] = useState(false);
 useEffect(() => {
     console.log("🧹 Clearing localStorage on Login page load...");
     localStorage.clear();
+        sessionStorage.clear();
     // Or if you want to clear specific items only:
     // localStorage.removeItem("token");
     // localStorage.removeItem("user_id");
@@ -81,13 +82,16 @@ useEffect(() => {
       }
 
       // ✅ Store in localStorage
-      localStorage.setItem("token", token);
-      localStorage.setItem("user_id", user.user_id);
-      localStorage.setItem("conversation_id", conversation_id);
+    // ✅ Store in localStorage and sessionStorage
+localStorage.setItem("token", token);
+localStorage.setItem("user_id", user.user_id);
+sessionStorage.setItem("conversation_id", conversation_id);
+sessionStorage.setItem("conversation_name", "New Chat");
 
-      console.log("✅ Token stored:", token);
-      console.log("✅ User ID stored:", user.user_id);
-      console.log("✅ Conversation ID stored:", conversation_id);
+console.log("✅ Token stored:", token);
+console.log("✅ User ID stored:", user.user_id);
+console.log("✅ Conversation ID stored in session:", conversation_id);
+
 
       // ✅ Add the new conversation to the list
       const newConversation = {

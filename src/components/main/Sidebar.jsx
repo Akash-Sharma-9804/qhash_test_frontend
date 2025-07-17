@@ -127,10 +127,42 @@ const [fetchingConversationId, setFetchingConversationId] = useState(null);
   // }, [token, dispatch]);
 // Replace the existing useEffect for fetching conversations
 // Replace the existing useEffect for fetching conversations
+// useEffect(() => {
+//   if (token) {
+//     fetchConversations(token)
+//       .then((data) => {
+//         console.log("Fetched Conversations:", data);
+//         const conversations = data.conversations || [];
+        
+//         // Set all conversations as fetching initially
+//         const fetchingIds = new Set(conversations.map(conv => conv.id));
+//         setFetchingConversationId(fetchingIds);
+        
+//         // Set conversations in Redux
+//         dispatch(setConversations(conversations));
+        
+//         // Simulate typing animation for each conversation
+//         conversations.forEach((conv, index) => {
+//           setTimeout(() => {
+//             setFetchingConversationId(prev => {
+//               if (prev instanceof Set) {
+//                 const newSet = new Set(prev);
+//                 newSet.delete(conv.id);
+//                 return newSet.size > 0 ? newSet : null;
+//               }
+//               return prev === conv.id ? null : prev;
+//             });
+//           }, (index + 1) * 300); // Stagger the animations
+//         });
+//       })
+//       .catch((err) => console.error("Error fetching conversations:", err));
+//   }
+// }, [token, dispatch]);
+
 useEffect(() => {
   if (token) {
     fetchConversations(token)
-      .then((data) => {
+      .then(async (data) => {
         console.log("Fetched Conversations:", data);
         const conversations = data.conversations || [];
         
@@ -140,6 +172,46 @@ useEffect(() => {
         
         // Set conversations in Redux
         dispatch(setConversations(conversations));
+        
+        // Check if session conversation exists, if not create new one
+        const sessionConvId = sessionStorage.getItem("conversation_id");
+        const isCreating = sessionStorage.getItem("creating_conversation");
+        
+        if (!sessionConvId && !isCreating) {
+          try {
+            // Set flag to prevent duplicate creation
+            sessionStorage.setItem("creating_conversation", "true");
+            
+            console.log("🔄 No session conversation found, creating new one...");
+            const newConversation = await createNewConversation(token);
+            
+            if (newConversation?.conversation_id || newConversation?.id) {
+              const conversationId = newConversation.conversation_id || newConversation.id;
+              const conversationName = newConversation.name || "New Chat";
+              
+              const conversationData = {
+                id: conversationId,
+                name: conversationName,
+                created_at: new Date().toISOString(),
+              };
+              
+              // Add to Redux
+              dispatch(addConversation(conversationData));
+              
+              // Set as active and store in session
+              dispatch(setActiveConversation(conversationId));
+              sessionStorage.setItem("conversation_id", conversationId);
+              sessionStorage.setItem("conversation_name", conversationName);
+              
+              console.log("✅ New conversation created and stored in session:", conversationId);
+            }
+          } catch (error) {
+            console.error("❌ Failed to create new conversation:", error);
+          } finally {
+            // Remove the flag after creation attempt
+            sessionStorage.removeItem("creating_conversation");
+          }
+        }
         
         // Simulate typing animation for each conversation
         conversations.forEach((conv, index) => {
@@ -158,7 +230,6 @@ useEffect(() => {
       .catch((err) => console.error("Error fetching conversations:", err));
   }
 }, [token, dispatch]);
-
 
 
 
@@ -198,8 +269,8 @@ useEffect(() => {
   // Replace the existing useEffect for localStorage
 // Replace the existing useEffect for localStorage
 useEffect(() => {
-  const storedConversationId = localStorage.getItem("conversation_id");
-  const storedConversationName = localStorage.getItem("conversation_name");
+  const storedConversationId = sessionStorage.getItem("conversation_id");
+  const storedConversationName = sessionStorage.getItem("conversation_name");
 
   if (storedConversationId && storedConversationName) {
     // Show typing animation for the stored conversation
@@ -221,7 +292,7 @@ useEffect(() => {
         (conv) => conv.id === activeConversation
       );
       if (updatedConversation) {
-        localStorage.setItem("conversation_name", updatedConversation.name);
+        sessionStorage.setItem("conversation_name", updatedConversation.name);
       }
     }
   }, [conversations, activeConversation, dispatch]);
@@ -254,20 +325,67 @@ useEffect(() => {
 
   // rename conversations
 
+//   const handleNewChat = async () => {
+//   try {
+//     const newChat = await createNewConversation(token); // API call to create conversation
+//     console.log("🔍 API Response:", newChat); // Debug log
+
+//     if (newChat?.conversation_id) {
+//       const conversationData = {
+//         id: newChat.conversation_id,
+//         name: newChat.name || "New Chat",
+//         created_at: new Date().toISOString(),
+//       };
+
+//       // Check if conversation already exists in Redux
+//       const existsInRedux = conversations.some(conv => conv.id === newChat.conversation_id);
+
+//       if (newChat.action === "created") {
+//         // Always add new conversations
+//         dispatch(addConversation(conversationData));
+//         console.log("✅ Added new conversation to Redux:", conversationData);
+//       } else if (newChat.action === "reused" && !existsInRedux) {
+//         // Add reused conversation only if it's not already in Redux
+//         dispatch(addConversation(conversationData));
+//         console.log("🔄 Added reused conversation to Redux:", conversationData);
+//       } else {
+//         console.log("🔄 Reusing existing conversation from Redux:", newChat.conversation_id);
+//       }
+
+//       // ✅ Always set as active (whether new or reused)
+//       dispatch(setActiveConversation(newChat.conversation_id));
+
+//       // ✅ Optional: save to localStorage
+//       sessionStorage.setItem("conversation_id", newChat.conversation_id);
+//     }
+//   } catch (error) {
+//     console.error("Error creating new chat:", error);
+//   }
+// };
   const handleNewChat = async () => {
+  const isCreating = sessionStorage.getItem("creating_conversation");
+  
+  if (isCreating) {
+    console.log("⚠️ Conversation creation already in progress, skipping...");
+    return;
+  }
+  
   try {
+    sessionStorage.setItem("creating_conversation", "true");
+    
     const newChat = await createNewConversation(token); // API call to create conversation
     console.log("🔍 API Response:", newChat); // Debug log
 
-    if (newChat?.conversation_id) {
+    if (newChat?.conversation_id || newChat?.id) {
+      const conversationId = newChat.conversation_id || newChat.id;
       const conversationData = {
-        id: newChat.conversation_id,
+        id: conversationId,
         name: newChat.name || "New Chat",
         created_at: new Date().toISOString(),
       };
 
       // Check if conversation already exists in Redux
-      const existsInRedux = conversations.some(conv => conv.id === newChat.conversation_id);
+      const existsInRedux = conversations.some(conv => conv.id === conversationId);
 
       if (newChat.action === "created") {
         // Always add new conversations
@@ -278,20 +396,23 @@ useEffect(() => {
         dispatch(addConversation(conversationData));
         console.log("🔄 Added reused conversation to Redux:", conversationData);
       } else {
-        console.log("🔄 Reusing existing conversation from Redux:", newChat.conversation_id);
+        console.log("🔄 Reusing existing conversation from Redux:", conversationId);
       }
 
       // ✅ Always set as active (whether new or reused)
-      dispatch(setActiveConversation(newChat.conversation_id));
+      dispatch(setActiveConversation(conversationId));
 
-      // ✅ Optional: save to localStorage
-      localStorage.setItem("conversation_id", newChat.conversation_id);
+      // ✅ Save to sessionStorage
+      sessionStorage.setItem("conversation_id", conversationId);
+      sessionStorage.setItem("conversation_name", newChat.name || "New Chat");
     }
   } catch (error) {
     console.error("Error creating new chat:", error);
+  } finally {
+    sessionStorage.removeItem("creating_conversation");
   }
 };
-  
+
 
   // const handleRename = async (id) => {
   //   if (
@@ -442,8 +563,8 @@ const handleDeleteConversation = async (id) => {
       navigate(`/chat/${newConversation.id}`);
       
       // Update localStorage
-      localStorage.setItem("conversation_id", newConversation.id);
-      localStorage.setItem("conversation_name", newConversation.name);
+      sessionStorage.setItem("conversation_id", newConversation.id);
+      sessionStorage.setItem("conversation_name", newConversation.name);
       
       toast.success("🗑️ Conversation cleared! Fresh workspace ready.");
       console.log(`✅ Auto-selected new conversation: ${newConversation.id}`);
@@ -475,14 +596,14 @@ const handleDeleteConversation = async (id) => {
     console.log("📌 Selected Conversation ID:", conv_id);
 
     dispatch(setActiveConversation(conv_id));
-    localStorage.setItem("conversation_id", conv_id);
+    sessionStorage.setItem("conversation_id", conv_id);
 
     const selectedConversation = conversations.find(
       (conv) => conv.id === conv_id
     );
 
     if (selectedConversation) {
-      localStorage.setItem("conversation_name", selectedConversation.name);
+      sessionStorage.setItem("conversation_name", selectedConversation.name);
     }
     // ✅ Close sidebar on mobile when conversation is selected
   if (window.innerWidth <= 768) {

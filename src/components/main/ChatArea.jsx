@@ -37,7 +37,7 @@ import {
   uploadFiles,
   fetchConversations,
   uploadFinalAudio,
- 
+ createNewConversation,
   sendGuestMessage,
 } from "../../api_Routes/api";
 // ✅ ADD THESE IMPORTS TO YOUR EXISTING IMPORTS
@@ -237,13 +237,79 @@ const ChatArea = ({ isGuest, sidebarOpen, setSidebarOpen  }) => {
   };
 
   // 1st useeffect
-  useEffect(() => {
-    const storedConversationId = localStorage.getItem("conversation_id");
+  // useEffect(() => {
+  //  const storedConversationId = sessionStorage.getItem("conversation_id");
 
-    if (storedConversationId) {
-      dispatch(setActiveConversation(parseInt(storedConversationId))); // Make sure it's a number
-    }
-  }, [dispatch]);
+
+  //   if (storedConversationId) {
+  //     dispatch(setActiveConversation(parseInt(storedConversationId))); // Make sure it's a number
+  //   }
+  // }, [dispatch]);
+
+useEffect(() => {
+  const storedConversationId = sessionStorage.getItem("conversation_id");
+  
+  if (storedConversationId) {
+    // Set existing session conversation as active
+    const conversationId = parseInt(storedConversationId);
+    dispatch(setActiveConversation(conversationId));
+    console.log("✅ Set existing session conversation as active:", conversationId);
+  }
+  // Note: Conversation creation is now handled only in Sidebar.jsx
+}, [dispatch]);
+
+
+// Clean up creation flag when component unmounts or user changes
+useEffect(() => {
+  return () => {
+    sessionStorage.removeItem("creating_conversation");
+  };
+}, []);
+
+// Listen for session cleared event from App.jsx
+// useEffect(() => {
+//   const handleSessionCleared = async () => {
+//     const token = localStorage.getItem("token");
+//     const sessionConvId = sessionStorage.getItem("conversation_id");
+    
+//     if (token && !sessionConvId && !isGuest) {
+//       try {
+//         console.log("🔄 Handling session cleared event, creating new conversation...");
+//         const newConversation = await createNewConversation(token);
+        
+//         if (newConversation?.id || newConversation?.conversation_id) {
+//           const conversationId = newConversation.id || newConversation.conversation_id;
+//           const conversationName = newConversation.name || "New Chat";
+          
+//           // Store in sessionStorage
+//           sessionStorage.setItem("conversation_id", conversationId);
+//           sessionStorage.setItem("conversation_name", conversationName);
+          
+//           // Set as active conversation in Redux
+//           dispatch(setActiveConversation(conversationId));
+          
+//           // Add to conversations list in Redux
+//           dispatch(addConversation({
+//             id: conversationId,
+//             name: conversationName,
+//             created_at: new Date().toISOString()
+//           }));
+          
+//           console.log("✅ New conversation created from session cleared event:", conversationId);
+//         }
+//       } catch (error) {
+//         console.error("❌ Failed to create conversation from session cleared event:", error);
+//       }
+//     }
+//   };
+
+//   window.addEventListener('session-cleared', handleSessionCleared);
+  
+//   return () => {
+//     window.removeEventListener('session-cleared', handleSessionCleared);
+//   };
+// }, [dispatch, isGuest]);
+
 
   // 2nd useeffect
   
@@ -348,7 +414,13 @@ setIsCreatingFile(false);
 
   useEffect(() => {
     if (activeConversation) {
-      localStorage.setItem("conversation_id", activeConversation);
+      sessionStorage.setItem("conversation_id", activeConversation);
+// Also store conversation name if available
+const currentConv = conversations.find(c => c.id === activeConversation);
+if (currentConv) {
+  sessionStorage.setItem("conversation_name", currentConv.name);
+}
+
     }
   }, [activeConversation]);
 
@@ -754,8 +826,8 @@ useEffect(() => {
     // ✅ Logged-in user flow
     const token = localStorage.getItem("token");
     const user_id = user?.user_id || localStorage.getItem("user_id");
-    const conv_id =
-      activeConversation || localStorage.getItem("conversation_id");
+   const conv_id = activeConversation || sessionStorage.getItem("conversation_id");
+
     if (!token) {
       console.error("🚨 Missing token.");
       return;
@@ -820,6 +892,21 @@ if (fileInputRef.current) {
       if (!activeConversation && finalConversationId) {
         dispatch(setActiveConversation(finalConversationId));
       }
+ // Store in sessionStorage
+  sessionStorage.setItem("conversation_id", finalConversationId);
+  sessionStorage.setItem("conversation_name", "New Chat");
+  
+  // Add to conversations list if not already there
+  const existingConv = conversations.find(c => c.id === finalConversationId);
+  if (!existingConv) {
+    dispatch(addConversation({
+      id: finalConversationId,
+      name: "New Chat",
+      created_at: new Date().toISOString()
+    }));
+  }
+  
+  console.log("✅ Set conversation as active from handleSendMessage:", finalConversationId);
 
       // ✅ 4. Extract metadata to send to chatbot
       const uploaded_file_metadata = uploadResponse?.data?.files || [];
@@ -1019,7 +1106,8 @@ case "file_error":
             const updatedData = await fetchConversations(token);
             if (updatedData?.conversations) {
               dispatch(setConversations(updatedData.conversations));
-              const currentId = localStorage.getItem("conversation_id");
+              const currentId = sessionStorage.getItem("conversation_id");
+
               if (currentId) {
                 dispatch(setActiveConversation(Number(currentId)));
               }
@@ -2645,7 +2733,7 @@ useEffect(() => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className={`absolute md:right-60  bottom-8  w-full   md:w-3/5 flex font-centurygothic flex-col items-center justify-center text-center text-gray-800 dark:text-white`}>
+                className={`absolute md:right-60 lg:right-72 bottom-8  w-full   md:w-3/5 flex font-centurygothic flex-col items-center justify-center text-center text-gray-800 dark:text-white`}>
                 {/* <img
                   src="./logo.png"
                   className="w-12 h-12 block dark:hidden"

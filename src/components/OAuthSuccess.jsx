@@ -254,7 +254,7 @@ const user = { user_id: userId, username, email, user_img: userImg, firstname };
   // Optionally store the token in localStorage (encrypted if needed)
   localStorage.setItem("token", token);
    localStorage.setItem("user", JSON.stringify(user)); // Store the full user object
-  localStorage.setItem("conversation_id", conversationId);
+  sessionStorage.setItem("conversation_id", conversationId);
 
   // console.log("✅ User details (from Google) stored:", { token, userId, username, email, conversationId });
 

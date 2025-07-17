@@ -98,7 +98,7 @@ const data = await verifyOtp({ email, username, otp, password });
           conversationId: data.conversation_id,
         })
       );
-      localStorage.setItem("token", data.token);
+      sessionStorage.setItem("token", data.token);
       toast.success("✅ Account created successfully!");
       navigate("/");
     } catch (error) {

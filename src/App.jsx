@@ -29,7 +29,7 @@ const AppRoutes = () => {
 useEffect(() => {
   const token = localStorage.getItem("token");
   const user = localStorage.getItem("user");
-  const convId = localStorage.getItem("conversation_id");
+  const convId = sessionStorage.getItem("conversation_id");
 
   if ([token, user, convId].some(item => item === "undefined" || item === "[object Object]")) {
     console.warn("🚨 Corrupted localStorage detected. Auto-resetting...");
@@ -52,7 +52,7 @@ useEffect(() => {
   }
 
   const token = localStorage.getItem("token");
-  const conversationId = localStorage.getItem("conversation_id");
+  const conversationId = sessionStorage.getItem("conversation_id");
 
   // console.log("Stored User from localStorage:", storedUser); // Debug line
 
@@ -72,7 +72,7 @@ useEffect(() => {
           const data = await response.json();
           dispatch(setUser({ user: data.user, token, conversationId: data.conversation_id }));
           localStorage.setItem("user", JSON.stringify(data.user));
-          localStorage.setItem("conversation_id", data.conversation_id);
+          sessionStorage.setItem("conversation_id", data.conversation_id);
         } else {
           navigate("/login");
         }
